@@ -47,7 +47,7 @@
     const DS = {
       hourlyWage:1400,annualLimit:1030000,commuteOneWay:178,
       trBefore:1040,trAfter:1100,food4wk:20000,food5wk:25000,
-      gbpToJpy:215,workDays:[0,1,2],
+      gbpToJpy:215,savingsGoal:0,workDays:[0,1,2],
       shifts:{
         1:{start:"09:00",end:"16:00",breakMin:60,label:"Mon"},
         2:{start:"09:00",end:"12:00",breakMin:0,label:"Tue"},
@@ -477,38 +477,229 @@
 
             {tab==="limit"&&(
               <div>
+
+                {/* ── Overview card ── */}
                 <div style={{...crd,padding:22}}>
-                  <div style={{fontSize:12,color:c.sub,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>Used so far in 2026</div>
-                  <div style={{fontSize:32,fontWeight:800,color:c.text}}>{yn(eT)}</div>
-                  <div style={{fontSize:13,color:c.sub,marginTop:4}}>out of your {yn(se.annualLimit)} annual limit</div>
-                  <div style={{background:c.cardAlt,borderRadius:8,height:10,margin:"14px 0",overflow:"hidden"}}><div style={{height:"100%",borderRadius:8,width:`${Math.min(100,(eT/se.annualLimit)*100)}%`,background:rL<100000?`linear-gradient(90deg,${c.peach},${c.roseD})`:`linear-gradient(90deg,${c.green},${c.blueD})`,transition:"width 0.4s"}}/></div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}><span style={{color:c.sub}}>Remaining</span><span style={{fontWeight:700,fontSize:16,color:rL<100000?c.roseD:c.greenD}}>{yn(rL)}</span></div>
+                  <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Annual limit used</div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:12}}>
+                    <div style={{fontSize:34,fontWeight:800,letterSpacing:-1}}>{yn(eT)}</div>
+                    <div style={{fontSize:13,color:c.sub}}>of {yn(se.annualLimit)}</div>
+                  </div>
+                  <div style={{background:c.cardAlt,borderRadius:8,height:12,marginBottom:14,overflow:"hidden"}}>
+                    <div style={{height:"100%",borderRadius:8,width:`${Math.min(100,(eT/se.annualLimit)*100)}%`,background:rL<100000?`linear-gradient(90deg,${c.peach},${c.roseD})`:`linear-gradient(90deg,${c.green},${c.blueD})`,transition:"width 0.4s"}}/>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <div style={{background:c.cardAlt,borderRadius:14,padding:"12px 14px"}}>
+                      <div style={{fontSize:11,color:c.sub,marginBottom:4}}>Remaining</div>
+                      <div style={{fontSize:20,fontWeight:800,color:rL<100000?c.roseD:c.greenD}}>{yn(rL)}</div>
+                    </div>
+                    <div style={{background:c.cardAlt,borderRadius:14,padding:"12px 14px"}}>
+                      <div style={{fontSize:11,color:c.sub,marginBottom:4}}>Safe/month ({nFM} left)</div>
+                      <div style={{fontSize:20,fontWeight:800,color:rL<100000?c.roseD:c.greenD}}>{yn(eS)}</div>
+                    </div>
+                  </div>
                 </div>
-                {(()=>{const maxW=Math.max(...MONTHS.map(mo=>gTx(da[mo.key])),1);return(<div style={crd}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>What you earned each month</span></div><div style={{fontSize:13}}>{MONTHS.map(mo=>{const w=gTx(da[mo.key]);const isFut=mo.key>(MONTHS[cMN-1]?.key||"");return(<div key={mo.key} style={{...rw,opacity:isFut?0.4:1}}><span style={{color:c.sub,width:36}}>{mo.short}</span><div style={{flex:1,margin:"0 10px",height:8,borderRadius:4,background:c.cardAlt,overflow:"hidden"}}>{w>0&&<div style={{height:"100%",borderRadius:4,width:`${(w/maxW)*100}%`,background:c.blueD,transition:"width 0.3s"}}/>}</div><span style={{fontWeight:500,width:80,textAlign:"right",color:w>0?c.text:c.muted}}>{w>0?yn(w):"—"}</span></div>);})}<div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10,fontWeight:700}}><span>Total earned</span><span>{yn(eT)}</span></div></div></div>);})()}
-                <div style={{...crd,background:rL<100000?c.roseBg:c.greenBg,border:`2px solid ${rL<100000?c.roseD:c.greenD}`}}>
-                  <div style={{fontSize:12,color:c.sub,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>You have {nFM} months left in the year</div>
-                  <div style={{fontSize:13,color:c.text}}>To stay under your limit, you can earn up to:</div>
-                  <div style={{fontSize:30,fontWeight:800,color:rL<100000?c.roseD:c.greenD,margin:"8px 0"}}>{yn(eS)}<span style={{fontSize:14,fontWeight:500}}> / month</span></div>
-                  <div style={{fontSize:13,color:c.sub}}>That's about <strong>{mHP.toFixed(0)} hours</strong> of work per month at ¥{se.hourlyWage}/hr</div>
+
+                {/* ── Status banner ── */}
+                <div style={{...crd,background:rL<0?c.roseD:rL<150000?c.peachD:c.greenD,padding:18,display:"flex",alignItems:"center",gap:14,marginBottom:14}}>
+                  <div style={{fontSize:30,lineHeight:1}}>{rL<0?"⚠️":rL<150000?"⚡":"✓"}</div>
+                  <div>
+                    <div style={{fontSize:15,fontWeight:700,color:c.white}}>{rL<0?"Over your limit!":rL<150000?"Getting close — be careful":"You're on track"}</div>
+                    <div style={{fontSize:12,color:"rgba(255,255,255,0.8)",marginTop:2}}>
+                      {rL<0?`Exceeded by ${yn(Math.abs(rL))}`:rL<150000?`Only ${yn(rL)} left across ${nFM} months`:`≈ ${mHP.toFixed(0)} hours/month at ¥${se.hourlyWage}/hr`}
+                    </div>
+                  </div>
                 </div>
-                {nMK&&(()=>{const mondays=cDIMAvail(nMK,1),tuesdays=cDIMAvail(nMK,2),sundays=cDIMAvail(nMK,0);const fullH=mondays*monH+tuesdays*tueH+sundays*sunH;const fullWage=Math.round(fullH*se.hourlyWage);const overIfFull=fullWage>eS;let budget=eS,rMon=0,rTue=0,rSun=0;for(let i=0;i<sundays;i++){if(budget>=sunH*se.hourlyWage){rSun++;budget-=sunH*se.hourlyWage;}else break;}for(let i=0;i<mondays;i++){if(budget>=monH*se.hourlyWage){rMon++;budget-=monH*se.hourlyWage;}else break;}for(let i=0;i<tuesdays;i++){if(budget>=tueH*se.hourlyWage){rTue++;budget-=tueH*se.hourlyWage;}else break;}const rH=rMon*monH+rTue*tueH+rSun*sunH;const rWage=Math.round(rH*se.hourlyWage);return(<div style={{...crd,border:`2px solid ${c.blueD}`}}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>Max you can work in {nML}</span></div><div style={{fontSize:12,color:c.sub,marginBottom:14}}>To stay under your ¥{se.annualLimit.toLocaleString()} limit{(nMK==="2026-05"||nMK==="2026-06")?" · holiday excluded":""}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>{[{day:"Mon",count:mondays,h:monH,rec:rMon},{day:"Tue",count:tuesdays,h:tueH,rec:rTue},{day:"Sun",count:sundays,h:sunH,rec:rSun}].map(({day,count,h,rec})=>(<div key={day} style={{background:c.cardAlt,borderRadius:12,padding:"12px 10px",textAlign:"center"}}><div style={{fontSize:13,fontWeight:700,color:c.text,marginBottom:2}}>{day}</div><div style={{fontSize:22,fontWeight:800,color:c.blueD}}>{count}</div><div style={{fontSize:10,color:c.sub}}>{h}h/shift</div><div style={{marginTop:6,fontSize:11,fontWeight:600,color:rec===count?c.greenD:c.peachD}}>rec: {rec}</div></div>))}</div><div style={{padding:14,borderRadius:14,background:overIfFull?c.peachBg:c.greenBg,marginBottom:10}}><div style={{fontSize:12,color:c.sub,marginBottom:6}}>{overIfFull?"Working all shifts would exceed your limit. Recommended:":"You can work all shifts and stay within your limit."}</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><span style={{fontSize:13,fontWeight:600,color:overIfFull?c.peachD:c.greenD}}>{rMon} Mon · {rTue} Tue · {rSun} Sun</span><span style={{fontWeight:700,fontSize:15,color:overIfFull?c.peachD:c.greenD}}>{rH.toFixed(1)}h</span></div><div style={{fontSize:13,fontWeight:700,color:overIfFull?c.peachD:c.greenD}}>{yn(rWage)} earned — {yn(eS-rWage)} under limit</div></div>{overIfFull&&(<div style={{padding:14,borderRadius:14,background:c.roseBg,border:`1px solid ${c.roseD}`}}><div style={{fontSize:12,color:c.roseD,fontWeight:600,marginBottom:4}}>If you worked every shift:</div><div style={{fontSize:13,color:c.roseD}}>{fullH.toFixed(1)}h = {yn(fullWage)} — over by {yn(fullWage-eS)}</div></div>)}</div>);})()}
-                <div style={{...crd,border:`2px solid ${c.blueD}`}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>Plan next month</span></div>
-                  <div style={{fontSize:12,color:c.sub,marginBottom:14}}>{nMK&&(()=>{const mo=cDIMAvail(nMK,1),tu=cDIMAvail(nMK,2),su=cDIMAvail(nMK,0);return`${nML}: ${mo} Monday${mo!==1?"s":""}, ${tu} Tuesday${tu!==1?"s":""}, ${su} Sunday${su!==1?"s":""} — ${nMW} days total`;})()}</div>
-                  {nMK&&(()=>{const mondays=cDIMAvail(nMK,1),tuesdays=cDIMAvail(nMK,2),sundays=cDIMAvail(nMK,0);return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>{[{label:"How many Mondays?",max:mondays,key:"pMon",h:monH},{label:"How many Tuesdays?",max:tuesdays,key:"pTue",h:tueH},{label:"How many Sundays?",max:sundays,key:"pSun",h:sunH}].map(({label,max,key,h})=>(<div key={key}><label style={lbl}>{label}</label><NI value={pH[key]||0} onChange={v=>setPH(p=>({...p,[key]:Math.min(v,max)}))} placeholder={`max ${max}`}/><div style={{fontSize:10,color:c.sub,marginTop:3}}>{h}h each</div></div>))}</div>);})()}
-                  {pHasInput&&(<div style={{fontSize:13}}><div style={{padding:14,background:c.cardAlt,borderRadius:14}}><div style={rw}><span style={{color:c.sub}}>Days planned</span><span style={{fontWeight:600}}>{pTotalDays} days ({pTotalH.toFixed(1)}h)</span></div><div style={rw}><span style={{color:c.sub}}>You'd earn</span><span style={{fontWeight:700,fontSize:16}}>{yn(pW)}</span></div><div style={rw}><span style={{color:c.sub}}>New annual total</span><span style={{fontWeight:600}}>{yn(pNT)}</span></div><div style={rw}><span style={{color:c.sub}}>Limit left after</span><span style={{fontWeight:700,color:pR<0?c.roseD:pR<100000?c.peachD:c.greenD}}>{yn(pR)}</span></div>{nFM>1&&!pOL&&<div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{color:c.sub}}>Max per remaining month after</span><span style={{fontWeight:600}}>{yn(pFA)} ({pFH.toFixed(0)}h)</span></div>}</div><div style={{marginTop:10,padding:14,borderRadius:14,background:pOL?c.roseD:pR<100000?c.peachD:c.greenD,color:c.white,fontSize:13,fontWeight:700}}>{pOL?`Over your limit by ${yn(Math.abs(pR))}. Work fewer hours.`:pR<100000?`Cutting it close — only ${yn(pR)} left after.`:`You're safe. ${yn(pR)} left for the rest of the year.`}</div></div>)}
-                </div>
+
+                {/* ── Monthly breakdown bar chart ── */}
+                {(()=>{const maxW=Math.max(...MONTHS.map(mo=>gTx(da[mo.key])),1);return(
+                  <div style={crd}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                      <div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/>
+                      <span style={{fontSize:15,fontWeight:700}}>Monthly Earnings</span>
+                    </div>
+                    {MONTHS.map(mo=>{
+                      const w=gTx(da[mo.key]);
+                      const isFut=mo.key>(MONTHS[cMN-1]?.key||"");
+                      return(
+                        <div key={mo.key} style={{marginBottom:10,opacity:isFut?0.35:1}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                            <span style={{fontSize:12,color:c.sub,width:36,flexShrink:0}}>{mo.short}</span>
+                            <div style={{flex:1,margin:"0 10px",height:8,borderRadius:4,background:c.cardAlt,overflow:"hidden"}}>
+                              {w>0&&<div style={{height:"100%",borderRadius:4,width:`${(w/maxW)*100}%`,background:c.blueD,transition:"width 0.3s"}}/>}
+                            </div>
+                            <span style={{fontSize:13,fontWeight:w>0?600:400,color:w>0?c.text:c.muted,width:80,textAlign:"right",flexShrink:0}}>{w>0?yn(w):"—"}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10,fontWeight:700,fontSize:14}}>
+                      <span>Total earned</span><span style={{color:c.blueD}}>{yn(eT)}</span>
+                    </div>
+                  </div>
+                );})()}
+
+                {/* ── Next month planner (combined) ── */}
+                {nMK&&(()=>{
+                  const mondays=cDIMAvail(nMK,1),tuesdays=cDIMAvail(nMK,2),sundays=cDIMAvail(nMK,0);
+                  const fullH=mondays*monH+tuesdays*tueH+sundays*sunH;
+                  const fullWage=Math.round(fullH*se.hourlyWage);
+                  const overIfFull=fullWage>eS;
+                  let budget=eS,rMon=0,rTue=0,rSun=0;
+                  for(let i=0;i<sundays;i++){if(budget>=sunH*se.hourlyWage){rSun++;budget-=sunH*se.hourlyWage;}else break;}
+                  for(let i=0;i<mondays;i++){if(budget>=monH*se.hourlyWage){rMon++;budget-=monH*se.hourlyWage;}else break;}
+                  for(let i=0;i<tuesdays;i++){if(budget>=tueH*se.hourlyWage){rTue++;budget-=tueH*se.hourlyWage;}else break;}
+                  const rH=rMon*monH+rTue*tueH+rSun*sunH;
+                  const rWage=Math.round(rH*se.hourlyWage);
+                  return(
+                    <div style={{...crd,border:`2px solid ${c.blueD}`}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+                        <div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/>
+                        <span style={{fontSize:15,fontWeight:700}}>{nML} Planner</span>
+                      </div>
+                      <div style={{fontSize:12,color:c.sub,marginBottom:18}}>
+                        {mondays} Mondays · {tuesdays} Tuesdays · {sundays} Sundays available{(nMK==="2026-05"||nMK==="2026-06")?" (holiday excluded)":""}
+                      </div>
+
+                      {/* Recommended row */}
+                      <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>Recommended shifts to stay safe</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+                        {[{day:"Mon",avail:mondays,rec:rMon,h:monH},{day:"Tue",avail:tuesdays,rec:rTue,h:tueH},{day:"Sun",avail:sundays,rec:rSun,h:sunH}].map(({day,avail,rec,h})=>(
+                          <div key={day} style={{background:c.cardAlt,borderRadius:12,padding:"12px 8px",textAlign:"center"}}>
+                            <div style={{fontSize:12,color:c.sub,marginBottom:4}}>{day}</div>
+                            <div style={{fontSize:22,fontWeight:800,color:rec===avail?c.greenD:c.peachD}}>
+                              {rec}<span style={{fontSize:11,color:c.sub,fontWeight:400}}>/{avail}</span>
+                            </div>
+                            <div style={{fontSize:10,color:c.sub,marginTop:2}}>{h}h each</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{padding:12,borderRadius:12,background:overIfFull?c.peachBg:c.greenBg,border:`1px solid ${overIfFull?c.peachD:c.greenD}`,marginBottom:18,fontSize:13,fontWeight:600,color:overIfFull?c.peachD:c.greenD}}>
+                        {rH.toFixed(1)}h = {yn(rWage)} earned — {yn(eS-rWage)} under limit
+                        {overIfFull&&<div style={{fontSize:12,fontWeight:400,marginTop:4,color:c.roseD}}>Working all {fullH.toFixed(1)}h would exceed by {yn(fullWage-eS)}</div>}
+                      </div>
+
+                      {/* Plan your own */}
+                      <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>Plan your own</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
+                        {[{label:"Mon",max:mondays,key:"pMon",h:monH},{label:"Tue",max:tuesdays,key:"pTue",h:tueH},{label:"Sun",max:sundays,key:"pSun",h:sunH}].map(({label,max,key,h})=>(
+                          <div key={key} style={{background:c.cardAlt,borderRadius:12,padding:12}}>
+                            <div style={{fontSize:11,color:c.sub,marginBottom:6,textAlign:"center"}}>{label} <span style={{opacity:0.6}}>(max {max})</span></div>
+                            <NI value={pH[key]||0} onChange={v=>setPH(p=>({...p,[key]:Math.min(v,max)}))} placeholder="0"/>
+                            <div style={{fontSize:10,color:c.sub,marginTop:4,textAlign:"center"}}>{h}h/shift</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {pHasInput&&(
+                        <div>
+                          <div style={{padding:14,background:c.cardAlt,borderRadius:14,fontSize:13,marginBottom:10}}>
+                            <div style={rw}><span style={{color:c.sub}}>Shifts planned</span><span style={{fontWeight:600}}>{pTotalDays} days · {pTotalH.toFixed(1)}h</span></div>
+                            <div style={rw}><span style={{color:c.sub}}>You'd earn</span><span style={{fontWeight:700,fontSize:16,color:c.text}}>{yn(pW)}</span></div>
+                            <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{color:c.sub}}>Annual total after</span><span style={{fontWeight:600}}>{yn(pNT)}</span></div>
+                            <div style={rw}><span style={{color:c.sub}}>Limit remaining</span><span style={{fontWeight:700,color:pOL?c.roseD:pR<100000?c.peachD:c.greenD}}>{yn(pR)}</span></div>
+                            {nFM>1&&!pOL&&<div style={rw}><span style={{color:c.sub}}>Safe/month after this</span><span style={{fontWeight:600}}>{yn(pFA)} ({pFH.toFixed(0)}h)</span></div>}
+                          </div>
+                          <div style={{padding:14,borderRadius:14,background:pOL?c.roseD:pR<100000?c.peachD:c.greenD,color:c.white,fontSize:14,fontWeight:700,textAlign:"center"}}>
+                            {pOL?`Over by ${yn(Math.abs(pR))} — work fewer shifts`:pR<100000?`Almost at the limit — only ${yn(pR)} left`:`✓ Safe — ${yn(pR)} still available`}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
               </div>
             )}
 
             {tab==="savings"&&(
               <div>
+
+                {/* ── Hero ── */}
                 <div style={{...crd,background:c.blueD,padding:22}}>
-                  <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:4}}>Total Saved</div>
-                  <div style={{fontSize:36,fontWeight:800,color:c.white,letterSpacing:-1}}>{yn(tS)}</div>
-                  <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",marginTop:4}}>avg {yn(sA)}/mo</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:4}}>Total Saved in 2026</div>
+                  <div style={{fontSize:38,fontWeight:800,color:c.white,letterSpacing:-1,marginBottom:8}}>{yn(tS)}</div>
+                  {se.savingsGoal>0&&(
+                    <div style={{marginBottom:8}}>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"rgba(255,255,255,0.7)",marginBottom:6}}>
+                        <span>Goal: {yn(se.savingsGoal)}</span>
+                        <span>{Math.min(100,Math.round((tS/se.savingsGoal)*100))}%</span>
+                      </div>
+                      <div style={{background:"rgba(255,255,255,0.2)",borderRadius:6,height:8,overflow:"hidden",marginBottom:6}}>
+                        <div style={{height:"100%",borderRadius:6,width:`${Math.min(100,(tS/se.savingsGoal)*100)}%`,background:"rgba(255,255,255,0.9)",transition:"width 0.4s"}}/>
+                      </div>
+                      <div style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>
+                        {tS>=se.savingsGoal?"🎉 Goal reached!":yn(se.savingsGoal-tS)+" to go"}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",marginTop:4}}>avg {yn(sA)}/month</div>
                 </div>
-                {MONTHS.map(mo=>(<div key={mo.key} style={{...crd,display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:12,color:c.sub,width:28}}>{mo.short}</span><div style={{flex:1}}><NI prefix="¥" value={da[mo.key].savings||0} onChange={v=>sM(mo.key,"savings",v)}/></div></div>))}
+
+                {/* ── Stats ── */}
+                {tS>0&&(
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                    <div style={{...crd,margin:0,textAlign:"center",padding:16}}>
+                      <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Avg / Month</div>
+                      <div style={{fontSize:22,fontWeight:800,color:c.blueD}}>{yn(sA)}</div>
+                    </div>
+                    <div style={{...crd,margin:0,textAlign:"center",padding:16}}>
+                      <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Projected Year</div>
+                      <div style={{fontSize:22,fontWeight:800,color:c.blueD}}>{yn(sA*12)}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Monthly entries ── */}
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                    <div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/>
+                    <span style={{fontSize:15,fontWeight:700}}>Monthly Savings</span>
+                  </div>
+                  {(()=>{
+                    const maxS=Math.max(...MONTHS.map(mo=>da[mo.key].savings||0),1);
+                    return MONTHS.map(mo=>{
+                      const s=da[mo.key].savings||0;
+                      const isFut=mo.key>(MONTHS[cMN-1]?.key||"");
+                      return(
+                        <div key={mo.key} style={{marginBottom:16,opacity:isFut?0.5:1}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                            <span style={{fontSize:13,fontWeight:600,color:s>0?c.text:c.muted}}>{mo.label}</span>
+                            {s>0&&<span style={{fontSize:13,fontWeight:700,color:c.blueD}}>{yn(s)}</span>}
+                          </div>
+                          <NI prefix="¥" value={s} onChange={v=>sM(mo.key,"savings",v)} placeholder={isFut?"Future…":"Enter amount…"}/>
+                          {s>0&&<div style={{height:4,borderRadius:4,background:c.cardAlt,overflow:"hidden",marginTop:6}}><div style={{height:"100%",borderRadius:4,width:`${(s/maxS)*100}%`,background:c.blueD,transition:"width 0.3s"}}/></div>}
+                        </div>
+                      );
+                    });
+                  })()}
+                  <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12,fontWeight:700,fontSize:14}}>
+                    <span>Total saved</span><span style={{color:c.blueD,fontSize:18}}>{yn(tS)}</span>
+                  </div>
+                </div>
+
+                {/* ── Goal setting ── */}
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+                    <div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/>
+                    <span style={{fontSize:15,fontWeight:700}}>Savings Goal</span>
+                  </div>
+                  <label style={lbl}>Target amount</label>
+                  <NI prefix="¥" value={se.savingsGoal||0} onChange={v=>setSe(p=>({...p,savingsGoal:v}))} placeholder="e.g. 500000"/>
+                  {se.savingsGoal>0&&(
+                    <div style={{marginTop:12,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
+                      {tS>=se.savingsGoal?(
+                        <div style={{color:c.greenD,fontWeight:700,fontSize:14,textAlign:"center"}}>🎉 Goal reached!</div>
+                      ):(
+                        <div>
+                          <div style={rw}><span style={{color:c.sub}}>Still needed</span><span style={{fontWeight:700,color:c.blueD}}>{yn(se.savingsGoal-tS)}</span></div>
+                          {sA>0&&<div style={rw}><span style={{color:c.sub}}>At current rate</span><span style={{fontWeight:600}}>{Math.ceil((se.savingsGoal-tS)/sA)} more months</span></div>}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
               </div>
             )}
 
