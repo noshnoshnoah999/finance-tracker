@@ -174,20 +174,38 @@
       useEffect(()=>{
         if(!ld||!se.notifs) return;
         if(!('Notification' in window)||Notification.permission!=='granted') return;
-        const today=new Date().toDateString();
-        const nk='finance-notif-'+today;
-        if(localStorage.getItem(nk)) return;
-        localStorage.setItem(nk,'1');
         const now=new Date();
-        const y=now.getFullYear(),mo=now.getMonth()+1,d=now.getDate();
+        const y=now.getFullYear(),mo=now.getMonth()+1,d=now.getDate(),dow=now.getDay();
         const mk=`${y}-${String(mo).padStart(2,'0')}`;
+        const todayStr=`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const pd=gPD(mk);
-        if(d===pd) new Notification('💰 Pay Day!',{body:'Today is your payday — log your hours!',icon:'/icon-512.png'});
-        else if(d===pd-1) new Notification('💰 Pay Day Tomorrow',{body:`Payday is tomorrow (${pd}th). Get ready!`,icon:'/icon-512.png'});
         const tot=MONTHS.reduce((s,m2)=>{const dv=da[m2.key];const w=dv.hours>0?Math.round(dv.hours*se.hourlyWage):(dv.wageOverride||0);return s+w;},0);
         const pct=Math.round((tot/se.annualLimit)*100);
-        if(pct>=90) new Notification('⚠️ Limit Almost Full',{body:`${pct}% used — only ¥${(se.annualLimit-tot).toLocaleString()} left!`,icon:'/icon-512.png'});
-        else if(pct>=80) new Notification('⚡ Nearing Annual Limit',{body:`${pct}% of your ¥${se.annualLimit.toLocaleString()} limit used`,icon:'/icon-512.png'});
+        const rem2=se.annualLimit-tot;
+        const curMo=MONTHS.find(m=>m.key===mk);
+        // daily de-dup per notification type
+        const fire=(key,title,body)=>{const k='fn-'+key+'-'+todayStr;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/icon-512.png'}),200);};
+        // once-ever de-dup for milestones
+        const fireOnce=(key,title,body)=>{const k='fn1-'+key;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/icon-512.png'}),200);};
+        // ── Existing ──
+        if(d===pd) fire('payday','💰 Pay Day!','Today is your payday — log your hours!');
+        else if(d===pd-1) fire('payday-eve','💰 Pay Day Tomorrow',`Payday is tomorrow (${pd}th). Get ready!`);
+        if(pct>=90) fire('limit90','⚠️ Limit Almost Full',`${pct}% used — only ¥${rem2.toLocaleString()} left!`);
+        else if(pct>=80) fire('limit80','⚡ Nearing Annual Limit',`${pct}% of your ¥${se.annualLimit.toLocaleString()} limit used`);
+        // ── Money ──
+        if(d===pd-3) fire('suica','🚇 Top up your SUICA',`Payday is in 3 days (${pd}th) — load up your SUICA for the new pay period`);
+        if(d===pd&&(se.mumItems||[]).length>0) fire('mum','👩 Send to Mum?',`Don't forget to send Mum her money today!`);
+        // ── Schedule ──
+        const upcomingPL=PAID_LEAVE.find(ds=>{const diff=(new Date(ds)-now)/(86400000);return diff>=0&&diff<=5;});
+        if(upcomingPL) fire('pl-'+upcomingPL,'🏖️ Paid Leave Coming Up',`You have paid leave on ${upcomingPL} — enjoy the time off!`);
+        if(dow===0){const currDv=da[mk]||{};const hasLogged=currDv.hours>0||currDv.wageOverride>0;if(!hasLogged) fire('unlogged','🔁 Hours not logged yet',`You may have worked this week — don't forget to log your hours for ${curMo?.label||'this month'}!`);}
+        // ── Milestones ──
+        if(tot>=se.annualLimit/2) fireOnce('halfway','🏆 Halfway There!',`You've earned ¥${tot.toLocaleString()} — halfway through your ¥${se.annualLimit.toLocaleString()} annual limit`);
+        const currDa2=da[mk]||{};const pF2=currDa2.paidFixed||{};
+        const allBillsPaid=(se.fixed||[]).length>0&&(se.fixed||[]).every(f=>pF2[f.id])&&pF2['suica']&&pF2['food'];
+        if(allBillsPaid) fire('allpaid','✅ All Bills Paid!',`Every fixed expense is marked as paid for ${curMo?.label||'this month'} — nice work!`);
+        const dayEarnings=se.hourlyWage*6;
+        if(rem2>0&&rem2<dayEarnings*2) fire('lastday','📆 Almost at the Limit',`Only ¥${rem2.toLocaleString()} left — your next shift could exceed your annual limit!`);
       },[ld,se.notifs]);
 
       const sM=(k,f,v)=>setDa(p=>({...p,[k]:{...p[k],[f]:v}}));
@@ -764,9 +782,11 @@
                         const r=await fetch("https://api.frankfurter.app/latest?from=GBP&to=JPY");
                         const j=await r.json();
                         const rate=Math.round(j.rates.JPY);
+                        const oldRate=se.gbpToJpy;
                         setSe(p=>({...p,gbpToJpy:rate}));
                         setFxLoad("done");
                         setTimeout(()=>setFxLoad("idle"),3000);
+                        if(se.notifs&&Notification.permission==='granted'&&rate>oldRate) new Notification('💷 Rate improved!',{body:`£1 = ¥${rate} today (up from ¥${oldRate}) — good time for Dad to send money!`,icon:'/icon-512.png'});
                       }catch(e){
                         setFxLoad("error");
                         setTimeout(()=>setFxLoad("idle"),3000);
@@ -805,11 +825,19 @@
                       {se.notifs&&Notification.permission!=='granted'&&(
                         <div style={{fontSize:12,color:c.roseD,marginBottom:12}}>Notifications blocked — check your browser or device settings</div>
                       )}
-                      <div style={{padding:12,background:c.cardAlt,borderRadius:12,fontSize:12,color:c.sub,lineHeight:1.7}}>
+                      <div style={{padding:12,background:c.cardAlt,borderRadius:12,fontSize:12,color:c.sub,lineHeight:1.8}}>
                         <div style={{fontWeight:600,color:c.text,marginBottom:4}}>You'll be notified when:</div>
-                        <div>• It's your payday or the day before</div>
-                        <div>• You've hit 80% of your annual limit</div>
-                        <div>• You've hit 90% of your annual limit</div>
+                        <div>💰 It's your payday or the day before</div>
+                        <div>🚇 3 days before payday — top up SUICA</div>
+                        <div>👩 Payday — reminder to send Mum her money</div>
+                        <div>💷 GBP rate improves when you fetch it</div>
+                        <div>🏖️ Paid leave is coming up (within 5 days)</div>
+                        <div>🔁 Sunday — if hours aren't logged yet</div>
+                        <div>⚡ You've hit 80% of your annual limit</div>
+                        <div>⚠️ You've hit 90% of your annual limit</div>
+                        <div>📆 Your next shift could exceed the limit</div>
+                        <div>🏆 You hit the halfway point (¥515,000)</div>
+                        <div>✅ All fixed expenses paid for the month</div>
                       </div>
                     </div>
                   ):(
