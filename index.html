@@ -121,6 +121,7 @@
       const [sv,setSv]=useState(false);
       const [confirmReset,setConfirmReset]=useState(false);
       const [sync,setSync]=useState("idle");
+      const [fxLoad,setFxLoad]=useState("idle");
       const timer=useRef(null);
 
       _t.c=th==="ember"?EMBER:th==="pumpkin"?PUMP:SAGE;
@@ -754,7 +755,27 @@
                 </div>
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/><span style={{fontSize:15,fontWeight:700}}>Exchange Rate</span></div>
-                  <div><label style={lbl}>GBP to JPY</label><NI prefix="¥" value={se.gbpToJpy} onChange={v=>setSe(p=>({...p,gbpToJpy:v}))}/></div>
+                  <label style={lbl}>GBP to JPY</label>
+                  <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                    <div style={{flex:1}}><NI prefix="¥" value={se.gbpToJpy} onChange={v=>setSe(p=>({...p,gbpToJpy:v}))}/></div>
+                    <button onClick={async()=>{
+                      setFxLoad("loading");
+                      try{
+                        const r=await fetch("https://api.frankfurter.app/latest?from=GBP&to=JPY");
+                        const j=await r.json();
+                        const rate=Math.round(j.rates.JPY);
+                        setSe(p=>({...p,gbpToJpy:rate}));
+                        setFxLoad("done");
+                        setTimeout(()=>setFxLoad("idle"),3000);
+                      }catch(e){
+                        setFxLoad("error");
+                        setTimeout(()=>setFxLoad("idle"),3000);
+                      }
+                    }} style={{padding:"10px 16px",borderRadius:12,border:"none",cursor:"pointer",background:fxLoad==="done"?c.greenD:fxLoad==="error"?c.roseD:c.blueD,color:c.white,fontWeight:700,fontSize:13,fontFamily:ft,whiteSpace:"nowrap",opacity:fxLoad==="loading"?0.6:1}}>
+                      {fxLoad==="loading"?"…":fxLoad==="done"?"✓":fxLoad==="error"?"✗":"Live rate"}
+                    </button>
+                  </div>
+                  <div style={{fontSize:12,color:c.sub,marginTop:8}}>£1 = ¥{se.gbpToJpy} · tap "Live rate" to fetch today's rate</div>
                 </div>
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
