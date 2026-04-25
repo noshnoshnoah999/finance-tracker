@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Finance" />
+  <meta name="theme-color" content="#f0f5ee" />
+  <title>Finance Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    body { margin: 0; background: #f0f5ee; }
+    input, button { touch-action: manipulation; font-family: inherit; }
+    @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 1000px; opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const SUPABASE_URL = 'https://ipjwpkqcuztahumijici.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwandwa3FjdXp0YWh1bWlqaWNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMTg0NjAsImV4cCI6MjA5MjU5NDQ2MH0.aCrIwHvNLkCtA_RXPdzIybRp2EMCrBeIVS5ABCtjl48';
+    const USER_KEY = 'f7e2a914-3b8c-4d5e-9a1f-6c2d7b0e8f3a';
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SK = 'finance-app-v24';
+
+    const MONTHS = [
+      {key:"2026-01",label:"January",short:"Jan",is5wk:false},
+      {key:"2026-02",label:"February",short:"Feb",is5wk:false},
+      {key:"2026-03",label:"March",short:"Mar",is5wk:true},
+      {key:"2026-04",label:"April",short:"Apr",is5wk:false},
+      {key:"2026-05",label:"May",short:"May",is5wk:false},
+      {key:"2026-06",label:"June",short:"Jun",is5wk:true},
+      {key:"2026-07",label:"July",short:"Jul",is5wk:false},
+      {key:"2026-08",label:"August",short:"Aug",is5wk:true},
+      {key:"2026-09",label:"September",short:"Sep",is5wk:false},
+      {key:"2026-10",label:"October",short:"Oct",is5wk:false},
+      {key:"2026-11",label:"November",short:"Nov",is5wk:true},
+      {key:"2026-12",label:"December",short:"Dec",is5wk:false},
+    ];
+    const DS = {
+      hourlyWage:1400,annualLimit:1030000,commuteOneWay:178,
+      trBefore:1040,trAfter:1100,food4wk:20000,food5wk:25000,
+      gbpToJpy:215,workDays:[0,1,2],
+      shifts:{
+        1:{start:"09:00",end:"16:00",breakMin:60,label:"Mon"},
+        2:{start:"09:00",end:"12:00",breakMin:0,label:"Tue"},
+        0:{start:"10:30",end:"17:00",breakMin:60,label:"Sun"},
+      },
+      mumItems:[{id:1,name:"MacBook Air Payment",amount:6783}],
+      fixed:[
+        {id:1,name:"Paidy (MacBook + iPhone)",amount:9916},
+        {id:2,name:"Japanese Lessons",amount:3026},
+        {id:3,name:"Claude Pro",amount:3200},
+      ],
+    };
+    const PAID_LEAVE = ["2026-05-24","2026-05-25","2026-05-31","2026-06-01","2026-06-07"];
+    const isHoliday = ds => { const d=new Date(ds); return d>=new Date("2026-05-20")&&d<=new Date("2026-06-10"); };
+    const DEF_DAD = () => [
+      {id:"d1",note:"Pocket money",gbp:50},{id:"d2",note:"Haircut",gbp:25},
+      {id:"d3",note:"Lunch money",gbp:25},{id:"d4",note:"Student loan",gbp:150},
+      {id:"d5",note:"Commuter pass",gbp:50},{id:"d6",note:"Japanese lessons",gbp:25},
+    ];
+    const eM = () => ({hours:0,days:0,wageOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,paidFixed:{},paidOneOffs:{}});
+    const PF = {"2026-01":{hours:0,days:4,wageOverride:28982},"2026-02":{hours:0,days:10,wageOverride:81143},"2026-03":{hours:0,days:14,wageOverride:107112},"2026-04":{hours:0,days:14,wageOverride:97207}};
+    const gDef = () => { const d={}; MONTHS.forEach(mo=>{ const m=eM(); if(PF[mo.key]) Object.assign(m,PF[mo.key],{dadItems:DEF_DAD()}); else m.days=wDIM(mo.key,DS.workDays); d[mo.key]=m; }); return d; };
+
+    const cWD=(s,e,wd,skipHol=false)=>{let n=0;const d=new Date(s),en=new Date(e);while(d<=en){const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;if(wd.includes(d.getDay())&&!(skipHol&&isHoliday(ds)))n++;d.setDate(d.getDate()+1);}return n;};
+    const wDIM=(mk,wd)=>{const[y,mo]=mk.split("-").map(Number);return cWD(new Date(y,mo-1,1),new Date(y,mo,0),wd);};
+    const cDIM=(mk,dow)=>{const[y,mo]=mk.split("-").map(Number);let n=0;const d=new Date(y,mo-1,1),en=new Date(y,mo,0);while(d<=en){if(d.getDay()===dow)n++;d.setDate(d.getDate()+1);}return n;};
+    const cDIMAvail=(mk,dow)=>{const[y,mo]=mk.split("-").map(Number);let n=0;const d=new Date(y,mo-1,1),en=new Date(y,mo,0);while(d<=en){const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;if(d.getDay()===dow&&!isHoliday(ds))n++;d.setDate(d.getDate()+1);}return n;};
+    const sH=sh=>{if(!sh)return 0;const[a,b]=sh.start.split(":").map(Number),[cv,dv]=sh.end.split(":").map(Number);return(cv+dv/60)-(a+b/60)-(sh.breakMin/60);};
+    const sHIM=(mk,shifts)=>{if(!shifts)return 0;let t=0;Object.keys(shifts).forEach(d=>{t+=cDIM(mk,Number(d))*sH(shifts[d]);});return t;};
+    const gPD=mk=>{const[y,mo]=mk.split("-").map(Number);const d=new Date(y,mo-1,15);const dw=d.getDay();if(dw===6)d.setDate(14);if(dw===0)d.setDate(13);return d.getDate();};
+    const pMN=mk=>{const[y,mo]=mk.split("-").map(Number);if(mo===1)return"Dec "+(y-1);return MONTHS[mo-2].label;};
+
+    const yn=n=>"¥"+Math.round(n).toLocaleString();
+    const gf=n=>"£"+n.toFixed(2);
+    const DCL=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    const DN=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const ft="-apple-system,BlinkMacSystemFont,'SF Pro Rounded','Helvetica Neue',sans-serif";
+    const mn="-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif";
+    const rw={display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0"};
+
+    const SAGE={bg:"#f0f5ee",card:"#e4ebe1",cardAlt:"#d8e2d4",border:"#c8d4c3",text:"#1a1f18",sub:"#5a6656",muted:"#8a9685",greenD:"#2d6a3e",green:"#4a9960",greenBg:"#c8e6cf",blueD:"#3a6b8a",blue:"#6ba3c4",blueBg:"#c4dde8",lavD:"#6a5a8a",lavBg:"#d8d0e6",peachD:"#a87040",peach:"#d4a06a",peachBg:"#eedcc8",roseD:"#a84040",rose:"#d47070",roseBg:"#ecd0d0",white:"#ffffff",accent:"#2d6a3e"};
+    const EMBER={bg:"#f5efe8",card:"#ebe0d4",cardAlt:"#e0d2c2",border:"#d4c4b0",text:"#2a1f14",sub:"#6b5540",muted:"#9a8672",greenD:"#6a7a2d",green:"#8a9a4a",greenBg:"#dae6b8",blueD:"#7a5a3a",blue:"#a48060",blueBg:"#e8d8c4",lavD:"#8a5a4a",lavBg:"#e6d0c8",peachD:"#b85e2a",peach:"#d4884a",peachBg:"#f0dcc4",roseD:"#a83030",rose:"#d06050",roseBg:"#ecc8c4",white:"#ffffff",accent:"#b85e2a"};
+    const PUMP={bg:"#1a2a33",card:"#233d4d",cardAlt:"#2c4a5c",border:"#3a5a6a",text:"#f0e6dc",sub:"#c8d8e0",muted:"#7a9aa8",greenD:"#fe7f2d",green:"#fea05a",greenBg:"#3a3020",blueD:"#fe7f2d",blue:"#fea05a",blueBg:"#33281a",lavD:"#e09040",lavBg:"#2a2818",peachD:"#fe7f2d",peach:"#fea05a",peachBg:"#33281a",roseD:"#e05050",rose:"#f07070",roseBg:"#3a2020",white:"#f0e6dc",accent:"#fe7f2d"};
+    const _t={c:SAGE};
+
+    function PaidBtn({paid,onToggle}){const c=_t.c;return(<button onClick={onToggle} style={{border:`2px solid ${paid?c.greenD:c.border}`,background:paid?c.greenD:"transparent",borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:11,color:paid?c.white:c.sub,fontWeight:600,minWidth:44,fontFamily:mn}}>{paid?"✓":"Paid?"}</button>);}
+
+    function NI({value,onChange,prefix,style:sx,placeholder}){
+      const c=_t.c;
+      const ist={fontSize:14,border:`2px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.bg,fontWeight:500,fontFamily:mn};
+      return(<div style={{position:"relative",...sx}}>{prefix&&<span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,color:c.sub,fontWeight:500}}>{prefix}</span>}<input type="number" inputMode="numeric" step="any" value={value||""} onChange={e=>onChange(Number(e.target.value)||0)} placeholder={placeholder||"0"} style={{...ist,...(prefix?{paddingLeft:prefix.length>1?30:26}:{})}} /></div>);
+    }
+
+    function App() {
+      const [tab,setTab]=useState("wage");
+      const [se,setSe]=useState(DS);
+      const [da,setDa]=useState(gDef);
+      const [bm,setBm]=useState("2026-04");
+      const [xp,setXp]=useState({});
+      const [ld,setLd]=useState(false);
+      const [eF,setEF]=useState(null);
+      const [nE,setNE]=useState({name:"",amount:""});
+      const [nD,setND]=useState({note:"",gbp:""});
+      const [eD,setED]=useState(null);
+      const [pF,setPF2]=useState("");
+      const [pT,setPT]=useState("");
+      const [pH,setPH]=useState({pMon:0,pTue:0,pSun:0});
+      const [th,setTh]=useState("sage");
+      const [nM,setNM]=useState({name:"",amount:""});
+      const [eMI,setEMI]=useState(null);
+      const [sv,setSv]=useState(false);
+      const [confirmReset,setConfirmReset]=useState(false);
+      const [sync,setSync]=useState("idle");
+      const timer=useRef(null);
+
+      _t.c=th==="ember"?EMBER:th==="pumpkin"?PUMP:SAGE;
+      const c=_t.c;
+      const crd={background:c.card,borderRadius:18,padding:18,marginBottom:14};
+      const inp={fontSize:14,border:`2px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.bg,fontWeight:500,fontFamily:mn};
+      const lbl={fontSize:11,color:c.sub,marginBottom:6,display:"block",textTransform:"uppercase",letterSpacing:0.5,fontFamily:mn};
+
+      // Load
+      useEffect(()=>{
+        (async()=>{
+          try {
+            const {data}=await sb.from('finance_data').select('data').eq('user_key',USER_KEY).single();
+            if(data?.data){
+              const v=data.data;
+              if(v.settings) setSe({...DS,...v.settings,fixed:v.settings.fixed||DS.fixed.map(f=>({...f}))});
+              if(v.data) setDa(p=>{const x={...p};Object.keys(v.data).forEach(k=>{if(x[k]!==undefined)x[k]={...eM(),...v.data[k]};});return x;});
+              if(v.theme) setTh(v.theme);
+            } else {
+              const r=localStorage.getItem(SK);
+              if(r){const v=JSON.parse(r);if(v.settings)setSe({...DS,...v.settings,fixed:v.settings.fixed||DS.fixed.map(f=>({...f}))});if(v.data)setDa(p=>{const x={...p};Object.keys(v.data).forEach(k=>{if(x[k]!==undefined)x[k]={...eM(),...v.data[k]};});return x;});if(v.theme)setTh(v.theme);}
+            }
+          } catch(e) {
+            const r=localStorage.getItem(SK);
+            if(r){try{const v=JSON.parse(r);if(v.settings)setSe({...DS,...v.settings,fixed:v.settings.fixed||DS.fixed.map(f=>({...f}))});if(v.data)setDa(p=>{const x={...p};Object.keys(v.data).forEach(k=>{if(x[k]!==undefined)x[k]={...eM(),...v.data[k]};});return x;});if(v.theme)setTh(v.theme);}catch(_){}}
+          }
+          setLd(true);
+        })();
+      },[]);
+
+      // Save
+      const doSave=async(payload)=>{
+        setSync("saving");
+        try{
+          await sb.from('finance_data').upsert({user_key:USER_KEY,data:payload,updated_at:new Date().toISOString()});
+          localStorage.setItem(SK,JSON.stringify(payload));
+          setSync("saved"); setTimeout(()=>setSync("idle"),2000);
+        }catch(e){
+          localStorage.setItem(SK,JSON.stringify(payload));
+          setSync("error"); setTimeout(()=>setSync("idle"),3000);
+        }
+      };
+      useEffect(()=>{
+        if(!ld) return;
+        const payload={settings:se,data:da,theme:th};
+        if(timer.current) clearTimeout(timer.current);
+        timer.current=setTimeout(()=>doSave(payload),800);
+      },[se,da,th,ld]);
+
+      const sM=(k,f,v)=>setDa(p=>({...p,[k]:{...p[k],[f]:v}}));
+
+      const rt=se.commuteOneWay*2;
+      const trf=k=>k<="2026-03"?se.trBefore:se.trAfter;
+      const gW=d=>d.hours>0?Math.round(d.hours*se.hourlyWage):(d.wageOverride||0);
+      const gTr=(d,k)=>d.days*trf(k);
+      const gTx=d=>gW(d);
+      const dTJ=d=>(d.dadItems||[]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
+      const fF=k=>MONTHS.find(x=>x.key===k)?.is5wk?se.food5wk:se.food4wk;
+      const gSuicaDays=mk=>{const[y,mo]=mk.split("-").map(Number);const pd1=gPD(mk);const nextMK=mo===12?`${y+1}-01`:`${y}-${String(mo+1).padStart(2,"0")}`;const pd2=gPD(nextMK);const from=new Date(y,mo-1,pd1);const[y2,mo2]=nextMK.split("-").map(Number);const to=new Date(y2,mo2-1,pd2-1);return cWD(from,to,se.workDays,true);};
+      const gCm=(_,mk)=>gSuicaDays(mk)*rt;
+
+      const aT=MONTHS.reduce((s,mo)=>s+gTx(da[mo.key]),0);
+      const rem=se.annualLimit-aT;
+      const pct=Math.min(100,(aT/se.annualLimit)*100);
+      const o85=pct>85;
+      const nw=new Date();
+      const cMN=nw.getFullYear()===2026?nw.getMonth()+1:4;
+      const mxP=Math.floor(rem/Math.max(1,12-cMN+1));
+      const tS=MONTHS.reduce((s,mo)=>s+(da[mo.key]?.savings||0),0);
+      const sA=cMN>0?tS/cMN:0;
+      const eMs=MONTHS.filter((_,i)=>i<cMN);
+      const fMs=MONTHS.filter((_,i)=>i>=cMN);
+      const eT=eMs.reduce((s,mo)=>s+gTx(da[mo.key]),0);
+      const rL=se.annualLimit-eT;
+      const nFM=fMs.length;
+      const eS=nFM>0?Math.floor(rL/nFM):0;
+      const mHP=se.hourlyWage>0?eS/se.hourlyWage:0;
+      const monH=sH((se.shifts||{})[1]);
+      const tueH=sH((se.shifts||{})[2]);
+      const sunH=sH((se.shifts||{})[0]);
+      const pTotalH=(pH.pMon||0)*monH+(pH.pTue||0)*tueH+(pH.pSun||0)*sunH;
+      const pTotalDays=(pH.pMon||0)+(pH.pTue||0)+(pH.pSun||0);
+      const pW=Math.round(pTotalH*se.hourlyWage);
+      const pNT=eT+pW;
+      const pR=se.annualLimit-pNT;
+      const pFA=nFM>1?Math.floor(pR/(nFM-1)):0;
+      const pFH=se.hourlyWage>0?pFA/se.hourlyWage:0;
+      const pOL=pNT>se.annualLimit;
+      const pHasInput=(pH.pMon||0)+(pH.pTue||0)+(pH.pSun||0)>0;
+      const nML=cMN<=11?MONTHS[cMN].label:"—";
+      const nMK=cMN<=11?MONTHS[cMN].key:null;
+      const nMW=nMK?wDIM(nMK,se.workDays):0;
+
+      const bd=da[bm]||eM();
+      const bdW=gW(bd),bdTr=gTr(bd,bm),bdCm=bd.suicaOverride!=null?bd.suicaOverride:gCm(bd,bm);
+      const bdDJ=dTJ(bd),bdI=bdW+bdTr,bdFd=fF(bm),bdSkin=bd.skinTreatment||0,bdGenSav=bd.generalSavings||0;
+      const bdFC=se.fixed.reduce((s,f)=>s+f.amount,0);
+      const bdFT=bdFC+bdCm+bdFd+bdSkin+bdGenSav;
+      const bdOY=bd.oneOffs.filter(x=>!x.mumPays).reduce((s,x)=>s+x.amount,0);
+      const bdOM=bd.oneOffs.filter(x=>x.mumPays).reduce((s,x)=>s+x.amount,0);
+      const bdMC=bd.mumChecked||[],bdPF=bd.paidFixed||{},bdPOO=bd.paidOneOffs||{};
+      const bdFoodAmt=MONTHS.find(x=>x.key===bm)?.is5wk?se.food5wk:se.food4wk;
+      const allMumItems=[{id:"food",name:"Food Budget"+(MONTHS.find(x=>x.key===bm)?.is5wk?" (5-wk)":" (4-wk)"),amount:bdFoodAmt},...(se.mumItems||[])];
+      const bdMTDisplay=allMumItems.filter(x=>bdMC.includes(x.id)).reduce((s,x)=>s+x.amount,0);
+      const bdFr=bdI-bdFT-bdOY;
+      const mWD=wDIM(bm,se.workDays),mPC=mWD*rt;
+      let pRD=0,pRC=0;
+      if(pF&&pT){pRD=cWD(pF,pT,se.workDays,true);pRC=pRD*rt;}
+
+      const aOO=k=>{if(!nE.name||!nE.amount)return;setDa(p=>({...p,[k]:{...p[k],oneOffs:[...p[k].oneOffs,{id:Date.now(),name:nE.name,amount:Number(nE.amount)||0,mumPays:false}]}}));setNE({name:"",amount:""});};
+      const rOO=(k,id)=>setDa(p=>({...p,[k]:{...p[k],oneOffs:p[k].oneOffs.filter(x=>x.id!==id)}}));
+      const tMu=(k,id)=>setDa(p=>({...p,[k]:{...p[k],oneOffs:p[k].oneOffs.map(x=>x.id===id?{...x,mumPays:!x.mumPays}:x)}}));
+      const aDI=k=>{if(!nD.gbp)return;setDa(p=>({...p,[k]:{...p[k],dadItems:[...(p[k].dadItems||[]),{id:Date.now(),note:nD.note||"Dad",gbp:Number(nD.gbp)||0}]}}));setND({note:"",gbp:""});};
+      const rDI=(k,id)=>setDa(p=>({...p,[k]:{...p[k],dadItems:(p[k].dadItems||[]).filter(x=>x.id!==id)}}));
+      const uDI=(k,id,f,v)=>setDa(p=>({...p,[k]:{...p[k],dadItems:(p[k].dadItems||[]).map(x=>x.id===id?{...x,[f]:v}:x)}}));
+      const tMC=(k,id)=>setDa(p=>{const cu=p[k]?.mumChecked||[];const nx=cu.includes(id)?cu.filter(x=>x!==id):[...cu,id];return{...p,[k]:{...p[k],mumChecked:nx}};});
+      const aMI=()=>{if(!nM.name||!nM.amount)return;setSe(p=>({...p,mumItems:[...p.mumItems,{id:Date.now(),name:nM.name,amount:Number(nM.amount)||0}]}));setNM({name:"",amount:""});};
+      const rMI=id=>setSe(p=>({...p,mumItems:p.mumItems.filter(x=>x.id!==id)}));
+      const hR=()=>{setSe({...DS,fixed:DS.fixed.map(f=>({...f})),mumItems:DS.mumItems.map(x=>({...x}))});setDa(gDef());setConfirmReset(false);};
+      const tPF=(k,id)=>sM(k,"paidFixed",{...(da[k].paidFixed||{}),[id]:!(da[k].paidFixed||{})[id]});
+      const tPOO=(k,id)=>sM(k,"paidOneOffs",{...(da[k].paidOneOffs||{}),[id]:!(da[k].paidOneOffs||{})[id]});
+
+      const renderCal=()=>{
+        const[y,mo]=bm.split("-").map(Number);
+        const fd=new Date(y,mo-1,1).getDay();
+        const ms=fd===0?6:fd-1;
+        const dim=new Date(y,mo,0).getDate();
+        const cells=[];
+        for(let i=0;i<ms;i++)cells.push(null);
+        for(let d=1;d<=dim;d++)cells.push(d);
+        return(
+          <div style={{marginTop:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,textAlign:"center",fontSize:11}}>
+              {DCL.map(d2=><div key={d2} style={{color:c.sub,fontWeight:600,padding:4}}>{d2}</div>)}
+              {cells.map((d2,i)=>{
+                if(d2===null)return<div key={"e"+i}/>;
+                const dt=new Date(y,mo-1,d2);
+                const ds=`${y}-${String(mo).padStart(2,"0")}-${String(d2).padStart(2,"0")}`;
+                const iW=se.workDays.includes(dt.getDay());
+                const isHol=isHoliday(ds),isPL=PAID_LEAVE.includes(ds);
+                const bg=isPL?c.blueD:(isHol&&iW)?c.peachD:iW?c.greenD:"transparent";
+                const col=(isPL||(isHol&&iW)||iW)?c.white:c.muted;
+                return(<div key={d2} style={{padding:6,borderRadius:8,fontSize:12,fontWeight:(iW||isPL)?700:400,background:bg,color:col}}>{d2}{isPL&&<div style={{fontSize:7,lineHeight:1,opacity:0.8}}>PL</div>}{isHol&&iW&&!isPL&&<div style={{fontSize:7,lineHeight:1,opacity:0.8}}>HOL</div>}</div>);
+              })}
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:10,flexWrap:"wrap"}}>
+              {[{col:c.greenD,label:"Work day"},{col:c.blueD,label:"Paid leave"},{col:c.peachD,label:"Holiday"}].map(x=>(
+                <div key={x.label} style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:c.sub}}>
+                  <div style={{width:10,height:10,borderRadius:3,background:x.col}}/>{x.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      };
+
+      if(!ld) return(
+        <div style={{background:c.bg,height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:ft,color:c.sub,fontSize:14}}>
+          Loading…
+        </div>
+      );
+
+      const tabs=["wage","budget","limit","savings","settings"];
+      const syncCol=sync==="saved"?c.greenD:sync==="error"?c.roseD:c.muted;
+      const syncLabel=sync==="saving"?"↑":sync==="saved"?"✓":sync==="error"?"!":null;
+
+      return(
+        <div style={{fontFamily:ft,background:c.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",color:c.text,overflowY:"auto",height:"100vh"}}>
+
+          <div style={{background:c.card,padding:"24px 20px 18px",position:"sticky",top:0,zIndex:10,borderRadius:"0 0 22px 22px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:2}}>
+              <span style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5}}>Annual Taxable Income</span>
+              <span style={{display:"flex",alignItems:"center",gap:6}}>
+                {syncLabel&&<span style={{fontSize:11,color:syncCol,fontWeight:700}}>{syncLabel}</span>}
+                <span style={{fontSize:11,color:c.sub}}>{yn(se.annualLimit)}</span>
+              </span>
+            </div>
+            <div style={{fontSize:34,fontWeight:800,marginBottom:10,letterSpacing:-1}}>{yn(aT)}</div>
+            <div style={{background:c.cardAlt,borderRadius:8,height:12,marginBottom:10,overflow:"hidden"}}>
+              <div style={{height:"100%",borderRadius:8,transition:"width 0.4s",width:`${pct}%`,background:o85?`linear-gradient(90deg,${c.peach},${c.roseD})`:`linear-gradient(90deg,${c.green},${c.blueD})`}}/>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:500}}>
+              <span style={{color:rem<0?c.roseD:c.greenD}}>{yn(rem)} left</span>
+              <span style={{color:c.sub}}>~{yn(mxP)}/mo</span>
+            </div>
+          </div>
+
+          <div style={{display:"flex",gap:6,padding:"14px 20px 6px"}}>
+            {tabs.map(t=>(
+              <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"10px 0",border:"none",cursor:"pointer",borderRadius:12,fontFamily:ft,fontSize:12,fontWeight:tab===t?700:500,color:tab===t?c.white:c.sub,background:tab===t?c.accent:c.card,whiteSpace:"nowrap"}}>
+                {t.charAt(0).toUpperCase()+t.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          <div style={{padding:"10px 20px 120px"}}>
+
+            {tab==="wage"&&MONTHS.map(mo=>{
+              const d=da[mo.key];
+              const wage=gW(d),tr=gTr(d,mo.key),cm=gCm(d,mo.key),tx=wage,rate=trf(mo.key),op=xp[mo.key];
+              const hD=wage>0||d.wageOverride>0,hH=d.hours>0;
+              const mI=MONTHS.findIndex(x=>x.key===mo.key);
+              const cT=MONTHS.slice(0,mI+1).reduce((s,x)=>s+gTx(da[x.key]),0);
+              const oT=cT<=se.annualLimit/12*(mI+1);
+              return(
+                <div key={mo.key} style={{...crd,padding:0,overflow:"hidden"}}>
+                  <button onClick={()=>setXp(p=>({...p,[mo.key]:!p[mo.key]}))} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"16px 18px",border:"none",background:"transparent",cursor:"pointer",fontFamily:ft}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{width:10,height:10,borderRadius:5,background:hD?c.greenD:c.border}}/>
+                      <span style={{fontWeight:600,color:c.text,fontSize:15}}>{mo.label} {gPD(mo.key)}th</span>
+                    </div>
+                    <span style={{fontSize:14,fontWeight:600,color:hD?c.text:c.muted}}>{hD?yn(tx):"—"}</span>
+                  </button>
+                  {op&&(
+                    <div style={{padding:"0 18px 18px",borderTop:`1px solid ${c.border}`,animation:"slideDown 0.2s ease-out"}}>
+                      <div style={{paddingTop:14}}>
+                        <label style={lbl}>Hours Worked in {pMN(mo.key)}</label>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                          <div><label style={{...lbl,fontSize:10}}>Hours</label><NI value={Math.floor(d.hours)} onChange={v=>{const mins=Math.round((d.hours-Math.floor(d.hours))*60);sM(mo.key,"hours",v+(mins/60));}} placeholder="69"/></div>
+                          <div><label style={{...lbl,fontSize:10}}>Minutes</label><NI value={Math.round((d.hours-Math.floor(d.hours))*60)} onChange={v=>{const hrs=Math.floor(d.hours);sM(mo.key,"hours",hrs+(v/60));}} placeholder="26"/></div>
+                        </div>
+                        <div style={{fontSize:11,color:c.sub,marginTop:6}}>= {d.hours>0?d.hours.toFixed(4)+"h":"0h"} × {yn(se.hourlyWage)} = {yn(Math.round(d.hours*se.hourlyWage))}</div>
+                      </div>
+                      {!hH&&<div style={{marginTop:12}}><label style={lbl}>Manual Wage</label><NI prefix="¥" value={d.wageOverride} onChange={v=>sM(mo.key,"wageOverride",v)}/></div>}
+                      <div style={{marginTop:12}}><label style={lbl}>Days Worked</label><NI value={d.days} onChange={v=>sM(mo.key,"days",v)}/></div>
+                      <div style={{marginTop:14,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
+                        <div style={rw}><span style={{color:c.sub}}>Wage {hH?`(${d.hours} × ${yn(se.hourlyWage)})`:"(manual)"}</span><span style={{fontWeight:600}}>{yn(wage)}</span></div>
+                        <div style={rw}><span style={{color:c.sub}}>Transport ({d.days}d × {yn(rate)})</span><span style={{fontWeight:500}}>{yn(tr)}</span></div>
+                        <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:600}}>Total Pay</span><span style={{fontWeight:700,fontSize:15}}>{yn(wage+tr)}</span></div>
+                      </div>
+                      <div style={{marginTop:10,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
+                        <div style={rw}><span style={{color:c.sub}}>Commute ({d.days}d × {yn(rt)})</span><span style={{fontWeight:500}}>{yn(cm)}</span></div>
+                        <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:700,fontSize:14}}>Taxable (wage only)</span><span style={{fontWeight:700,fontSize:16}}>{yn(tx)}</span></div>
+                      </div>
+                      {hD&&(
+                        <div style={{marginTop:10,padding:14,borderRadius:14,fontSize:13,background:oT?c.greenD:c.roseD,color:c.white}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{opacity:0.8}}>Earned so far</span><span style={{fontWeight:700}}>{yn(cT)} / {yn(se.annualLimit)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{opacity:0.8}}>Remaining</span><span style={{fontWeight:700}}>{yn(se.annualLimit-cT)}</span></div>
+                          <div style={{fontWeight:700,fontSize:14}}>{oT?`Safe — ~${yn(eS)}/mo for ${nFM} months left`:"Over safe limit — reduce hours"}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {tab==="budget"&&(
+              <div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
+                  {MONTHS.map(mo=>(<button key={mo.key} onClick={()=>setBm(mo.key)} style={{padding:"7px 14px",borderRadius:10,border:"none",background:bm===mo.key?c.accent:c.card,color:bm===mo.key?c.white:c.sub,fontSize:12,cursor:"pointer",fontWeight:bm===mo.key?600:400,fontFamily:ft}}>{mo.short}</button>))}
+                </div>
+
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>Work Schedule</span></div>
+                    <span style={{fontSize:12,fontWeight:600,color:c.blueD,background:c.blueBg,padding:"4px 10px",borderRadius:8}}>{[1,2,0].map(d=>DN[d]).join(", ")}</span>
+                  </div>
+                  <div style={{padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
+                    {[1,2,0].map(dow=>{const sh=(se.shifts||{})[dow];if(!sh)return null;return<div key={dow} style={rw}><span style={{color:c.sub}}>{sh.label}</span><span style={{fontWeight:500}}>{sh.start}–{sh.end}{sh.breakMin>0?` (${sh.breakMin}m break)`:""}</span><span style={{fontWeight:600}}>{sH(sh)}h</span></div>;})}
+                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:600}}>Weekly total</span><span style={{fontWeight:700}}>{Object.keys(se.shifts||{}).reduce((s,d)=>s+sH(se.shifts[d]),0)}h</span></div>
+                    <div style={rw}><span style={{color:c.sub}}>Scheduled this month</span><span style={{fontWeight:700,color:c.blueD}}>{sHIM(bm,se.shifts).toFixed(1)}h</span></div>
+                    <div style={rw}><span style={{color:c.sub}}>Scheduled wage</span><span style={{fontWeight:700,color:c.blueD}}>{yn(sHIM(bm,se.shifts)*se.hourlyWage)}</span></div>
+                  </div>
+                  {renderCal()}
+                  <div style={{marginTop:14,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
+                    <div style={rw}><span style={{color:c.sub}}>Work days this month</span><span style={{fontWeight:600}}>{mWD} days</span></div>
+                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:700}}>SUICA needed</span><span style={{fontWeight:700,color:c.blueD}}>{yn(mPC)}</span></div>
+                  </div>
+                  <div style={{marginTop:14}}>
+                    <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>SUICA Date Range</div>
+                    {(()=>{
+                      const periods=[];
+                      for(let i=0;i<4;i++){const mi=MONTHS.findIndex(x=>x.key===bm)+i;if(mi>=0&&mi<11){const mk1=MONTHS[mi].key,mk2=MONTHS[mi+1].key;const[y1,m1]=mk1.split("-").map(Number),[y2,m2]=mk2.split("-").map(Number);const pd1=gPD(mk1),pd2=gPD(mk2);const fr=`${y1}-${String(m1).padStart(2,"0")}-${String(pd1).padStart(2,"0")}`;const toDate=new Date(y2,m2-1,pd2);toDate.setDate(toDate.getDate()-1);const to=`${toDate.getFullYear()}-${String(toDate.getMonth()+1).padStart(2,"0")}-${String(toDate.getDate()).padStart(2,"0")}`;periods.push({label:`${MONTHS[mi].short} ${pd1} → ${MONTHS[mi+1].short} ${toDate.getDate()}`,from:fr,to});}}
+                      return(<div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>{periods.map((p,pi)=>(<button key={pi} onClick={()=>{if(pF===p.from&&pT===p.to){setPF2("");setPT("");}else{setPF2(p.from);setPT(p.to);}}} style={{padding:"6px 12px",borderRadius:10,border:"none",background:pF===p.from&&pT===p.to?c.accent:c.cardAlt,color:pF===p.from&&pT===p.to?c.white:c.sub,fontSize:11,cursor:"pointer",fontWeight:pF===p.from&&pT===p.to?600:400,fontFamily:ft}}>{p.label}</button>))}</div>);
+                    })()}
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <div><label style={lbl}>From</label><input type="date" value={pF} onChange={e=>setPF2(e.target.value)} style={inp}/></div>
+                      <div><label style={lbl}>To</label><input type="date" value={pT} onChange={e=>setPT(e.target.value)} style={inp}/></div>
+                    </div>
+                    {pF&&pT&&(<div style={{marginTop:10,padding:14,background:c.blueD,borderRadius:14,fontSize:13,color:c.white}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{opacity:0.7}}>Work days (excl. holiday)</span><span style={{fontWeight:600}}>{pRD} days</span></div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontWeight:700,fontSize:14}}>Add to SUICA</span><span style={{fontWeight:800,fontSize:20}}>{yn(pRC)}</span></div></div>)}
+                  </div>
+                </div>
+
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/><span style={{fontSize:15,fontWeight:700}}>Income</span></div>
+                  <div style={{fontSize:13}}>
+                    <div style={rw}><span style={{color:c.sub}}>Wage</span><span style={{fontWeight:500}}>{yn(bdW)}</span></div>
+                    <div style={rw}><span style={{color:c.sub}}>Transport Received</span><span style={{fontWeight:500}}>{yn(bdTr)}</span></div>
+                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total</span><span style={{fontWeight:700,fontSize:16,color:c.greenD}}>{yn(bdI)}</span></div>
+                  </div>
+                </div>
+
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/><span style={{fontSize:15,fontWeight:700}}>Dad's Contributions</span></div>
+                    <span style={{fontSize:11,color:c.sub,background:c.cardAlt,padding:"4px 10px",borderRadius:8,fontWeight:500}}>£1 = ¥{se.gbpToJpy}</span>
+                  </div>
+                  {(bd.dadItems||[]).map(it=>(<div key={it.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,fontSize:13}}>{eD===it.id?<><input value={it.note} onChange={e=>uDI(bm,it.id,"note",e.target.value)} placeholder="Note" style={{...inp,flex:2}}/><div style={{flex:1,position:"relative"}}><span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,color:c.sub}}>£</span><input type="number" inputMode="numeric" value={it.gbp||""} onChange={e=>uDI(bm,it.id,"gbp",Number(e.target.value)||0)} style={{...inp,paddingLeft:26}}/></div><button onClick={()=>setED(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></>:<><span style={{flex:2,color:c.text,fontWeight:500}}>{it.note||"Dad"}</span><span style={{color:c.sub}}>{gf(it.gbp)}</span><span style={{fontWeight:600}}>{yn(Math.round(it.gbp*se.gbpToJpy))}</span><button onClick={()=>setED(it.id)} style={{border:"none",background:c.cardAlt,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500}}>Edit</button><button onClick={()=>rDI(bm,it.id)} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></>}</div>))}
+                  {(bd.dadItems||[]).length>0&&<div style={{...rw,fontSize:13,borderTop:`1px solid ${c.border}`,paddingTop:10,fontWeight:700}}><span>Total</span><span>{gf((bd.dadItems||[]).reduce((s,x)=>s+x.gbp,0))} = {yn(bdDJ)}</span></div>}
+                  <div style={{display:"flex",gap:8,marginTop:12}}>
+                    <input placeholder="Note" value={nD.note} onChange={e=>setND(p=>({...p,note:e.target.value}))} style={{...inp,flex:2}}/>
+                    <div style={{flex:1,position:"relative"}}><span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,color:c.sub}}>£</span><input placeholder="0" type="number" inputMode="numeric" value={nD.gbp} onChange={e=>setND(p=>({...p,gbp:e.target.value}))} style={{...inp,paddingLeft:26}}/></div>
+                    <button onClick={()=>aDI(bm)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:12,padding:"10px 16px",cursor:"pointer",fontFamily:ft,fontWeight:700,fontSize:16}}>+</button>
+                  </div>
+                </div>
+
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.lavD}}/><span style={{fontSize:15,fontWeight:700}}>Fixed Expenses</span></div>
+                  <div style={{fontSize:13}}>
+                    {se.fixed.filter(f=>!f.variable).map(f=>{const paid=bdPF[f.id];return(<div key={f.id} style={rw}>{eF===f.id?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><input value={f.name} onChange={e=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,name:e.target.value}:x)}))} style={{...inp,flex:2}}/><NI prefix="¥" value={f.amount} onChange={v=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,amount:v}:x)}))} style={{flex:1}}/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}><span onClick={()=>setEF(f.id)} style={{color:paid?c.muted:c.sub,textDecoration:paid?"line-through":"none",flex:1,cursor:"pointer"}}>{f.name}</span><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:500,color:paid?c.muted:c.text}}>{yn(f.amount)}</span><PaidBtn paid={paid} onToggle={()=>tPF(bm,f.id)}/></div></div>}</div>);})}
+                    <div style={rw}>{eF==="suica"?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>SUICA ({gPD(bm)}th → next payday)</span><input type="number" inputMode="numeric" value={bd.suicaOverride??bdCm} onChange={e=>sM(bm,"suicaOverride",Number(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button>{bd.suicaOverride!=null&&<button onClick={()=>{sM(bm,"suicaOverride",null);setEF(null);}} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer"}}>reset</button>}</div>:<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}><span onClick={()=>setEF("suica")} style={{color:bdPF["suica"]?c.muted:c.sub,textDecoration:bdPF["suica"]?"line-through":"none",flex:1,cursor:"pointer"}}>SUICA ({gPD(bm)}th → next payday{bd.suicaOverride!=null?" · edited":""})</span><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:500,color:bdPF["suica"]?c.muted:c.text}}>{yn(bdCm)}</span><PaidBtn paid={bdPF["suica"]} onToggle={()=>tPF(bm,"suica")}/></div></div>}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0"}}><span style={{color:bdPF["food"]?c.muted:c.sub,textDecoration:bdPF["food"]?"line-through":"none"}}>Food ({MONTHS.find(x=>x.key===bm)?.is5wk?"5-wk":"4-wk"})</span><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:500,color:bdPF["food"]?c.muted:c.text}}>{yn(bdFd)}</span><PaidBtn paid={bdPF["food"]} onToggle={()=>tPF(bm,"food")}/></div></div>
+                    {[{label:"Skin Treatment",field:"skinTreatment",val:bdSkin},{label:"General Savings",field:"generalSavings",val:bdGenSav}].map(({label,field,val})=>{const paid=bdPF[field];return(<div key={field} style={rw}>{eF===field?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>{label}</span><input type="number" inputMode="numeric" value={val||""} placeholder="0" onChange={e=>sM(bm,field,parseFloat(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}><span onClick={()=>setEF(field)} style={{color:paid?c.muted:c.sub,textDecoration:paid?"line-through":"none",flex:1,cursor:"pointer"}}>{label}</span><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:500,color:paid?c.muted:c.text}}>{yn(val)}</span><PaidBtn paid={paid} onToggle={()=>tPF(bm,field)}/></div></div>}</div>);})}
+                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total Fixed</span><span style={{fontWeight:700,fontSize:16,color:c.lavD}}>{yn(bdFT)}</span></div>
+                    {(()=>{let unpaid=0;se.fixed.filter(f=>!f.variable).forEach(f=>{if(!bdPF[f.id])unpaid+=f.amount;});if(!bdPF["suica"])unpaid+=bdCm;if(!bdPF["food"])unpaid+=bdFd;if(!bdPF["skinTreatment"])unpaid+=bdSkin;if(!bdPF["generalSavings"])unpaid+=bdGenSav;const allPaid=unpaid===0;return(<div style={{marginTop:8,padding:14,borderRadius:14,background:allPaid?c.greenD:c.lavBg,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,fontWeight:600,color:allPaid?c.white:c.lavD}}>Left to pay</span><span style={{fontSize:18,fontWeight:800,color:allPaid?c.white:c.lavD}}>{allPaid?"All paid ✓":yn(unpaid)}</span></div>);})()}
+                  </div>
+                </div>
+
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.peachD}}/><span style={{fontSize:15,fontWeight:700}}>One-off Expenses</span></div>
+                  {bd.oneOffs.length===0&&<div style={{fontSize:13,color:c.muted,marginBottom:10}}>None this month</div>}
+                  {bd.oneOffs.map(o=>{const paid=bdPOO[o.id];return(<div key={o.id} style={{...rw,fontSize:13}}><div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}><span style={{color:o.mumPays||paid?c.muted:c.text,textDecoration:o.mumPays||paid?"line-through":"none",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.name}</span>{o.mumPays&&<span style={{fontSize:10,background:c.peachBg,color:c.peachD,padding:"2px 8px",borderRadius:6,fontWeight:600,flexShrink:0}}>Mum</span>}</div><div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}><span style={{fontWeight:500,color:o.mumPays||paid?c.muted:c.text}}>{yn(o.amount)}</span>{!o.mumPays&&<PaidBtn paid={paid} onToggle={()=>tPOO(bm,o.id)}/>}<button onClick={()=>tMu(bm,o.id)} style={{border:"none",background:c.cardAlt,borderRadius:8,padding:"3px 8px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500}}>{o.mumPays?"Me":"Mum"}</button><button onClick={()=>rOO(bm,o.id)} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></div></div>);})}
+                  {bdOM>0&&<div style={{...rw,fontSize:12,color:c.peachD,borderTop:`1px dashed ${c.border}`,marginTop:4,fontWeight:600}}><span>Mum pays</span><span>{yn(bdOM)}</span></div>}
+                  <div style={{display:"flex",gap:8,marginTop:12}}>
+                    <input placeholder="Name" value={nE.name} onChange={e=>setNE(p=>({...p,name:e.target.value}))} style={{...inp,flex:2}}/>
+                    <input placeholder="¥" type="number" inputMode="numeric" value={nE.amount} onChange={e=>setNE(p=>({...p,amount:e.target.value}))} style={{...inp,flex:1}}/>
+                    <button onClick={()=>aOO(bm)} style={{border:"none",background:c.peachD,color:c.white,borderRadius:12,padding:"10px 16px",cursor:"pointer",fontFamily:ft,fontWeight:700,fontSize:16}}>+</button>
+                  </div>
+                </div>
+
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:10,height:10,borderRadius:5,background:c.roseD}}/><span style={{fontSize:15,fontWeight:700}}>Send to Mum</span></div>
+                    <span style={{fontSize:11,color:c.sub}}>Pay day: {gPD(bm)}th</span>
+                  </div>
+                  {allMumItems.map(it=>{const ch=bdMC.includes(it.id),isFood=it.id==="food",isEditing=eMI===it.id;return(<div key={it.id}><div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",fontSize:13}}><button onClick={()=>tMC(bm,it.id)} style={{width:24,height:24,borderRadius:8,border:`2px solid ${ch?c.greenD:c.border}`,background:ch?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:14,fontWeight:700,flexShrink:0,padding:0}}>{ch?"✓":""}</button><span style={{flex:1,fontWeight:500,color:ch?c.text:c.muted}}>{it.name}</span><span style={{fontWeight:600,color:ch?c.text:c.muted}}>{yn(it.amount)}</span><button onClick={()=>setEMI(isEditing?null:it.id)} style={{border:"none",background:isEditing?c.greenD:c.cardAlt,color:isEditing?c.white:c.sub,borderRadius:8,padding:"4px 8px",cursor:"pointer",fontSize:11,fontWeight:isEditing?600:400}}>{isEditing?"Done":"Edit"}</button>{!isFood&&<button onClick={()=>rMI(it.id)} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button>}</div>{isEditing&&(<div style={{display:"flex",gap:8,marginBottom:8}}>{!isFood&&<input value={it.name} onChange={e=>setSe(p=>({...p,mumItems:p.mumItems.map(x=>x.id===it.id?{...x,name:e.target.value}:x)}))} placeholder="Name" style={{...inp,flex:2}}/>}{isFood&&<span style={{flex:2,fontSize:12,color:c.muted,alignSelf:"center"}}>Food budget (set in Settings)</span>}{!isFood&&<NI prefix="¥" value={it.amount} onChange={v=>setSe(p=>({...p,mumItems:p.mumItems.map(x=>x.id===it.id?{...x,amount:v}:x)}))} style={{flex:1}}/>}</div>)}</div>);})}
+                  <div style={{display:"flex",gap:8,marginTop:10}}>
+                    <input placeholder="Name" value={nM.name} onChange={e=>setNM(p=>({...p,name:e.target.value}))} style={{...inp,flex:2}}/>
+                    <input placeholder="¥" type="number" inputMode="numeric" value={nM.amount} onChange={e=>setNM(p=>({...p,amount:e.target.value}))} style={{...inp,flex:1}}/>
+                    <button onClick={aMI} style={{border:"none",background:c.roseD,color:c.white,borderRadius:12,padding:"10px 16px",cursor:"pointer",fontFamily:ft,fontWeight:700,fontSize:16}}>+</button>
+                  </div>
+                  {bdMTDisplay>0&&(<div style={{marginTop:14,padding:16,background:c.roseD,borderRadius:14,color:c.white}}><div style={{fontSize:12,opacity:0.8,marginBottom:4}}>{allMumItems.filter(x=>bdMC.includes(x.id)).map(x=>yn(x.amount)).join(" + ")}</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontWeight:700,fontSize:14}}>Send to Mum</span><span style={{fontSize:24,fontWeight:800}}>{yn(bdMTDisplay)}</span></div></div>)}
+                </div>
+
+                <div style={{...crd,background:bdFr>=0?c.greenD:c.roseD,padding:22}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontWeight:700,fontSize:15,color:c.white}}>Free to Spend</span>
+                    <span style={{fontSize:26,fontWeight:800,color:c.white}}>{yn(bdFr)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tab==="limit"&&(
+              <div>
+                <div style={{...crd,padding:22}}>
+                  <div style={{fontSize:12,color:c.sub,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>Used so far in 2026</div>
+                  <div style={{fontSize:32,fontWeight:800,color:c.text}}>{yn(eT)}</div>
+                  <div style={{fontSize:13,color:c.sub,marginTop:4}}>out of your {yn(se.annualLimit)} annual limit</div>
+                  <div style={{background:c.cardAlt,borderRadius:8,height:10,margin:"14px 0",overflow:"hidden"}}><div style={{height:"100%",borderRadius:8,width:`${Math.min(100,(eT/se.annualLimit)*100)}%`,background:rL<100000?`linear-gradient(90deg,${c.peach},${c.roseD})`:`linear-gradient(90deg,${c.green},${c.blueD})`,transition:"width 0.4s"}}/></div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}><span style={{color:c.sub}}>Remaining</span><span style={{fontWeight:700,fontSize:16,color:rL<100000?c.roseD:c.greenD}}>{yn(rL)}</span></div>
+                </div>
+                {(()=>{const maxW=Math.max(...MONTHS.map(mo=>gTx(da[mo.key])),1);return(<div style={crd}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>What you earned each month</span></div><div style={{fontSize:13}}>{MONTHS.map(mo=>{const w=gTx(da[mo.key]);const isFut=mo.key>(MONTHS[cMN-1]?.key||"");return(<div key={mo.key} style={{...rw,opacity:isFut?0.4:1}}><span style={{color:c.sub,width:36}}>{mo.short}</span><div style={{flex:1,margin:"0 10px",height:8,borderRadius:4,background:c.cardAlt,overflow:"hidden"}}>{w>0&&<div style={{height:"100%",borderRadius:4,width:`${(w/maxW)*100}%`,background:c.blueD,transition:"width 0.3s"}}/>}</div><span style={{fontWeight:500,width:80,textAlign:"right",color:w>0?c.text:c.muted}}>{w>0?yn(w):"—"}</span></div>);})}<div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10,fontWeight:700}}><span>Total earned</span><span>{yn(eT)}</span></div></div></div>);})()}
+                <div style={{...crd,background:rL<100000?c.roseBg:c.greenBg,border:`2px solid ${rL<100000?c.roseD:c.greenD}`}}>
+                  <div style={{fontSize:12,color:c.sub,marginBottom:6,textTransform:"uppercase",letterSpacing:0.5}}>You have {nFM} months left in the year</div>
+                  <div style={{fontSize:13,color:c.text}}>To stay under your limit, you can earn up to:</div>
+                  <div style={{fontSize:30,fontWeight:800,color:rL<100000?c.roseD:c.greenD,margin:"8px 0"}}>{yn(eS)}<span style={{fontSize:14,fontWeight:500}}> / month</span></div>
+                  <div style={{fontSize:13,color:c.sub}}>That's about <strong>{mHP.toFixed(0)} hours</strong> of work per month at ¥{se.hourlyWage}/hr</div>
+                </div>
+                {nMK&&(()=>{const mondays=cDIMAvail(nMK,1),tuesdays=cDIMAvail(nMK,2),sundays=cDIMAvail(nMK,0);const fullH=mondays*monH+tuesdays*tueH+sundays*sunH;const fullWage=Math.round(fullH*se.hourlyWage);const overIfFull=fullWage>eS;let budget=eS,rMon=0,rTue=0,rSun=0;for(let i=0;i<sundays;i++){if(budget>=sunH*se.hourlyWage){rSun++;budget-=sunH*se.hourlyWage;}else break;}for(let i=0;i<mondays;i++){if(budget>=monH*se.hourlyWage){rMon++;budget-=monH*se.hourlyWage;}else break;}for(let i=0;i<tuesdays;i++){if(budget>=tueH*se.hourlyWage){rTue++;budget-=tueH*se.hourlyWage;}else break;}const rH=rMon*monH+rTue*tueH+rSun*sunH;const rWage=Math.round(rH*se.hourlyWage);return(<div style={{...crd,border:`2px solid ${c.blueD}`}}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>Max you can work in {nML}</span></div><div style={{fontSize:12,color:c.sub,marginBottom:14}}>To stay under your ¥{se.annualLimit.toLocaleString()} limit{(nMK==="2026-05"||nMK==="2026-06")?" · holiday excluded":""}</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>{[{day:"Mon",count:mondays,h:monH,rec:rMon},{day:"Tue",count:tuesdays,h:tueH,rec:rTue},{day:"Sun",count:sundays,h:sunH,rec:rSun}].map(({day,count,h,rec})=>(<div key={day} style={{background:c.cardAlt,borderRadius:12,padding:"12px 10px",textAlign:"center"}}><div style={{fontSize:13,fontWeight:700,color:c.text,marginBottom:2}}>{day}</div><div style={{fontSize:22,fontWeight:800,color:c.blueD}}>{count}</div><div style={{fontSize:10,color:c.sub}}>{h}h/shift</div><div style={{marginTop:6,fontSize:11,fontWeight:600,color:rec===count?c.greenD:c.peachD}}>rec: {rec}</div></div>))}</div><div style={{padding:14,borderRadius:14,background:overIfFull?c.peachBg:c.greenBg,marginBottom:10}}><div style={{fontSize:12,color:c.sub,marginBottom:6}}>{overIfFull?"Working all shifts would exceed your limit. Recommended:":"You can work all shifts and stay within your limit."}</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><span style={{fontSize:13,fontWeight:600,color:overIfFull?c.peachD:c.greenD}}>{rMon} Mon · {rTue} Tue · {rSun} Sun</span><span style={{fontWeight:700,fontSize:15,color:overIfFull?c.peachD:c.greenD}}>{rH.toFixed(1)}h</span></div><div style={{fontSize:13,fontWeight:700,color:overIfFull?c.peachD:c.greenD}}>{yn(rWage)} earned — {yn(eS-rWage)} under limit</div></div>{overIfFull&&(<div style={{padding:14,borderRadius:14,background:c.roseBg,border:`1px solid ${c.roseD}`}}><div style={{fontSize:12,color:c.roseD,fontWeight:600,marginBottom:4}}>If you worked every shift:</div><div style={{fontSize:13,color:c.roseD}}>{fullH.toFixed(1)}h = {yn(fullWage)} — over by {yn(fullWage-eS)}</div></div>)}</div>);})()}
+                <div style={{...crd,border:`2px solid ${c.blueD}`}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>Plan next month</span></div>
+                  <div style={{fontSize:12,color:c.sub,marginBottom:14}}>{nMK&&(()=>{const mo=cDIMAvail(nMK,1),tu=cDIMAvail(nMK,2),su=cDIMAvail(nMK,0);return`${nML}: ${mo} Monday${mo!==1?"s":""}, ${tu} Tuesday${tu!==1?"s":""}, ${su} Sunday${su!==1?"s":""} — ${nMW} days total`;})()}</div>
+                  {nMK&&(()=>{const mondays=cDIMAvail(nMK,1),tuesdays=cDIMAvail(nMK,2),sundays=cDIMAvail(nMK,0);return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>{[{label:"How many Mondays?",max:mondays,key:"pMon",h:monH},{label:"How many Tuesdays?",max:tuesdays,key:"pTue",h:tueH},{label:"How many Sundays?",max:sundays,key:"pSun",h:sunH}].map(({label,max,key,h})=>(<div key={key}><label style={lbl}>{label}</label><NI value={pH[key]||0} onChange={v=>setPH(p=>({...p,[key]:Math.min(v,max)}))} placeholder={`max ${max}`}/><div style={{fontSize:10,color:c.sub,marginTop:3}}>{h}h each</div></div>))}</div>);})()}
+                  {pHasInput&&(<div style={{fontSize:13}}><div style={{padding:14,background:c.cardAlt,borderRadius:14}}><div style={rw}><span style={{color:c.sub}}>Days planned</span><span style={{fontWeight:600}}>{pTotalDays} days ({pTotalH.toFixed(1)}h)</span></div><div style={rw}><span style={{color:c.sub}}>You'd earn</span><span style={{fontWeight:700,fontSize:16}}>{yn(pW)}</span></div><div style={rw}><span style={{color:c.sub}}>New annual total</span><span style={{fontWeight:600}}>{yn(pNT)}</span></div><div style={rw}><span style={{color:c.sub}}>Limit left after</span><span style={{fontWeight:700,color:pR<0?c.roseD:pR<100000?c.peachD:c.greenD}}>{yn(pR)}</span></div>{nFM>1&&!pOL&&<div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{color:c.sub}}>Max per remaining month after</span><span style={{fontWeight:600}}>{yn(pFA)} ({pFH.toFixed(0)}h)</span></div>}</div><div style={{marginTop:10,padding:14,borderRadius:14,background:pOL?c.roseD:pR<100000?c.peachD:c.greenD,color:c.white,fontSize:13,fontWeight:700}}>{pOL?`Over your limit by ${yn(Math.abs(pR))}. Work fewer hours.`:pR<100000?`Cutting it close — only ${yn(pR)} left after.`:`You're safe. ${yn(pR)} left for the rest of the year.`}</div></div>)}
+                </div>
+              </div>
+            )}
+
+            {tab==="savings"&&(
+              <div>
+                <div style={{...crd,background:c.blueD,padding:22}}>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:4}}>Total Saved</div>
+                  <div style={{fontSize:36,fontWeight:800,color:c.white,letterSpacing:-1}}>{yn(tS)}</div>
+                  <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",marginTop:4}}>avg {yn(sA)}/mo</div>
+                </div>
+                {MONTHS.map(mo=>(<div key={mo.key} style={{...crd,display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:12,color:c.sub,width:28}}>{mo.short}</span><div style={{flex:1}}><NI prefix="¥" value={da[mo.key].savings||0} onChange={v=>sM(mo.key,"savings",v)}/></div></div>))}
+              </div>
+            )}
+
+            {tab==="settings"&&(
+              <div>
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/><span style={{fontSize:15,fontWeight:700}}>Wage & Limits</span></div>
+                  <div style={{display:"grid",gap:12}}>
+                    <div><label style={lbl}>Hourly Wage</label><NI prefix="¥" value={se.hourlyWage} onChange={v=>setSe(p=>({...p,hourlyWage:v}))}/></div>
+                    <div><label style={lbl}>Annual Limit</label><NI prefix="¥" value={se.annualLimit} onChange={v=>setSe(p=>({...p,annualLimit:v}))}/></div>
+                  </div>
+                </div>
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>Transport</span></div>
+                  <div style={{display:"grid",gap:12}}>
+                    <div><label style={lbl}>Commute One-Way</label><NI prefix="¥" value={se.commuteOneWay} onChange={v=>setSe(p=>({...p,commuteOneWay:v}))}/></div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                      <div><label style={lbl}>Before 14 Mar</label><NI prefix="¥" value={se.trBefore} onChange={v=>setSe(p=>({...p,trBefore:v}))}/></div>
+                      <div><label style={lbl}>After 14 Mar</label><NI prefix="¥" value={se.trAfter} onChange={v=>setSe(p=>({...p,trAfter:v}))}/></div>
+                    </div>
+                    <div style={{fontSize:12,color:c.sub}}>Round trip: {yn(rt)}</div>
+                  </div>
+                </div>
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.peachD}}/><span style={{fontSize:15,fontWeight:700}}>Food Budget</span></div>
+                  <div style={{display:"grid",gap:12}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                      <div><label style={lbl}>4-Week</label><NI prefix="¥" value={se.food4wk} onChange={v=>setSe(p=>({...p,food4wk:v}))}/></div>
+                      <div><label style={lbl}>5-Week</label><NI prefix="¥" value={se.food5wk} onChange={v=>setSe(p=>({...p,food5wk:v}))}/></div>
+                    </div>
+                    <div style={{fontSize:11,color:c.sub}}>5-week months: Mar, Jun, Aug, Nov</div>
+                  </div>
+                </div>
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/><span style={{fontSize:15,fontWeight:700}}>Exchange Rate</span></div>
+                  <div><label style={lbl}>GBP to JPY</label><NI prefix="¥" value={se.gbpToJpy} onChange={v=>setSe(p=>({...p,gbpToJpy:v}))}/></div>
+                </div>
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:10,height:10,borderRadius:5,background:c.lavD}}/><span style={{fontSize:15,fontWeight:700}}>Fixed Expenses</span></div>
+                    <button onClick={()=>{const id=Date.now();setSe(p=>({...p,fixed:[...p.fixed,{id,name:"New",amount:0}]}));setEF(id);}} style={{border:"none",background:c.lavD,color:c.white,borderRadius:10,padding:"6px 14px",cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:600}}>+ Add</button>
+                  </div>
+                  {se.fixed.map(f=>(<div key={f.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>{eF===f.id?<><input value={f.name} onChange={e=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,name:e.target.value}:x)}))} style={{...inp,flex:2}}/><NI prefix="¥" value={f.amount} onChange={v=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,amount:v}:x)}))} style={{flex:1}}/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></>:<><span style={{flex:2,fontSize:14,fontWeight:500}}>{f.name}</span><span style={{flex:1,fontSize:13,textAlign:"right",fontWeight:500}}>{yn(f.amount)}</span><button onClick={()=>setEF(f.id)} style={{border:"none",background:c.cardAlt,borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500}}>Edit</button><button onClick={()=>setSe(p=>({...p,fixed:p.fixed.filter(x=>x.id!==f.id)}))} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></>}</div>))}
+                </div>
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.accent}}/><span style={{fontSize:15,fontWeight:700}}>Theme</span></div>
+                  <div style={{display:"flex",gap:10}}>
+                    {[{id:"sage",label:"Sage",col:"#2d6a3e",bg:"#f0f5ee"},{id:"ember",label:"Ember",col:"#b85e2a",bg:"#f5efe8"},{id:"pumpkin",label:"Pumpkin",col:"#fe7f2d",bg:"#233d4d"}].map(t2=>(<button key={t2.id} onClick={()=>setTh(t2.id)} style={{flex:1,padding:"14px 0",borderRadius:14,border:th===t2.id?`3px solid ${t2.col}`:`2px solid ${c.border}`,background:t2.bg,cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:th===t2.id?700:500,color:t2.col,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{width:24,height:24,borderRadius:12,background:t2.col}}/>{t2.label}</button>))}
+                  </div>
+                </div>
+                <button onPointerDown={()=>{setSv(true);setTimeout(()=>setSv(false),2000);}} style={{width:"100%",padding:16,border:"none",background:sv?c.green:c.greenD,color:c.white,borderRadius:14,fontFamily:ft,fontSize:14,fontWeight:700,cursor:"pointer",marginTop:8}}>{sv?"Saved!":"Save Settings"}</button>
+                {!confirmReset
+                  ?<button onClick={()=>setConfirmReset(true)} style={{width:"100%",padding:16,border:"none",background:c.roseD,color:c.white,borderRadius:14,fontFamily:ft,fontSize:14,fontWeight:700,cursor:"pointer",marginTop:8}}>Reset All Data</button>
+                  :<div style={{marginTop:8,padding:16,background:c.roseBg,borderRadius:14,border:`2px solid ${c.roseD}`}}><div style={{fontSize:13,color:c.roseD,marginBottom:12,fontWeight:600}}>This will wipe all your data. Are you sure?</div><div style={{display:"flex",gap:8}}><button onClick={hR} style={{flex:1,padding:12,border:"none",background:c.roseD,color:c.white,borderRadius:10,fontFamily:ft,fontSize:13,fontWeight:700,cursor:"pointer"}}>Yes, reset</button><button onClick={()=>setConfirmReset(false)} style={{flex:1,padding:12,border:`2px solid ${c.border}`,background:"transparent",color:c.sub,borderRadius:10,fontFamily:ft,fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button></div></div>}
+              </div>
+            )}
+
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
