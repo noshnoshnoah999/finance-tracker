@@ -577,7 +577,7 @@
                   </div>
                 );})()}
 
-                {/* ── Next month planner (combined) ── */}
+                {/* ── What to work this month ── */}
                 {nMK&&(()=>{
                   const mondays=cDIMAvail(nMK,1),tuesdays=cDIMAvail(nMK,2),sundays=cDIMAvail(nMK,0);
                   const fullH=mondays*monH+tuesdays*tueH+sundays*sunH;
@@ -589,36 +589,67 @@
                   for(let i=0;i<tuesdays;i++){if(budget>=tueH*se.hourlyWage){rTue++;budget-=tueH*se.hourlyWage;}else break;}
                   const rH=rMon*monH+rTue*tueH+rSun*sunH;
                   const rWage=Math.round(rH*se.hourlyWage);
+                  const days=[
+                    {day:"Monday",avail:mondays,rec:rMon,h:monH},
+                    {day:"Tuesday",avail:tuesdays,rec:rTue,h:tueH},
+                    {day:"Sunday",avail:sundays,rec:rSun,h:sunH},
+                  ];
                   return(
                     <div style={{...crd,border:`2px solid ${c.blueD}`}}>
                       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
                         <div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/>
-                        <span style={{fontSize:15,fontWeight:700}}>{nML} Planner</span>
+                        <span style={{fontSize:15,fontWeight:700}}>What to work in {nML}</span>
                       </div>
                       <div style={{fontSize:12,color:c.sub,marginBottom:18}}>
-                        {mondays} Mondays · {tuesdays} Tuesdays · {sundays} Sundays available{(nMK==="2026-05"||nMK==="2026-06")?" (holiday excluded)":""}
+                        Recommended shifts to stay under your limit{(nMK==="2026-05"||nMK==="2026-06")?" · holiday shifts excluded":""}
                       </div>
 
-                      {/* Recommended row */}
-                      <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>Recommended shifts to stay safe</div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
-                        {[{day:"Mon",avail:mondays,rec:rMon,h:monH},{day:"Tue",avail:tuesdays,rec:rTue,h:tueH},{day:"Sun",avail:sundays,rec:rSun,h:sunH}].map(({day,avail,rec,h})=>(
-                          <div key={day} style={{background:c.cardAlt,borderRadius:12,padding:"12px 8px",textAlign:"center"}}>
-                            <div style={{fontSize:12,color:c.sub,marginBottom:4}}>{day}</div>
-                            <div style={{fontSize:22,fontWeight:800,color:rec===avail?c.greenD:c.peachD}}>
-                              {rec}<span style={{fontSize:11,color:c.sub,fontWeight:400}}>/{avail}</span>
+                      {/* Day-by-day breakdown */}
+                      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+                        {days.map(({day,avail,rec,h})=>{
+                          const earned=Math.round(rec*h*se.hourlyWage);
+                          const skip=rec===0;
+                          const workAll=rec===avail;
+                          return(
+                            <div key={day} style={{background:skip?c.cardAlt:c.cardAlt,borderRadius:14,padding:"14px 16px",opacity:skip?0.5:1}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                                <div>
+                                  <span style={{fontSize:15,fontWeight:700,color:c.text}}>{day}</span>
+                                  <span style={{fontSize:12,color:c.sub,marginLeft:8}}>{h}h per shift</span>
+                                </div>
+                                <span style={{fontSize:14,fontWeight:800,color:skip?c.muted:workAll?c.greenD:c.peachD}}>
+                                  {skip?"Skip all":workAll?`All ${rec}`:`${rec} of ${avail}`}
+                                </span>
+                              </div>
+                              {/* Shift dots */}
+                              <div style={{display:"flex",gap:6,marginBottom:10}}>
+                                {Array.from({length:avail}).map((_,i)=>(
+                                  <div key={i} style={{flex:1,height:8,borderRadius:4,background:i<rec?c.blueD:c.border}}/>
+                                ))}
+                              </div>
+                              <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
+                                <span style={{color:c.sub}}>{rec} shift{rec!==1?"s":""} · {(rec*h).toFixed(1)}h total</span>
+                                <span style={{fontWeight:700,color:skip?c.muted:c.text}}>{skip?"¥0":yn(earned)}</span>
+                              </div>
                             </div>
-                            <div style={{fontSize:10,color:c.sub,marginTop:2}}>{h}h each</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{padding:12,borderRadius:12,background:overIfFull?c.peachBg:c.greenBg,border:`1px solid ${overIfFull?c.peachD:c.greenD}`,marginBottom:18,fontSize:13,fontWeight:600,color:overIfFull?c.peachD:c.greenD}}>
-                        {rH.toFixed(1)}h = {yn(rWage)} earned — {yn(eS-rWage)} under limit
-                        {overIfFull&&<div style={{fontSize:12,fontWeight:400,marginTop:4,color:c.roseD}}>Working all {fullH.toFixed(1)}h would exceed by {yn(fullWage-eS)}</div>}
+                          );
+                        })}
                       </div>
 
-                      {/* Plan your own */}
-                      <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>Plan your own</div>
+                      {/* Summary */}
+                      <div style={{padding:16,borderRadius:14,background:overIfFull?c.peachBg:c.greenBg,border:`2px solid ${overIfFull?c.peachD:c.greenD}`,marginBottom:16}}>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12,textAlign:"center"}}>
+                          <div><div style={{fontSize:11,color:c.sub,marginBottom:3}}>Shifts</div><div style={{fontSize:18,fontWeight:800,color:c.text}}>{rMon+rTue+rSun}</div></div>
+                          <div><div style={{fontSize:11,color:c.sub,marginBottom:3}}>Hours</div><div style={{fontSize:18,fontWeight:800,color:c.text}}>{rH.toFixed(1)}h</div></div>
+                          <div><div style={{fontSize:11,color:c.sub,marginBottom:3}}>Earn</div><div style={{fontSize:18,fontWeight:800,color:overIfFull?c.peachD:c.greenD}}>{yn(rWage)}</div></div>
+                        </div>
+                        <div style={{padding:10,borderRadius:10,background:overIfFull?c.peachD:c.greenD,color:c.white,fontSize:13,fontWeight:700,textAlign:"center"}}>
+                          {overIfFull?`⚠️ All shifts would exceed by ${yn(fullWage-eS)}`:`✓ Safe — ${yn(eS-rWage)} under your monthly limit`}
+                        </div>
+                      </div>
+
+                      {/* What-if calculator */}
+                      <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>What if I work different shifts?</div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
                         {[{label:"Mon",max:mondays,key:"pMon",h:monH},{label:"Tue",max:tuesdays,key:"pTue",h:tueH},{label:"Sun",max:sundays,key:"pSun",h:sunH}].map(({label,max,key,h})=>(
                           <div key={key} style={{background:c.cardAlt,borderRadius:12,padding:12}}>
@@ -628,7 +659,6 @@
                           </div>
                         ))}
                       </div>
-
                       {pHasInput&&(
                         <div>
                           <div style={{padding:14,background:c.cardAlt,borderRadius:14,fontSize:13,marginBottom:10}}>
