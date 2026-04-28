@@ -195,6 +195,13 @@
         // ── Money ──
         if(d===pd-3) fire('suica','🚇 Top up your SUICA',`Payday is in 3 days (${pd}th) — load up your SUICA for the new pay period`);
         if(d===pd&&(se.mumItems||[]).length>0) fire('mum','👩 Send to Mum?',`Don't forget to send Mum her money today!`);
+        // ── Budget prep reminders ──
+        const currBudget=da[mk]||{};
+        const hasOneOffs=(currBudget.oneOffs||[]).length>0;
+        const hasSortedFixed=Object.values(currBudget.paidFixed||{}).some(v=>v);
+        const needsPrep=!hasOneOffs||!hasSortedFixed;
+        if(needsPrep&&d===pd-7) fire('budget-prep-7','📋 Sort your budget — 1 week to payday',`Payday is in 7 days (${pd}th) — have you added your one-off expenses and sorted your fixed bills for ${curMo?.label||'this month'}?`);
+        if(needsPrep&&d===pd-2) fire('budget-prep-2','📋 Payday in 2 days — budget not sorted!',`You haven't added one-off expenses or sorted your fixed bills yet for ${curMo?.label||'this month'} — do it before the ${pd}th!`);
         // ── Schedule ──
         const upcomingPL=PAID_LEAVE.find(ds=>{const diff=(new Date(ds)-now)/(86400000);return diff>=0&&diff<=5;});
         if(upcomingPL) fire('pl-'+upcomingPL,'🏖️ Paid Leave Coming Up',`You have paid leave on ${upcomingPL} — enjoy the time off!`);
