@@ -122,7 +122,9 @@
       const [confirmReset,setConfirmReset]=useState(false);
       const [sync,setSync]=useState("idle");
       const [fxLoad,setFxLoad]=useState("idle");
+      const [wide,setWide]=useState(window.innerWidth>=768);
       const timer=useRef(null);
+      useEffect(()=>{const fn=()=>setWide(window.innerWidth>=768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
 
       _t.c=th==="ember"?EMBER:th==="pumpkin"?PUMP:SAGE;
       const c=_t.c;
@@ -332,10 +334,12 @@
       const syncCol=sync==="saved"?c.greenD:sync==="error"?c.roseD:c.muted;
       const syncLabel=sync==="saving"?"↑":sync==="saved"?"✓":sync==="error"?"!":null;
 
+      const px=wide?"40px":"20px";
       return(
-        <div style={{fontFamily:ft,background:c.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",color:c.text,overflowY:"auto",height:"100vh"}}>
+        <div style={{fontFamily:ft,background:c.bg,minHeight:"100vh",color:c.text,overflowY:"auto",height:"100vh"}}>
+          <div style={{maxWidth:wide?1100:480,margin:"0 auto"}}>
 
-          <div style={{background:c.card,padding:"24px 20px 18px",position:"sticky",top:0,zIndex:10,borderRadius:"0 0 22px 22px"}}>
+          <div style={{background:c.card,padding:`24px ${px} 18px`,position:"sticky",top:0,zIndex:10,borderRadius:"0 0 22px 22px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:2}}>
               <span style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5}}>Annual Taxable Income</span>
               <span style={{display:"flex",alignItems:"center",gap:6}}>
@@ -353,7 +357,7 @@
             </div>
           </div>
 
-          <div style={{display:"flex",gap:6,padding:"14px 20px 6px"}}>
+          <div style={{display:"flex",gap:6,padding:`14px ${px} 6px`}}>
             {tabs.map(t=>(
               <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"10px 0",border:"none",cursor:"pointer",borderRadius:12,fontFamily:ft,fontSize:12,fontWeight:tab===t?700:500,color:tab===t?c.white:c.sub,background:tab===t?c.accent:c.card,whiteSpace:"nowrap"}}>
                 {t.charAt(0).toUpperCase()+t.slice(1)}
@@ -361,7 +365,7 @@
             ))}
           </div>
 
-          <div style={{padding:"10px 20px 120px"}}>
+          <div style={{padding:`10px ${px} 80px`}}>
 
             {tab==="wage"&&MONTHS.map(mo=>{
               const d=da[mo.key];
@@ -894,6 +898,7 @@
               </div>
             )}
 
+          </div>
           </div>
         </div>
       );
