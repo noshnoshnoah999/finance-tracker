@@ -47,7 +47,7 @@
     const DS = {
       hourlyWage:1400,annualLimit:1030000,commuteOneWay:178,
       trBefore:1040,trAfter:1100,food4wk:20000,food5wk:25000,
-      gbpToJpy:215,savingsGoal:0,notifs:false,workDays:[0,1,2],
+      gbpToJpy:215,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],
       shifts:{
         1:{start:"09:00",end:"16:00",breakMin:60,label:"Mon"},
         2:{start:"09:00",end:"12:00",breakMin:0,label:"Tue"},
@@ -123,6 +123,7 @@
       const [sync,setSync]=useState("idle");
       const [fxLoad,setFxLoad]=useState("idle");
       const [wide,setWide]=useState(window.innerWidth>=768);
+      const [nGoal,setNGoal]=useState({name:"",target:0,monthly:0});
       const timer=useRef(null);
       useEffect(()=>{const fn=()=>setWide(window.innerWidth>=768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
 
@@ -330,7 +331,7 @@
         </div>
       );
 
-      const tabs=["wage","budget","limit","savings","settings"];
+      const tabs=["wage","budget","limit","savings","goals","settings"];
       const syncCol=sync==="saved"?c.greenD:sync==="error"?c.roseD:c.muted;
       const syncLabel=sync==="saving"?"↑":sync==="saved"?"✓":sync==="error"?"!":null;
 
@@ -779,6 +780,74 @@
                   )}
                 </div>
 
+              </div>
+            )}
+
+            {tab==="goals"&&(
+              <div>
+                {(se.goals||[]).length===0&&(
+                  <div style={{...crd,textAlign:"center",padding:40}}>
+                    <div style={{fontSize:40,marginBottom:12}}>🎯</div>
+                    <div style={{fontSize:16,fontWeight:700,marginBottom:8,color:c.text}}>No goals yet</div>
+                    <div style={{fontSize:13,color:c.sub}}>Add something you're saving toward below</div>
+                  </div>
+                )}
+                <div style={{display:wide&&(se.goals||[]).length>1?"grid":"block",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:14}}>
+                  {(se.goals||[]).map(g=>{
+                    const gpct=g.target>0?Math.min(100,Math.round((g.saved/g.target)*100)):0;
+                    const gleft=Math.max(0,g.target-(g.saved||0));
+                    const gmonths=g.monthly>0?Math.ceil(gleft/g.monthly):null;
+                    const gdone=(g.saved||0)>=g.target;
+                    return(
+                      <div key={g.id} style={{...crd,marginBottom:wide&&(se.goals||[]).length>1?0:14}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                          <div>
+                            <div style={{fontSize:17,fontWeight:700,color:c.text}}>{g.name}</div>
+                            <div style={{fontSize:12,color:c.sub,marginTop:2}}>Target: {yn(g.target)}</div>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{fontSize:15,fontWeight:800,color:gdone?c.greenD:c.blueD}}>{gpct}%</span>
+                            <button onClick={()=>setSe(p=>({...p,goals:(p.goals||[]).filter(x=>x.id!==g.id)}))} style={{border:"none",background:"transparent",color:c.roseD,fontSize:20,cursor:"pointer",padding:0,lineHeight:1}}>×</button>
+                          </div>
+                        </div>
+                        <div style={{background:c.cardAlt,borderRadius:8,height:10,marginBottom:14,overflow:"hidden"}}>
+                          <div style={{height:"100%",borderRadius:8,width:`${gpct}%`,background:gdone?c.greenD:`linear-gradient(90deg,${c.blueD},${c.blue})`,transition:"width 0.4s"}}/>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+                          <div><label style={lbl}>Saved so far</label><NI prefix="¥" value={g.saved||0} onChange={v=>setSe(p=>({...p,goals:(p.goals||[]).map(x=>x.id===g.id?{...x,saved:v}:x)}))}/></div>
+                          <div><label style={lbl}>Saving / month</label><NI prefix="¥" value={g.monthly||0} onChange={v=>setSe(p=>({...p,goals:(p.goals||[]).map(x=>x.id===g.id?{...x,monthly:v}:x)}))}/></div>
+                        </div>
+                        {gdone?(
+                          <div style={{padding:12,borderRadius:12,background:c.greenD,color:c.white,textAlign:"center",fontWeight:700,fontSize:14}}>🎉 Goal reached!</div>
+                        ):(
+                          <div style={{padding:12,background:c.cardAlt,borderRadius:12,fontSize:13}}>
+                            <div style={{display:"flex",justifyContent:"space-between",marginBottom:g.monthly>0?6:0}}>
+                              <span style={{color:c.sub}}>Still needed</span>
+                              <span style={{fontWeight:700,color:c.blueD}}>{yn(gleft)}</span>
+                            </div>
+                            {gmonths&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:c.sub}}>At {yn(g.monthly)}/mo</span><span style={{fontWeight:600}}>{gmonths} month{gmonths!==1?"s":""} to go</span></div>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                    <div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/>
+                    <span style={{fontSize:15,fontWeight:700}}>Add a goal</span>
+                  </div>
+                  <div style={{display:"grid",gap:10}}>
+                    <div><label style={lbl}>Goal name</label><input placeholder="e.g. Bed setup" value={nGoal.name} onChange={e=>setNGoal(p=>({...p,name:e.target.value}))} style={inp}/></div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                      <div><label style={lbl}>Target amount</label><NI prefix="¥" value={nGoal.target||0} onChange={v=>setNGoal(p=>({...p,target:v}))} placeholder="100000"/></div>
+                      <div><label style={lbl}>Saving / month</label><NI prefix="¥" value={nGoal.monthly||0} onChange={v=>setNGoal(p=>({...p,monthly:v}))} placeholder="10000"/></div>
+                    </div>
+                    <button onClick={()=>{if(!nGoal.name||!nGoal.target)return;setSe(p=>({...p,goals:[...(p.goals||[]),{id:Date.now(),name:nGoal.name,target:nGoal.target,saved:0,monthly:nGoal.monthly||0}]}));setNGoal({name:"",target:0,monthly:0});}} style={{padding:14,border:"none",background:c.greenD,color:c.white,borderRadius:12,cursor:"pointer",fontFamily:ft,fontSize:14,fontWeight:700}}>
+                      Add Goal
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
