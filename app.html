@@ -126,6 +126,7 @@
       const [nGoal,setNGoal]=useState({name:"",target:0,monthly:0});
       const [nItem,setNItem]=useState({name:"",price:0,url:""});
       const [addingToGoal,setAddingToGoal]=useState(null);
+      const [schedOpen,setSchedOpen]=useState(false);
       const timer=useRef(null);
       useEffect(()=>{const fn=()=>setWide(window.innerWidth>=768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
 
@@ -369,6 +370,56 @@
           </div>
 
           <div style={{padding:`10px ${px} 80px`}}>
+
+            {tab==="wage"&&(
+              <div style={{...crd,marginBottom:10,padding:0,overflow:"hidden"}}>
+                <button onClick={()=>setSchedOpen(p=>!p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"14px 18px",border:"none",background:"transparent",cursor:"pointer",fontFamily:ft}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/>
+                    <span style={{fontWeight:700,fontSize:15,color:c.text}}>Schedule Overview</span>
+                  </div>
+                  <span style={{fontSize:12,color:c.sub}}>{schedOpen?"▲ Close":"▼ Edit all months"}</span>
+                </button>
+                {schedOpen&&(
+                  <div style={{padding:"0 18px 18px",borderTop:`1px solid ${c.border}`}}>
+                    <div style={{display:"grid",gridTemplateColumns:"44px 1fr 1fr 1fr",gap:6,alignItems:"center",padding:"10px 0 6px",borderBottom:`1px solid ${c.border}`}}>
+                      <span style={{fontSize:10,color:c.muted,fontWeight:600,textTransform:"uppercase"}}>Mo</span>
+                      <span style={{fontSize:10,color:c.muted,fontWeight:600,textTransform:"uppercase"}}>Days</span>
+                      <span style={{fontSize:10,color:c.muted,fontWeight:600,textTransform:"uppercase"}}>Hours</span>
+                      <span style={{fontSize:10,color:c.muted,fontWeight:600,textTransform:"uppercase",textAlign:"right"}}>Wage</span>
+                    </div>
+                    {MONTHS.map(mo=>{
+                      const d=da[mo.key];
+                      const hasHours=d.hours>0;
+                      const wage=gW(d);
+                      const isPast=mo.key<`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+                      return(
+                        <div key={mo.key} style={{display:"grid",gridTemplateColumns:"44px 1fr 1fr 1fr",gap:6,alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${c.border}`,opacity:isPast&&wage===0?0.5:1}}>
+                          <span style={{fontSize:13,fontWeight:700,color:isPast?(wage>0?c.greenD:c.muted):c.blueD}}>{mo.short}</span>
+                          <input
+                            type="number" inputMode="numeric" value={d.days||""}
+                            onChange={e=>sM(mo.key,"days",Number(e.target.value)||0)}
+                            placeholder="0"
+                            style={{fontSize:13,border:`2px solid ${c.border}`,borderRadius:8,padding:"6px 8px",width:"100%",boxSizing:"border-box",background:c.bg,color:c.text,fontFamily:mn,outline:"none"}}
+                          />
+                          <input
+                            type="number" inputMode="numeric" step="any" value={d.hours||""}
+                            onChange={e=>{const v=Number(e.target.value)||0;sM(mo.key,"hours",v);}}
+                            placeholder="0"
+                            style={{fontSize:13,border:`2px solid ${c.border}`,borderRadius:8,padding:"6px 8px",width:"100%",boxSizing:"border-box",background:c.bg,color:c.text,fontFamily:mn,outline:"none"}}
+                          />
+                          <span style={{fontSize:12,fontWeight:700,color:wage>0?c.greenD:c.muted,textAlign:"right"}}>{wage>0?yn(wage):"—"}</span>
+                        </div>
+                      );
+                    })}
+                    <div style={{marginTop:12,padding:12,background:c.cardAlt,borderRadius:12,fontSize:13}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:c.sub}}>Total days logged</span><span style={{fontWeight:600}}>{MONTHS.reduce((s,m)=>s+(da[m.key]?.days||0),0)}d</span></div>
+                      <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:c.sub}}>Total hours logged</span><span style={{fontWeight:600}}>{MONTHS.reduce((s,m)=>s+(da[m.key]?.hours||0),0).toFixed(1)}h</span></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {tab==="wage"&&MONTHS.map(mo=>{
               const d=da[mo.key];
