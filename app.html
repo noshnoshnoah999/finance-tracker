@@ -4,9 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Finance" />
   <meta name="theme-color" content="#f0f5ee" />
+  <link rel="manifest" href="/finance-tracker/manifest.json" />
+  <link rel="apple-touch-icon" href="/finance-tracker/apple-touch-icon-v4.png" />
+  <link rel="apple-touch-icon-precomposed" href="/finance-tracker/apple-touch-icon-v4.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/finance-tracker/icon-192-v4.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/finance-tracker/icon-512-v4.png" />
   <title>Finance Tracker</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -61,9 +66,8 @@
       ],
     };
     const PAID_LEAVE = ["2026-05-24","2026-05-25","2026-05-31","2026-06-01","2026-06-07"];
-    const isHoliday = ds => { const d=new Date(ds); return d>=new Date("2026-05-20")&&d<=new Date("2026-06-10"); };
     // Returns: "work" | "hol" | "pl" | "off" | "none"
-    const getDayState=(ds,dt,customDays,wd)=>{const ov=(customDays||{})[ds];if(ov)return ov;const isSched=wd.includes(dt.getDay());if(PAID_LEAVE.includes(ds))return"pl";if(isHoliday(ds)&&isSched)return"hol";if(isSched)return"work";return"none";};
+    const getDayState=(ds,dt,customDays,wd)=>{const ov=(customDays||{})[ds];if(ov)return ov;const isSched=wd.includes(dt.getDay());if(PAID_LEAVE.includes(ds))return"pl";if(isSched)return"work";return"none";};
     const DEF_DAD = () => [
       {id:"d1",note:"Pocket money",gbp:50},{id:"d2",note:"Haircut",gbp:25},
       {id:"d3",note:"Lunch money",gbp:25},{id:"d4",note:"Student loan",gbp:150},
@@ -76,7 +80,7 @@
     const cWD=(s,e,wd,skipHol=false)=>{let n=0;const d=new Date(s),en=new Date(e);while(d<=en){const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;if(wd.includes(d.getDay())&&!(skipHol&&isHoliday(ds)))n++;d.setDate(d.getDate()+1);}return n;};
     const wDIM=(mk,wd)=>{const[y,mo]=mk.split("-").map(Number);return cWD(new Date(y,mo-1,1),new Date(y,mo,0),wd);};
     const cDIM=(mk,dow)=>{const[y,mo]=mk.split("-").map(Number);let n=0;const d=new Date(y,mo-1,1),en=new Date(y,mo,0);while(d<=en){if(d.getDay()===dow)n++;d.setDate(d.getDate()+1);}return n;};
-    const cDIMAvail=(mk,dow)=>{const[y,mo]=mk.split("-").map(Number);let n=0;const d=new Date(y,mo-1,1),en=new Date(y,mo,0);while(d<=en){const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;if(d.getDay()===dow&&!isHoliday(ds))n++;d.setDate(d.getDate()+1);}return n;};
+    const cDIMAvail=(mk,dow,customDays)=>{const[y,mo]=mk.split("-").map(Number);let n=0;const d=new Date(y,mo-1,1),en=new Date(y,mo,0);while(d<=en){const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;const st=getDayState(ds,d,customDays||{},[dow]);if(d.getDay()===dow&&st==="work")n++;d.setDate(d.getDate()+1);}return n;};
     const sH=sh=>{if(!sh)return 0;const[a,b]=sh.start.split(":").map(Number),[cv,dv]=sh.end.split(":").map(Number);return(cv+dv/60)-(a+b/60)-(sh.breakMin/60);};
     const sHIM=(mk,shifts)=>{if(!shifts)return 0;let t=0;Object.keys(shifts).forEach(d=>{t+=cDIM(mk,Number(d))*sH(shifts[d]);});return t;};
     const gPD=mk=>{const[y,mo]=mk.split("-").map(Number);const d=new Date(y,mo-1,15);const dw=d.getDay();if(dw===6)d.setDate(14);if(dw===0)d.setDate(13);return d.getDate();};
@@ -192,9 +196,9 @@
         const rem2=se.annualLimit-tot;
         const curMo=MONTHS.find(m=>m.key===mk);
         // daily de-dup per notification type
-        const fire=(key,title,body)=>{const k='fn-'+key+'-'+todayStr;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/icon-512.png'}),200);};
+        const fire=(key,title,body)=>{const k='fn-'+key+'-'+todayStr;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/finance-tracker/icon-512-v4.png'}),200);};
         // once-ever de-dup for milestones
-        const fireOnce=(key,title,body)=>{const k='fn1-'+key;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/icon-512.png'}),200);};
+        const fireOnce=(key,title,body)=>{const k='fn1-'+key;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/finance-tracker/icon-512-v4.png'}),200);};
         // ── Existing ──
         if(d===pd) fire('payday','💰 Pay Day!','Today is your payday — log your hours!');
         else if(d===pd-1) fire('payday-eve','💰 Pay Day Tomorrow',`Payday is tomorrow (${pd}th). Get ready!`);
@@ -265,7 +269,6 @@
       const pHasInput=(pH.pMon||0)+(pH.pTue||0)+(pH.pSun||0)>0;
       const nML=cMN<=11?MONTHS[cMN].label:"—";
       const nMK=cMN<=11?MONTHS[cMN].key:null;
-      const nMW=nMK?wDIM(nMK,se.workDays):0;
 
       const bd=da[bm]||eM();
       const bdW=gW(bd),bdTr=gTr(bd,bm),bdCm=bd.suicaOverride!=null?bd.suicaOverride:gCm(bd,bm);
@@ -667,7 +670,8 @@
 
                 {/* ── What to work this month ── */}
                 {nMK&&(()=>{
-                  const mondays=cDIMAvail(nMK,1),tuesdays=cDIMAvail(nMK,2),sundays=cDIMAvail(nMK,0);
+                  const nMKcd=da[nMK]?.customDays||{};
+                  const mondays=cDIMAvail(nMK,1,nMKcd),tuesdays=cDIMAvail(nMK,2,nMKcd),sundays=cDIMAvail(nMK,0,nMKcd);
                   const fullH=mondays*monH+tuesdays*tueH+sundays*sunH;
                   const fullWage=Math.round(fullH*se.hourlyWage);
                   const overIfFull=fullWage>eS;
@@ -1019,7 +1023,7 @@
                         setSe(p=>({...p,gbpToJpy:rate}));
                         setFxLoad("done");
                         setTimeout(()=>setFxLoad("idle"),3000);
-                        if(se.notifs&&Notification.permission==='granted'&&rate>oldRate) new Notification('💷 Rate improved!',{body:`£1 = ¥${rate} today (up from ¥${oldRate}) — good time for Dad to send money!`,icon:'/icon-512.png'});
+                        if(se.notifs&&Notification.permission==='granted'&&rate>oldRate) new Notification('💷 Rate improved!',{body:`£1 = ¥${rate} today (up from ¥${oldRate}) — good time for Dad to send money!`,icon:'/finance-tracker/icon-512-v4.png'});
                       }catch(e){
                         setFxLoad("error");
                         setTimeout(()=>setFxLoad("idle"),3000);
@@ -1051,7 +1055,7 @@
                         </button>
                       </div>
                       {se.notifs&&Notification.permission==='granted'&&(
-                        <button onClick={()=>new Notification('Finance Tracker ✓',{body:'Notifications are working!',icon:'/icon-512.png'})} style={{width:"100%",padding:10,border:`1px solid ${c.border}`,background:"transparent",color:c.sub,borderRadius:10,cursor:"pointer",fontFamily:ft,fontSize:12,marginBottom:12}}>
+                        <button onClick={()=>new Notification('Finance Tracker ✓',{body:'Notifications are working!',icon:'/finance-tracker/icon-512-v4.png'})} style={{width:"100%",padding:10,border:`1px solid ${c.border}`,background:"transparent",color:c.sub,borderRadius:10,cursor:"pointer",fontFamily:ft,fontSize:12,marginBottom:12}}>
                           Send test notification
                         </button>
                       )}
