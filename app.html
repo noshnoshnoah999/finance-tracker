@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-title" content="Finance" />
   <meta name="theme-color" content="#f0f5ee" />
   <link rel="manifest" href="/finance-tracker/manifest.json" />
-  <link rel="apple-touch-icon" href="/finance-tracker/apple-touch-icon-v5.png" />
-  <link rel="apple-touch-icon-precomposed" href="/finance-tracker/apple-touch-icon-v5.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="/finance-tracker/icon-192-v5.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="/finance-tracker/icon-512-v5.png" />
+  <link rel="apple-touch-icon" href="/finance-tracker/apple-touch-icon-v6.png" />
+  <link rel="apple-touch-icon-precomposed" href="/finance-tracker/apple-touch-icon-v6.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/finance-tracker/icon-192-v6.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/finance-tracker/icon-512-v6.png" />
   <title>Finance Tracker</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -196,9 +196,9 @@
         const rem2=se.annualLimit-tot;
         const curMo=MONTHS.find(m=>m.key===mk);
         // daily de-dup per notification type
-        const fire=(key,title,body)=>{const k='fn-'+key+'-'+todayStr;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/finance-tracker/icon-512-v5.png'}),200);};
+        const fire=(key,title,body)=>{const k='fn-'+key+'-'+todayStr;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/finance-tracker/icon-512-v6.png'}),200);};
         // once-ever de-dup for milestones
-        const fireOnce=(key,title,body)=>{const k='fn1-'+key;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/finance-tracker/icon-512-v5.png'}),200);};
+        const fireOnce=(key,title,body)=>{const k='fn1-'+key;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/finance-tracker/icon-512-v6.png'}),200);};
         // ── Existing ──
         if(d===pd) fire('payday','💰 Pay Day!','Today is your payday — log your hours!');
         else if(d===pd-1) fire('payday-eve','💰 Pay Day Tomorrow',`Payday is tomorrow (${pd}th). Get ready!`);
@@ -1023,7 +1023,7 @@
                         setSe(p=>({...p,gbpToJpy:rate}));
                         setFxLoad("done");
                         setTimeout(()=>setFxLoad("idle"),3000);
-                        if(se.notifs&&Notification.permission==='granted'&&rate>oldRate) new Notification('💷 Rate improved!',{body:`£1 = ¥${rate} today (up from ¥${oldRate}) — good time for Dad to send money!`,icon:'/finance-tracker/icon-512-v5.png'});
+                        if(se.notifs&&Notification.permission==='granted'&&rate>oldRate) new Notification('💷 Rate improved!',{body:`£1 = ¥${rate} today (up from ¥${oldRate}) — good time for Dad to send money!`,icon:'/finance-tracker/icon-512-v6.png'});
                       }catch(e){
                         setFxLoad("error");
                         setTimeout(()=>setFxLoad("idle"),3000);
@@ -1055,7 +1055,7 @@
                         </button>
                       </div>
                       {se.notifs&&Notification.permission==='granted'&&(
-                        <button onClick={()=>new Notification('Finance Tracker ✓',{body:'Notifications are working!',icon:'/finance-tracker/icon-512-v5.png'})} style={{width:"100%",padding:10,border:`1px solid ${c.border}`,background:"transparent",color:c.sub,borderRadius:10,cursor:"pointer",fontFamily:ft,fontSize:12,marginBottom:12}}>
+                        <button onClick={()=>new Notification('Finance Tracker ✓',{body:'Notifications are working!',icon:'/finance-tracker/icon-512-v6.png'})} style={{width:"100%",padding:10,border:`1px solid ${c.border}`,background:"transparent",color:c.sub,borderRadius:10,cursor:"pointer",fontFamily:ft,fontSize:12,marginBottom:12}}>
                           Send test notification
                         </button>
                       )}
