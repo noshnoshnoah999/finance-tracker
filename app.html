@@ -77,7 +77,7 @@
     const PF = {"2026-01":{hours:0,days:4,wageOverride:28982},"2026-02":{hours:0,days:10,wageOverride:81143},"2026-03":{hours:0,days:14,wageOverride:107112},"2026-04":{hours:0,days:14,wageOverride:97207}};
     const gDef = () => { const d={}; MONTHS.forEach(mo=>{ const m=eM(); if(PF[mo.key]) Object.assign(m,PF[mo.key],{dadItems:DEF_DAD()}); else m.days=wDIM(mo.key,DS.workDays); d[mo.key]=m; }); return d; };
 
-    const cWD=(s,e,wd,skipHol=false)=>{let n=0;const d=new Date(s),en=new Date(e);while(d<=en){const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;if(wd.includes(d.getDay())&&!(skipHol&&isHoliday(ds)))n++;d.setDate(d.getDate()+1);}return n;};
+    const cWD=(s,e,wd)=>{let n=0;const d=new Date(s),en=new Date(e);while(d<=en){if(wd.includes(d.getDay()))n++;d.setDate(d.getDate()+1);}return n;};
     const wDIM=(mk,wd)=>{const[y,mo]=mk.split("-").map(Number);return cWD(new Date(y,mo-1,1),new Date(y,mo,0),wd);};
     const cDIM=(mk,dow)=>{const[y,mo]=mk.split("-").map(Number);let n=0;const d=new Date(y,mo-1,1),en=new Date(y,mo,0);while(d<=en){if(d.getDay()===dow)n++;d.setDate(d.getDate()+1);}return n;};
     const cDIMAvail=(mk,dow,customDays)=>{const[y,mo]=mk.split("-").map(Number);let n=0;const d=new Date(y,mo-1,1),en=new Date(y,mo,0);while(d<=en){const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;const st=getDayState(ds,d,customDays||{},[dow]);if(d.getDay()===dow&&st==="work")n++;d.setDate(d.getDate()+1);}return n;};
@@ -194,6 +194,8 @@
             if(selfChange.current) return;
             const v=payload.new?.data;
             if(!v) return;
+            selfChange.current=true;
+            setTimeout(()=>{selfChange.current=false;},4000);
             if(v.settings) setSe({...DS,...v.settings,fixed:v.settings.fixed||DS.fixed.map(f=>({...f}))});
             if(v.data) setDa(p=>{const x={...p};Object.keys(v.data).forEach(k=>{if(x[k]!==undefined)x[k]={...eM(),...v.data[k]};});return x;});
             if(v.theme) setTh(v.theme);
@@ -241,7 +243,7 @@
         // ── Milestones ──
         if(tot>=se.annualLimit/2) fireOnce('halfway','🏆 Halfway There!',`You've earned ¥${tot.toLocaleString()} — halfway through your ¥${se.annualLimit.toLocaleString()} annual limit`);
         const currDa2=da[mk]||{};const pF2=currDa2.paidFixed||{};
-        const allBillsPaid=(se.fixed||[]).length>0&&(se.fixed||[]).every(f=>pF2[f.id])&&pF2['suica']&&pF2['food'];
+        const allBillsPaid=(se.fixed||[]).length>0&&(se.fixed||[]).every(f=>pF2[f.id])&&pF2['suica']&&pF2['food']&&(!currDa2.skinTreatment||pF2['skinTreatment'])&&(!currDa2.generalSavings||pF2['generalSavings']);
         if(allBillsPaid) fire('allpaid','✅ All Bills Paid!',`Every fixed expense is marked as paid for ${curMo?.label||'this month'} — nice work!`);
         const dayEarnings=se.hourlyWage*6;
         if(rem2>0&&rem2<dayEarnings*2) fire('lastday','📆 Almost at the Limit',`Only ¥${rem2.toLocaleString()} left — your next shift could exceed your annual limit!`);
@@ -469,7 +471,7 @@
 
             {tab==="wage"&&MONTHS.map(mo=>{
               const d=da[mo.key];
-              const wage=gW(d),tr=gTr(d,mo.key),cm=gCm(d,mo.key),tx=wage,rate=trf(mo.key),op=xp[mo.key];
+              const wage=gW(d),tr=gTr(d,mo.key),cm=gCm(d,mo.key),tx=wage,rate=trf(mo.key),op=xp[mo.key],suicaDays=rt>0?Math.round(cm/rt):0;
               const hD=wage>0||d.wageOverride>0,hH=d.hours>0;
               const mI=MONTHS.findIndex(x=>x.key===mo.key);
               const cT=MONTHS.slice(0,mI+1).reduce((s,x)=>s+gTx(da[x.key]),0);
@@ -501,7 +503,7 @@
                         <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:600}}>Total Pay</span><span style={{fontWeight:700,fontSize:15}}>{yn(wage+tr)}</span></div>
                       </div>
                       <div style={{marginTop:10,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
-                        <div style={rw}><span style={{color:c.sub}}>Commute ({d.days}d × {yn(rt)})</span><span style={{fontWeight:500}}>{yn(cm)}</span></div>
+                        <div style={rw}><span style={{color:c.sub}}>Commute ({suicaDays}d × {yn(rt)})</span><span style={{fontWeight:500}}>{yn(cm)}</span></div>
                         <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:700,fontSize:14}}>Taxable (wage only)</span><span style={{fontWeight:700,fontSize:16}}>{yn(tx)}</span></div>
                       </div>
                       {hD&&(
@@ -543,7 +545,7 @@
                     <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>SUICA Date Range</div>
                     {(()=>{
                       const periods=[];
-                      for(let i=0;i<4;i++){const mi=MONTHS.findIndex(x=>x.key===bm)+i;if(mi>=0&&mi<11){const mk1=MONTHS[mi].key,mk2=MONTHS[mi+1].key;const[y1,m1]=mk1.split("-").map(Number),[y2,m2]=mk2.split("-").map(Number);const pd1=gPD(mk1),pd2=gPD(mk2);const fr=`${y1}-${String(m1).padStart(2,"0")}-${String(pd1).padStart(2,"0")}`;const toDate=new Date(y2,m2-1,pd2);toDate.setDate(toDate.getDate()-1);const to=`${toDate.getFullYear()}-${String(toDate.getMonth()+1).padStart(2,"0")}-${String(toDate.getDate()).padStart(2,"0")}`;periods.push({label:`${MONTHS[mi].short} ${pd1} → ${MONTHS[mi+1].short} ${toDate.getDate()}`,from:fr,to});}}
+                      for(let i=0;i<4;i++){const mi=MONTHS.findIndex(x=>x.key===bm)+i;if(mi<0||mi>=MONTHS.length) break;const mk1=MONTHS[mi].key;const[y1,m1]=mk1.split("-").map(Number);const nextM=m1===12?1:m1+1,nextY=m1===12?y1+1:y1;const mk2=`${nextY}-${String(nextM).padStart(2,"0")}`;const shortNext=m1===12?"Jan":(MONTHS[mi+1]?.short||"Jan");const pd1=gPD(mk1),pd2=gPD(mk2);const fr=`${y1}-${String(m1).padStart(2,"0")}-${String(pd1).padStart(2,"0")}`;const toDate=new Date(nextY,nextM-1,pd2);toDate.setDate(toDate.getDate()-1);const to=`${toDate.getFullYear()}-${String(toDate.getMonth()+1).padStart(2,"0")}-${String(toDate.getDate()).padStart(2,"0")}`;periods.push({label:`${MONTHS[mi].short} ${pd1} → ${shortNext} ${toDate.getDate()}`,from:fr,to});}
                       return(<div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>{periods.map((p,pi)=>(<button key={pi} onClick={()=>{if(pF===p.from&&pT===p.to){setPF2("");setPT("");}else{setPF2(p.from);setPT(p.to);}}} style={{padding:"6px 12px",borderRadius:10,border:"none",background:pF===p.from&&pT===p.to?c.accent:c.cardAlt,color:pF===p.from&&pT===p.to?c.white:c.sub,fontSize:11,cursor:"pointer",fontWeight:pF===p.from&&pT===p.to?600:400,fontFamily:ft}}>{p.label}</button>))}</div>);
                     })()}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -710,7 +712,7 @@
                         <span style={{fontSize:15,fontWeight:700}}>What to work in {nML}</span>
                       </div>
                       <div style={{fontSize:12,color:c.sub,marginBottom:18}}>
-                        Recommended shifts to stay under your limit{(nMK==="2026-05"||nMK==="2026-06")?" · holiday shifts excluded":""}
+                        Recommended shifts to stay under your limit{(nMK==="2026-05"||nMK==="2026-06")?" · paid leave excluded":""}
                       </div>
 
                       {/* Day-by-day breakdown */}
