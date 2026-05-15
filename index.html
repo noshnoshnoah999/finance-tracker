@@ -297,11 +297,11 @@
       const bd=da[bm]||eM();
       const bdW=gW(bd),bdTr=gTr(bd,bm),bdCm=bd.suicaOverride!=null?bd.suicaOverride:gCm(bd,bm);
       const bdDJ=dTJ(bd),bdDJFree=(bd.dadItems||[]).filter(x=>(se.dadFreeSpend||{})[x.id]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0),bdI=bdW+bdTr,bdFd=bd.foodOverride!=null?bd.foodOverride:fF(bm),bdSkin=bd.skinTreatment||0,bdGenSav=bd.generalSavings||0;
+      const bdMC=bd.mumChecked||[],bdPF=bd.paidFixed||{},bdPOO=bd.paidOneOffs||{},bdSF=bd.skippedFixed||{};
       const bdFC=se.fixed.filter(f=>!bdSF[f.id]).reduce((s,f)=>s+f.amount,0);
       const bdFT=bdFC+bdCm+bdFd+bdSkin+bdGenSav;
       const bdOY=bd.oneOffs.filter(x=>!x.mumPays).reduce((s,x)=>s+x.amount,0);
       const bdOM=bd.oneOffs.filter(x=>x.mumPays).reduce((s,x)=>s+x.amount,0);
-      const bdMC=bd.mumChecked||[],bdPF=bd.paidFixed||{},bdPOO=bd.paidOneOffs||{},bdSF=bd.skippedFixed||{};
       const bdFoodAmt=bdFd;
       const allMumItems=[{id:"food",name:"Food Budget"+(bd.foodOverride!=null?" (custom)":MONTHS.find(x=>x.key===bm)?.is5wk?" (5-wk)":" (4-wk)"),amount:bdFoodAmt},...(se.mumItems||[])];
       const bdMTDisplay=allMumItems.filter(x=>bdMC.includes(x.id)).reduce((s,x)=>s+x.amount,0);
