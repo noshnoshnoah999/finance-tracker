@@ -304,7 +304,7 @@
       const bdFr=bdI-bdFT-bdOY;
       const mWD=(()=>{const[y,mo]=bm.split("-").map(Number);let n=0;const d2=new Date(y,mo-1,1),en=new Date(y,mo,0);const cd=da[bm]?.customDays||{};while(d2<=en){const ds=`${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,"0")}-${String(d2.getDate()).padStart(2,"0")}`;if(getDayState(ds,d2,cd,se.workDays)==="work")n++;d2.setDate(d2.getDate()+1);}return n;})(),mPC=mWD*rt;
       let pRD=0,pRC=0;
-      if(pF&&pT){pRD=cWD(pF,pT,se.workDays,true);pRC=pRD*rt;}
+      if(pF&&pT){const allCD={};MONTHS.forEach(mo=>{Object.assign(allCD,da[mo.key]?.customDays||{});});const _d=new Date(pF),_en=new Date(pT);while(_d<=_en){const _ds=`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}-${String(_d.getDate()).padStart(2,"0")}`;if(getDayState(_ds,_d,allCD,se.workDays)==="work")pRD++;_d.setDate(_d.getDate()+1);}pRC=pRD*rt;}
 
       const aOO=k=>{if(!nE.name||!nE.amount)return;setDa(p=>({...p,[k]:{...p[k],oneOffs:[...p[k].oneOffs,{id:Date.now(),name:nE.name,amount:Number(nE.amount)||0,mumPays:false}]}}));setNE({name:"",amount:""});};
       const rOO=(k,id)=>setDa(p=>({...p,[k]:{...p[k],oneOffs:p[k].oneOffs.filter(x=>x.id!==id)}}));
