@@ -74,7 +74,7 @@
       {id:"d3",note:"Lunch money",gbp:25},{id:"d4",note:"Student loan",gbp:150},
       {id:"d5",note:"Commuter pass",gbp:50},{id:"d6",note:"Japanese lessons",gbp:25},
     ];
-    const eM = () => ({hours:0,days:0,wageOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{}});
+    const eM = () => ({hours:0,days:0,wageOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{}});
     const PF = {"2026-01":{hours:0,days:4,wageOverride:28982},"2026-02":{hours:0,days:10,wageOverride:81143},"2026-03":{hours:0,days:14,wageOverride:107112},"2026-04":{hours:0,days:14,wageOverride:97207}};
     const gDef = () => { const d={}; MONTHS.forEach(mo=>{ const m=eM(); if(PF[mo.key]) Object.assign(m,PF[mo.key],{dadItems:DEF_DAD()}); else m.days=wDIM(mo.key,DS.workDays); d[mo.key]=m; }); return d; };
 
@@ -259,6 +259,7 @@
       const gW=d=>d.hours>0?Math.round(d.hours*se.hourlyWage):(d.wageOverride||0);
       const gTr=(d,k)=>d.days*trf(k);
       const gPrevMK=mk=>{const i=MONTHS.findIndex(x=>x.key===mk);return i>0?MONTHS[i-1].key:null;};
+      const gShifts=mk=>{const ov=da[mk]?.shiftOverrides||{};const r={};Object.keys(se.shifts||{}).forEach(d=>{r[d]=ov[d]?{...se.shifts[d],...ov[d]}:se.shifts[d];});return r;};
       const gTx=(d,mk)=>{const pmk=gPrevMK(mk);const plH=pmk&&d.hours>0?gPLHours(pmk,da[pmk]?.customDays,se.shifts,se.workDays):0;return gW(d)+Math.round(plH*se.hourlyWage);};
       const dTJ=d=>(d.dadItems||[]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
       const fF=k=>MONTHS.find(x=>x.key===k)?.is5wk?se.food5wk:se.food4wk;
@@ -281,9 +282,10 @@
       const nFM=fMs.length;
       const eS=nFM>0?Math.floor(rL/nFM):0;
       const mHP=se.hourlyWage>0?eS/se.hourlyWage:0;
-      const monH=sH((se.shifts||{})[1]);
-      const tueH=sH((se.shifts||{})[2]);
-      const sunH=sH((se.shifts||{})[0]);
+      const nMShifts=nMK?gShifts(nMK):se.shifts||{};
+      const monH=sH(nMShifts[1]);
+      const tueH=sH(nMShifts[2]);
+      const sunH=sH(nMShifts[0]);
       const pTotalH=(pH.pMon||0)*monH+(pH.pTue||0)*tueH+(pH.pSun||0)*sunH;
       const pTotalDays=(pH.pMon||0)+(pH.pTue||0)+(pH.pSun||0);
       const pW=Math.round(pTotalH*se.hourlyWage);
@@ -540,40 +542,42 @@
                     <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>Work Schedule</span></div>
                     <span style={{fontSize:12,fontWeight:600,color:c.blueD,background:c.blueBg,padding:"4px 10px",borderRadius:8}}>{[1,2,0].map(d=>DN[d]).join(", ")}</span>
                   </div>
+                  {(()=>{const bmShifts=gShifts(bm);const bmOv=da[bm]?.shiftOverrides||{};return(
                   <div style={{padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
-                    {[1,2,0].map(dow=>{const sh=(se.shifts||{})[dow];if(!sh)return null;const editing=eF===`shift-${dow}`;return(
+                    {[1,2,0].map(dow=>{const sh=bmShifts[dow];if(!sh)return null;const editing=eF===`shift-${dow}`;const hasOv=!!bmOv[dow];return(
                       <div key={dow} style={{padding:"8px 0",borderBottom:`1px solid ${c.border}`}}>
                         {editing?(
                           <div>
                             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
                               <span style={{color:c.sub,width:36,flexShrink:0,fontWeight:600}}>{sh.label}</span>
-                              <input type="time" value={sh.start} onChange={e=>setSe(p=>({...p,shifts:{...p.shifts,[dow]:{...p.shifts[dow],start:e.target.value}}}))} style={{...inp,flex:1,padding:"6px 10px"}}/>
+                              <input type="time" value={sh.start} onChange={e=>sM(bm,"shiftOverrides",{...bmOv,[dow]:{...(bmOv[dow]||sh),start:e.target.value}})} style={{...inp,flex:1,padding:"6px 10px"}}/>
                               <span style={{color:c.muted}}>to</span>
-                              <input type="time" value={sh.end} onChange={e=>setSe(p=>({...p,shifts:{...p.shifts,[dow]:{...p.shifts[dow],end:e.target.value}}}))} style={{...inp,flex:1,padding:"6px 10px"}}/>
+                              <input type="time" value={sh.end} onChange={e=>sM(bm,"shiftOverrides",{...bmOv,[dow]:{...(bmOv[dow]||sh),end:e.target.value}})} style={{...inp,flex:1,padding:"6px 10px"}}/>
                             </div>
                             <div style={{display:"flex",alignItems:"center",gap:6}}>
                               <span style={{color:c.sub,width:36,flexShrink:0,fontSize:11}}>Break</span>
-                              <NI value={sh.breakMin} onChange={v=>setSe(p=>({...p,shifts:{...p.shifts,[dow]:{...p.shifts[dow],breakMin:v}}}))} placeholder="0" style={{flex:1}}/>
+                              <NI value={sh.breakMin} onChange={v=>sM(bm,"shiftOverrides",{...bmOv,[dow]:{...(bmOv[dow]||sh),breakMin:v}})} placeholder="0" style={{flex:1}}/>
                               <span style={{color:c.muted,fontSize:11}}>min</span>
                               <button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:ft}}>Done</button>
+                              {hasOv&&<button onClick={()=>{const n={...bmOv};delete n[dow];sM(bm,"shiftOverrides",n);setEF(null);}} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer"}}>reset</button>}
                             </div>
                           </div>
                         ):(
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                             <span style={{color:c.sub,width:36,flexShrink:0}}>{sh.label}</span>
-                            <span style={{fontWeight:500,flex:1,textAlign:"center"}}>{sh.start}–{sh.end}{sh.breakMin>0?` (${sh.breakMin}m break)`:""}</span>
+                            <span style={{fontWeight:500,flex:1,textAlign:"center"}}>{sh.start}–{sh.end}{sh.breakMin>0?` (${sh.breakMin}m break)`:""}{hasOv&&<span style={{fontSize:10,color:c.blueD,marginLeft:6}}>custom</span>}</span>
                             <div style={{display:"flex",alignItems:"center",gap:8}}>
                               <span style={{fontWeight:600}}>{sH(sh)}h</span>
-                              <button onClick={()=>setEF(`shift-${dow}`)} style={{border:"none",background:c.cardAlt,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500,fontFamily:mn}}>Edit</button>
+                              <button onClick={()=>setEF(`shift-${dow}`)} style={{border:"none",background:c.card,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500,fontFamily:mn}}>Edit</button>
                             </div>
                           </div>
                         )}
                       </div>
                     );})}
-                    <div style={{...rw,paddingTop:10}}><span style={{fontWeight:600}}>Weekly total</span><span style={{fontWeight:700}}>{Object.keys(se.shifts||{}).reduce((s,d)=>s+sH(se.shifts[d]),0)}h</span></div>
-                    <div style={rw}><span style={{color:c.sub}}>Scheduled this month</span><span style={{fontWeight:700,color:c.blueD}}>{sHIM(bm,se.shifts).toFixed(1)}h</span></div>
-                    <div style={rw}><span style={{color:c.sub}}>Scheduled wage</span><span style={{fontWeight:700,color:c.blueD}}>{yn(sHIM(bm,se.shifts)*se.hourlyWage)}</span></div>
-                  </div>
+                    <div style={{...rw,paddingTop:10}}><span style={{fontWeight:600}}>Weekly total</span><span style={{fontWeight:700}}>{Object.keys(bmShifts).reduce((s,d)=>s+sH(bmShifts[d]),0)}h</span></div>
+                    <div style={rw}><span style={{color:c.sub}}>Scheduled this month</span><span style={{fontWeight:700,color:c.blueD}}>{sHIM(bm,bmShifts).toFixed(1)}h</span></div>
+                    <div style={rw}><span style={{color:c.sub}}>Scheduled wage</span><span style={{fontWeight:700,color:c.blueD}}>{yn(sHIM(bm,bmShifts)*se.hourlyWage)}</span></div>
+                  </div>);})()}
                   {renderCal()}
                   <div style={{marginTop:14,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
                     <div style={rw}><span style={{color:c.sub}}>Work days this month</span><span style={{fontWeight:600}}>{mWD} days</span></div>
