@@ -258,7 +258,8 @@
       const trf=k=>k<="2026-03"?se.trBefore:se.trAfter;
       const gW=d=>d.hours>0?Math.round(d.hours*se.hourlyWage):(d.wageOverride||0);
       const gTr=(d,k)=>d.days*trf(k);
-      const gTx=(d,mk)=>{const plH=mk&&d.hours>0?gPLHours(mk,da[mk]?.customDays,se.shifts,se.workDays):0;return gW(d)+Math.round(plH*se.hourlyWage);};
+      const gPrevMK=mk=>{const i=MONTHS.findIndex(x=>x.key===mk);return i>0?MONTHS[i-1].key:null;};
+      const gTx=(d,mk)=>{const pmk=gPrevMK(mk);const plH=pmk&&d.hours>0?gPLHours(pmk,da[pmk]?.customDays,se.shifts,se.workDays):0;return gW(d)+Math.round(plH*se.hourlyWage);};
       const dTJ=d=>(d.dadItems||[]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
       const fF=k=>MONTHS.find(x=>x.key===k)?.is5wk?se.food5wk:se.food4wk;
       const gSuicaDays=mk=>{const[y,mo]=mk.split("-").map(Number);const pd1=gPD(mk);const nextMK=mo===12?`${y+1}-01`:`${y}-${String(mo+1).padStart(2,"0")}`;const pd2=gPD(nextMK);const from=new Date(y,mo-1,pd1);const[y2,mo2]=nextMK.split("-").map(Number);const to=new Date(y2,mo2-1,pd2-1);const allCD={...(da[mk]?.customDays||{}),...(da[nextMK]?.customDays||{})};let n=0;const d2=new Date(from);while(d2<=to){const ds=`${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,"0")}-${String(d2.getDate()).padStart(2,"0")}`;if(getDayState(ds,d2,allCD,se.workDays)==="work")n++;d2.setDate(d2.getDate()+1);}return n;};
@@ -476,11 +477,12 @@
             {tab==="wage"&&MONTHS.map(mo=>{
               const d=da[mo.key];
               const wage=gW(d),tr=gTr(d,mo.key),cm=gCm(d,mo.key),rate=trf(mo.key),op=xp[mo.key],suicaDays=rt>0?Math.round(cm/rt):0;
-              const plH=d.hours>0?gPLHours(mo.key,d.customDays||{},se.shifts,se.workDays):0;
-              const plWage=Math.round(plH*se.hourlyWage);
-              const tx=wage+plWage;
               const hD=wage>0||d.wageOverride>0,hH=d.hours>0;
               const mI=MONTHS.findIndex(x=>x.key===mo.key);
+              const prevMK=mI>0?MONTHS[mI-1].key:null;
+              const plH=hH&&prevMK?gPLHours(prevMK,da[prevMK]?.customDays,se.shifts,se.workDays):0;
+              const plWage=Math.round(plH*se.hourlyWage);
+              const tx=wage+plWage;
               const cT=MONTHS.slice(0,mI+1).reduce((s,x)=>s+gTx(da[x.key],x.key),0);
               const oT=cT<=se.annualLimit/12*(mI+1);
               return(
@@ -566,7 +568,7 @@
 
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/><span style={{fontSize:15,fontWeight:700}}>Income</span></div>
-                  {(()=>{const bdPLH=bd.hours>0?gPLHours(bm,bd.customDays||{},se.shifts,se.workDays):0;const bdPLW=Math.round(bdPLH*se.hourlyWage);return(
+                  {(()=>{const bmPrev=gPrevMK(bm);const bdPLH=bd.hours>0&&bmPrev?gPLHours(bmPrev,da[bmPrev]?.customDays,se.shifts,se.workDays):0;const bdPLW=Math.round(bdPLH*se.hourlyWage);return(
                   <div style={{fontSize:13}}>
                     <div style={rw}><span style={{color:c.sub}}>Wage</span><span style={{fontWeight:500}}>{yn(bdW)}</span></div>
                     {bdPLH>0&&<div style={rw}><span style={{color:c.sub}}>Paid leave ({bdPLH.toFixed(1)}h)</span><span style={{fontWeight:500,color:c.blueD}}>{yn(bdPLW)}</span></div>}
