@@ -442,12 +442,13 @@
                       <span style={{fontSize:10,color:c.muted,fontWeight:600,textTransform:"uppercase"}}>Mo</span>
                       <span style={{fontSize:10,color:c.muted,fontWeight:600,textTransform:"uppercase"}}>Days</span>
                       <span style={{fontSize:10,color:c.muted,fontWeight:600,textTransform:"uppercase"}}>Hours</span>
-                      <span style={{fontSize:10,color:c.muted,fontWeight:600,textTransform:"uppercase",textAlign:"right"}}>Wage</span>
+                      <span style={{fontSize:10,color:c.muted,fontWeight:600,textTransform:"uppercase",textAlign:"right"}}>Total Pay</span>
                     </div>
                     {MONTHS.map(mo=>{
                       const d=da[mo.key];
                       const hasHours=d.hours>0;
                       const wage=gW(d);
+                      const totalPay=gTx(d,mo.key)+gTr(d,mo.key);
                       const isPast=mo.key<`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
                       return(
                         <div key={mo.key} style={{display:"grid",gridTemplateColumns:"44px 1fr 1fr 1fr",gap:6,alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${c.border}`,opacity:isPast&&wage===0?0.5:1}}>
@@ -464,7 +465,7 @@
                             placeholder="0"
                             style={{fontSize:13,border:`2px solid ${c.border}`,borderRadius:8,padding:"6px 8px",width:"100%",boxSizing:"border-box",background:c.bg,color:c.text,fontFamily:mn,outline:"none"}}
                           />
-                          <span style={{fontSize:12,fontWeight:700,color:wage>0?c.greenD:c.muted,textAlign:"right"}}>{wage>0?yn(wage):"—"}</span>
+                          <span style={{fontSize:12,fontWeight:700,color:totalPay>0?c.greenD:c.muted,textAlign:"right"}}>{totalPay>0?yn(totalPay):"—"}</span>
                         </div>
                       );
                     })}
