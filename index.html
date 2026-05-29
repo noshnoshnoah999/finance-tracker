@@ -18,9 +18,10 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
-    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
     body { margin: 0; background: #f0f5ee; }
     input, button { touch-action: manipulation; font-family: inherit; }
+    ::-webkit-scrollbar { display: none; }
     @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 1000px; opacity: 1; } }
   </style>
 </head>
@@ -141,7 +142,7 @@
 
       _t.c=th==="ember"?EMBER:th==="pumpkin"?PUMP:SAGE;
       const c=_t.c;
-      const crd={background:c.card,borderRadius:18,padding:18,marginBottom:14};
+      const crd={background:c.card,borderRadius:20,padding:20,marginBottom:12};
       const inp={fontSize:14,border:`2px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.bg,fontWeight:500,fontFamily:mn};
       const lbl={fontSize:11,color:c.sub,marginBottom:6,display:"block",textTransform:"uppercase",letterSpacing:0.5,fontFamily:mn};
 
@@ -399,27 +400,26 @@
         <div style={{fontFamily:ft,background:c.bg,minHeight:"100vh",color:c.text,overflowY:"auto",height:"100vh"}}>
           <div style={{maxWidth:wide?1100:480,margin:"0 auto"}}>
 
-          <div style={{background:c.card,padding:`24px ${px} 18px`,position:"sticky",top:0,zIndex:10,borderRadius:"0 0 22px 22px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:2}}>
-              <span style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5}}>Annual Taxable Income</span>
-              <span style={{display:"flex",alignItems:"center",gap:6}}>
-                {syncLabel&&<span style={{fontSize:11,color:syncCol,fontWeight:700}}>{syncLabel}</span>}
-                <span style={{fontSize:11,color:c.sub}}>{yn(se.annualLimit)}</span>
-              </span>
+          <div style={{background:c.card,padding:`20px ${px} 16px`,position:"sticky",top:0,zIndex:10,borderRadius:"0 0 22px 22px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:12}}>
+              <div>
+                <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.8,marginBottom:3}}>Income this year</div>
+                <div style={{fontSize:32,fontWeight:800,letterSpacing:-1,lineHeight:1.1}}>{yn(aT)}</div>
+              </div>
+              <div style={{textAlign:"right",paddingBottom:2}}>
+                {syncLabel&&<div style={{fontSize:11,color:syncCol,fontWeight:700,marginBottom:2}}>{syncLabel}</div>}
+                <div style={{fontSize:14,fontWeight:700,color:rem<0?c.roseD:c.greenD,lineHeight:1.2}}>{yn(rem)} left</div>
+                <div style={{fontSize:11,color:c.sub}}>~{yn(mxP)}/mo</div>
+              </div>
             </div>
-            <div style={{fontSize:34,fontWeight:800,marginBottom:10,letterSpacing:-1}}>{yn(aT)}</div>
-            <div style={{background:c.cardAlt,borderRadius:8,height:12,marginBottom:10,overflow:"hidden"}}>
-              <div style={{height:"100%",borderRadius:8,transition:"width 0.4s",width:`${pct}%`,background:o85?`linear-gradient(90deg,${c.peach},${c.roseD})`:`linear-gradient(90deg,${c.green},${c.blueD})`}}/>
-            </div>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:500}}>
-              <span style={{color:rem<0?c.roseD:c.greenD}}>{yn(rem)} left</span>
-              <span style={{color:c.sub}}>~{yn(mxP)}/mo</span>
+            <div style={{background:c.cardAlt,borderRadius:6,height:6,overflow:"hidden"}}>
+              <div style={{height:"100%",borderRadius:6,transition:"width 0.4s",width:`${pct}%`,background:o85?`linear-gradient(90deg,${c.peach},${c.roseD})`:`linear-gradient(90deg,${c.green},${c.blueD})`}}/>
             </div>
           </div>
 
-          <div style={{display:"flex",gap:6,padding:`14px ${px} 6px`}}>
+          <div style={{display:"flex",gap:2,padding:`10px ${px} 4px`,overflowX:"auto",scrollbarWidth:"none",msOverflowStyle:"none"}}>
             {tabs.map(t=>(
-              <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"10px 0",border:"none",cursor:"pointer",borderRadius:12,fontFamily:ft,fontSize:12,fontWeight:tab===t?700:500,color:tab===t?c.white:c.sub,background:tab===t?c.accent:c.card,whiteSpace:"nowrap"}}>
+              <button key={t} onClick={()=>setTab(t)} style={{flexShrink:0,padding:"8px 16px",border:"none",cursor:"pointer",borderRadius:20,fontFamily:ft,fontSize:13,fontWeight:tab===t?600:400,color:tab===t?c.white:c.sub,background:tab===t?c.accent:"transparent",whiteSpace:"nowrap"}}>
                 {t.charAt(0).toUpperCase()+t.slice(1)}
               </button>
             ))}
@@ -431,7 +431,7 @@
               <div style={{...crd,marginBottom:10,padding:0,overflow:"hidden"}}>
                 <button onClick={()=>setSchedOpen(p=>!p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"14px 18px",border:"none",background:"transparent",cursor:"pointer",fontFamily:ft}}>
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/>
+                    <div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/>
                     <span style={{fontWeight:700,fontSize:15,color:c.text}}>Schedule Overview</span>
                   </div>
                   <span style={{fontSize:12,color:c.sub}}>{schedOpen?"▲ Close":"▼ Edit all months"}</span>
@@ -541,7 +541,7 @@
 
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>Work Schedule</span></div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Work Schedule</span></div>
                     <span style={{fontSize:12,fontWeight:600,color:c.blueD,background:c.blueBg,padding:"4px 10px",borderRadius:8}}>{[1,2,0].map(d=>DN[d]).join(", ")}</span>
                   </div>
                   {(()=>{const bmShifts=gShifts(bm);const bmOv=da[bm]?.shiftOverrides||{};return(
@@ -601,7 +601,7 @@
                 </div>
 
                 <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/><span style={{fontSize:15,fontWeight:700}}>Income</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Income</span></div>
                   {(()=>{const bmPrev=gPrevMK(bm);const bdPLH=bd.hours>0&&bmPrev?gPLHours(bmPrev,da[bmPrev]?.customDays,se.shifts,se.workDays):0;const bdPLW=Math.round(bdPLH*se.hourlyWage);return(
                   <div style={{fontSize:13}}>
                     <div style={rw}><span style={{color:c.sub}}>Wage</span><span style={{fontWeight:500}}>{yn(bdW)}</span></div>
@@ -614,7 +614,7 @@
 
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/><span style={{fontSize:15,fontWeight:700}}>Dad's Contributions</span></div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Dad's Contributions</span></div>
                     <span style={{fontSize:11,color:c.sub,background:c.cardAlt,padding:"4px 10px",borderRadius:8,fontWeight:500}}>£1 = ¥{se.gbpToJpy}</span>
                   </div>
                   {(bd.dadItems||[]).map(it=>(<div key={it.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,fontSize:13}}>{eD===it.id?<><input value={it.note} onChange={e=>uDI(bm,it.id,"note",e.target.value)} placeholder="Note" style={{...inp,flex:2}}/><div style={{flex:1,position:"relative"}}><span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,color:c.sub}}>£</span><input type="number" inputMode="numeric" value={it.gbp||""} onChange={e=>uDI(bm,it.id,"gbp",Number(e.target.value)||0)} style={{...inp,paddingLeft:26}}/></div><button onClick={()=>setED(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></>:<><span style={{flex:2,color:c.text,fontWeight:500}}>{it.note||"Dad"}</span><span style={{color:c.sub}}>{gf(it.gbp)}</span><span style={{fontWeight:600}}>{yn(Math.round(it.gbp*se.gbpToJpy))}</span><button onClick={()=>setSe(p=>({...p,dadFreeSpend:{...(p.dadFreeSpend||{}),[it.id]:!(p.dadFreeSpend||{})[it.id]}}))} style={{border:`2px solid ${(se.dadFreeSpend||{})[it.id]?c.greenD:c.border}`,background:(se.dadFreeSpend||{})[it.id]?c.greenD:"transparent",borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:11,color:(se.dadFreeSpend||{})[it.id]?c.white:c.sub,fontWeight:600,minWidth:44,fontFamily:mn}}>{(se.dadFreeSpend||{})[it.id]?"Free":"Free?"}</button><button onClick={()=>setED(it.id)} style={{border:"none",background:c.cardAlt,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500}}>Edit</button><button onClick={()=>rDI(bm,it.id)} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></>}</div>))}
@@ -627,7 +627,7 @@
                 </div>
 
                 <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.lavD}}/><span style={{fontSize:15,fontWeight:700}}>Fixed Expenses</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.lavD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Fixed Expenses</span></div>
                   <div style={{fontSize:13}}>
                     {se.fixed.filter(f=>!f.variable).map(f=>{const paid=bdPF[f.id],skipped=bdSF[f.id];return(<div key={f.id} style={{...rw,opacity:skipped?0.4:1}}>{eF===f.id?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><input value={f.name} onChange={e=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,name:e.target.value}:x)}))} style={{...inp,flex:2}}/><NI prefix="¥" value={f.amount} onChange={v=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,amount:v}:x)}))} style={{flex:1}}/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}><span onClick={()=>setEF(f.id)} style={{color:paid||skipped?c.muted:c.sub,textDecoration:paid||skipped?"line-through":"none",flex:1,cursor:"pointer"}}>{f.name}</span><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:500,color:paid||skipped?c.muted:c.text}}>{yn(f.amount)}</span>{!skipped&&<PaidBtn paid={paid} onToggle={()=>tPF(bm,f.id)}/>}<button onClick={()=>tSF(bm,f.id)} style={{border:`2px solid ${skipped?c.muted:c.border}`,background:"transparent",borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:11,color:skipped?c.muted:c.sub,fontWeight:600,fontFamily:mn}}>{skipped?"Skipped":"Skip?"}</button></div></div>}</div>);})}
                     <div style={rw}>{eF==="suica"?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>SUICA ({bdSI.start} → {bdSI.end} · {bdSI.days} days)</span><input type="number" inputMode="numeric" value={bd.suicaOverride??bdCm} onChange={e=>sM(bm,"suicaOverride",Number(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button>{bd.suicaOverride!=null&&<button onClick={()=>{sM(bm,"suicaOverride",null);setEF(null);}} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer"}}>reset</button>}</div>:<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}><span onClick={()=>setEF("suica")} style={{color:bdPF["suica"]?c.muted:c.sub,textDecoration:bdPF["suica"]?"line-through":"none",flex:1,cursor:"pointer"}}>SUICA ({bdSI.start} → {bdSI.end} · {bdSI.days} days{bd.suicaOverride!=null?" · edited":""})</span><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:500,color:bdPF["suica"]?c.muted:c.text}}>{yn(bdCm)}</span><PaidBtn paid={bdPF["suica"]} onToggle={()=>tPF(bm,"suica")}/></div></div>}</div>
@@ -639,7 +639,7 @@
                 </div>
 
                 <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.peachD}}/><span style={{fontSize:15,fontWeight:700}}>One-off Expenses</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>One-off Expenses</span></div>
                   {bd.oneOffs.length===0&&<div style={{fontSize:13,color:c.muted,marginBottom:10}}>None this month</div>}
                   {bd.oneOffs.map(o=>{const paid=bdPOO[o.id];return(<div key={o.id} style={{...rw,fontSize:13}}><div style={{display:"flex",alignItems:"center",gap:8,flex:1,minWidth:0}}><span style={{color:o.mumPays||paid?c.muted:c.text,textDecoration:o.mumPays||paid?"line-through":"none",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.name}</span>{o.mumPays&&<span style={{fontSize:10,background:c.peachBg,color:c.peachD,padding:"2px 8px",borderRadius:6,fontWeight:600,flexShrink:0}}>Mum</span>}</div><div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}><span style={{fontWeight:500,color:o.mumPays||paid?c.muted:c.text}}>{yn(o.amount)}</span>{!o.mumPays&&<PaidBtn paid={paid} onToggle={()=>tPOO(bm,o.id)}/>}<button onClick={()=>tMu(bm,o.id)} style={{border:"none",background:c.cardAlt,borderRadius:8,padding:"3px 8px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500}}>{o.mumPays?"Me":"Mum"}</button><button onClick={()=>rOO(bm,o.id)} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></div></div>);})}
                   {bdOM>0&&<div style={{...rw,fontSize:12,color:c.peachD,borderTop:`1px dashed ${c.border}`,marginTop:4,fontWeight:600}}><span>Mum pays</span><span>{yn(bdOM)}</span></div>}
@@ -652,7 +652,7 @@
 
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:10,height:10,borderRadius:5,background:c.roseD}}/><span style={{fontSize:15,fontWeight:700}}>Send to Mum</span></div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.roseD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Send to Mum</span></div>
                     <span style={{fontSize:11,color:c.sub}}>Pay day: {gPD(bm)}th</span>
                   </div>
                   {allMumItems.map(it=>{const ch=bdMC.includes(it.id),isFood=it.id==="food",isEditing=eMI===it.id;return(<div key={it.id}><div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",fontSize:13}}><button onClick={()=>tMC(bm,it.id)} style={{width:24,height:24,borderRadius:8,border:`2px solid ${ch?c.greenD:c.border}`,background:ch?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:14,fontWeight:700,flexShrink:0,padding:0}}>{ch?"✓":""}</button><span style={{flex:1,fontWeight:500,color:ch?c.text:c.muted}}>{it.name}</span><span style={{fontWeight:600,color:ch?c.text:c.muted}}>{yn(it.amount)}</span><button onClick={()=>setEMI(isEditing?null:it.id)} style={{border:"none",background:isEditing?c.greenD:c.cardAlt,color:isEditing?c.white:c.sub,borderRadius:8,padding:"4px 8px",cursor:"pointer",fontSize:11,fontWeight:isEditing?600:400}}>{isEditing?"Done":"Edit"}</button>{!isFood&&<button onClick={()=>rMI(it.id)} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button>}</div>{isEditing&&(<div style={{display:"flex",gap:8,marginBottom:8}}>{!isFood&&<input value={it.name} onChange={e=>setSe(p=>({...p,mumItems:p.mumItems.map(x=>x.id===it.id?{...x,name:e.target.value}:x)}))} placeholder="Name" style={{...inp,flex:2}}/>}{isFood&&<span style={{flex:2,fontSize:12,color:c.muted,alignSelf:"center"}}>Food budget (set in Settings)</span>}{!isFood&&<NI prefix="¥" value={it.amount} onChange={v=>setSe(p=>({...p,mumItems:p.mumItems.map(x=>x.id===it.id?{...x,amount:v}:x)}))} style={{flex:1}}/>}</div>)}</div>);})}
@@ -710,7 +710,7 @@
                 {(()=>{const maxW=Math.max(...MONTHS.map(mo=>gTx(da[mo.key])),1);return(
                   <div style={crd}>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                      <div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/>
+                      <div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/>
                       <span style={{fontSize:15,fontWeight:700}}>Monthly Earnings</span>
                     </div>
                     {MONTHS.map(mo=>{
@@ -755,7 +755,7 @@
                   return(
                     <div style={{...crd,border:`2px solid ${c.blueD}`}}>
                       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
-                        <div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/>
+                        <div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/>
                         <span style={{fontSize:15,fontWeight:700}}>What to work in {nML}</span>
                       </div>
                       <div style={{fontSize:12,color:c.sub,marginBottom:18}}>
@@ -879,7 +879,7 @@
                 {/* ── Monthly entries ── */}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                    <div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/>
+                    <div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/>
                     <span style={{fontSize:15,fontWeight:700}}>Monthly Savings</span>
                   </div>
                   {(()=>{
@@ -907,7 +907,7 @@
                 {/* ── Goal setting ── */}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-                    <div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/>
+                    <div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/>
                     <span style={{fontSize:15,fontWeight:700}}>Savings Goal</span>
                   </div>
                   <label style={lbl}>Target amount</label>
@@ -1026,7 +1026,7 @@
                 {/* Add goal */}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                    <div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/>
+                    <div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/>
                     <span style={{fontSize:15,fontWeight:700}}>Add a goal</span>
                   </div>
                   <div style={{display:"grid",gap:10}}>
@@ -1046,14 +1046,14 @@
             {tab==="settings"&&(
               <div>
                 <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/><span style={{fontSize:15,fontWeight:700}}>Wage & Limits</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Wage & Limits</span></div>
                   <div style={{display:"grid",gap:12}}>
                     <div><label style={lbl}>Hourly Wage</label><NI prefix="¥" value={se.hourlyWage} onChange={v=>setSe(p=>({...p,hourlyWage:v}))}/></div>
                     <div><label style={lbl}>Annual Limit</label><NI prefix="¥" value={se.annualLimit} onChange={v=>setSe(p=>({...p,annualLimit:v}))}/></div>
                   </div>
                 </div>
                 <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>Transport</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Transport</span></div>
                   <div style={{display:"grid",gap:12}}>
                     <div><label style={lbl}>Commute One-Way</label><NI prefix="¥" value={se.commuteOneWay} onChange={v=>setSe(p=>({...p,commuteOneWay:v}))}/></div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
@@ -1064,7 +1064,7 @@
                   </div>
                 </div>
                 <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.peachD}}/><span style={{fontSize:15,fontWeight:700}}>Food Budget</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Food Budget</span></div>
                   <div style={{display:"grid",gap:12}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
                       <div><label style={lbl}>4-Week</label><NI prefix="¥" value={se.food4wk} onChange={v=>setSe(p=>({...p,food4wk:v}))}/></div>
@@ -1074,7 +1074,7 @@
                   </div>
                 </div>
                 <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.greenD}}/><span style={{fontSize:15,fontWeight:700}}>Exchange Rate</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Exchange Rate</span></div>
                   <label style={lbl}>GBP to JPY</label>
                   <div style={{display:"flex",gap:10,alignItems:"center"}}>
                     <div style={{flex:1}}><NI prefix="¥" value={se.gbpToJpy} onChange={v=>setSe(p=>({...p,gbpToJpy:v}))}/></div>
@@ -1101,13 +1101,13 @@
                 </div>
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:10,height:10,borderRadius:5,background:c.lavD}}/><span style={{fontSize:15,fontWeight:700}}>Fixed Expenses</span></div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.lavD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Fixed Expenses</span></div>
                     <button onClick={()=>{const id=Date.now();setSe(p=>({...p,fixed:[...p.fixed,{id,name:"New",amount:0}]}));setEF(id);}} style={{border:"none",background:c.lavD,color:c.white,borderRadius:10,padding:"6px 14px",cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:600}}>+ Add</button>
                   </div>
                   {se.fixed.map(f=>(<div key={f.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>{eF===f.id?<><input value={f.name} onChange={e=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,name:e.target.value}:x)}))} style={{...inp,flex:2}}/><NI prefix="¥" value={f.amount} onChange={v=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,amount:v}:x)}))} style={{flex:1}}/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></>:<><span style={{flex:2,fontSize:14,fontWeight:500}}>{f.name}</span><span style={{flex:1,fontSize:13,textAlign:"right",fontWeight:500}}>{yn(f.amount)}</span><button onClick={()=>setEF(f.id)} style={{border:"none",background:c.cardAlt,borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500}}>Edit</button><button onClick={()=>setSe(p=>({...p,fixed:p.fixed.filter(x=>x.id!==f.id)}))} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></>}</div>))}
                 </div>
                 <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><div style={{width:10,height:10,borderRadius:5,background:c.blueD}}/><span style={{fontSize:15,fontWeight:700}}>Notifications</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}><div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Notifications</span></div>
                   {'Notification' in window?(
                     <div>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
@@ -1147,7 +1147,7 @@
                   )}
                 </div>
                 <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:10,height:10,borderRadius:5,background:c.accent}}/><span style={{fontSize:15,fontWeight:700}}>Theme</span></div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.accent,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Theme</span></div>
                   <div style={{display:"flex",gap:10}}>
                     {[{id:"sage",label:"Sage",col:"#2d6a3e",bg:"#f0f5ee"},{id:"ember",label:"Ember",col:"#b85e2a",bg:"#f5efe8"},{id:"pumpkin",label:"Pumpkin",col:"#fe7f2d",bg:"#233d4d"}].map(t2=>(<button key={t2.id} onClick={()=>setTh(t2.id)} style={{flex:1,padding:"14px 0",borderRadius:14,border:th===t2.id?`3px solid ${t2.col}`:`2px solid ${c.border}`,background:t2.bg,cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:th===t2.id?700:500,color:t2.col,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{width:24,height:24,borderRadius:12,background:t2.col}}/>{t2.label}</button>))}
                   </div>
