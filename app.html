@@ -261,7 +261,7 @@
       const gTr=(d,k)=>d.days*trf(k);
       const gPrevMK=mk=>{const i=MONTHS.findIndex(x=>x.key===mk);return i>0?MONTHS[i-1].key:null;};
       const gShifts=mk=>{const ov=da[mk]?.shiftOverrides||{};const r={};Object.keys(se.shifts||{}).forEach(d=>{r[d]=ov[d]?{...se.shifts[d],...ov[d]}:se.shifts[d];});return r;};
-      const gTx=(d,mk)=>{const pmk=gPrevMK(mk);const plH=pmk&&d.hours>0?gPLHours(pmk,da[pmk]?.customDays,se.shifts,se.workDays):0;return gW(d)+Math.round(plH*se.hourlyWage);};
+      const gTx=(d,mk)=>{const pmk=gPrevMK(mk);const plH=pmk&&d.hours>0?gPLHours(pmk,da[pmk]?.customDays,gShifts(pmk),se.workDays):0;return gW(d)+Math.round(plH*se.hourlyWage);};
       const dTJ=d=>(d.dadItems||[]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
       const fF=k=>MONTHS.find(x=>x.key===k)?.is5wk?se.food5wk:se.food4wk;
       const gSuicaDays=mk=>{const[y,mo]=mk.split("-").map(Number);const pd1=gPD(mk);const nextMK=mo===12?`${y+1}-01`:`${y}-${String(mo+1).padStart(2,"0")}`;const pd2=gPD(nextMK);const from=new Date(y,mo-1,pd1);const[y2,mo2]=nextMK.split("-").map(Number);const to=new Date(y2,mo2-1,pd2-1);const allCD={...(da[mk]?.customDays||{}),...(da[nextMK]?.customDays||{})};let n=0;const d2=new Date(from);while(d2<=to){const ds=`${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,"0")}-${String(d2.getDate()).padStart(2,"0")}`;if(getDayState(ds,d2,allCD,se.workDays)==="work")n++;d2.setDate(d2.getDate()+1);}return n;};
@@ -302,6 +302,7 @@
 
       const bd=da[bm]||eM();
       const bdW=gW(bd),bdTr=gTr(bd,bm),bdCm=bd.suicaOverride!=null?bd.suicaOverride:gCm(bd,bm);const bdSI=gSuicaInfo(bm);
+      const bdPrevMK=gPrevMK(bm);const bdPLH=bd.hours>0&&bdPrevMK?gPLHours(bdPrevMK,da[bdPrevMK]?.customDays,gShifts(bdPrevMK),se.workDays):0;const bdPLW=Math.round(bdPLH*se.hourlyWage);
       const bdDJ=dTJ(bd),bdDJFree=(bd.dadItems||[]).filter(x=>(se.dadFreeSpend||{})[x.id]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0),bdI=bdW+bdTr,bdFd=bd.foodOverride!=null?bd.foodOverride:fF(bm),bdSkin=bd.skinTreatment||0,bdGenSav=bd.generalSavings||0;
       const bdMC=bd.mumChecked||[],bdPF=bd.paidFixed||{},bdPOO=bd.paidOneOffs||{},bdSF=bd.skippedFixed||{};
       const bdFC=se.fixed.filter(f=>!bdSF[f.id]).reduce((s,f)=>s+f.amount,0);
@@ -311,7 +312,7 @@
       const bdFoodAmt=bdFd;
       const allMumItems=[{id:"food",name:"Food Budget"+(bd.foodOverride!=null?" (custom)":MONTHS.find(x=>x.key===bm)?.is5wk?" (5-wk)":" (4-wk)"),amount:bdFoodAmt},...(se.mumItems||[])];
       const bdMTDisplay=allMumItems.filter(x=>bdMC.includes(x.id)).reduce((s,x)=>s+x.amount,0);
-      const bdFr=bdI+bdDJFree-bdFT-bdOY;
+      const bdFr=bdI+bdPLW+bdDJFree-bdFT-bdOY;
       const mWD=(()=>{const[y,mo]=bm.split("-").map(Number);let n=0;const d2=new Date(y,mo-1,1),en=new Date(y,mo,0);const cd=da[bm]?.customDays||{};while(d2<=en){const ds=`${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,"0")}-${String(d2.getDate()).padStart(2,"0")}`;if(getDayState(ds,d2,cd,se.workDays)==="work")n++;d2.setDate(d2.getDate()+1);}return n;})(),mPC=mWD*rt;
       let pRD=0,pRC=0;
       if(pF&&pT){const allCD={};MONTHS.forEach(mo=>{Object.assign(allCD,da[mo.key]?.customDays||{});});const _d=new Date(pF),_en=new Date(pT);while(_d<=_en){const _ds=`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}-${String(_d.getDate()).padStart(2,"0")}`;if(getDayState(_ds,_d,allCD,se.workDays)==="work")pRD++;_d.setDate(_d.getDate()+1);}pRC=pRD*rt;}
@@ -484,7 +485,7 @@
               const hD=wage>0||d.wageOverride>0,hH=d.hours>0;
               const mI=MONTHS.findIndex(x=>x.key===mo.key);
               const prevMK=mI>0?MONTHS[mI-1].key:null;
-              const plH=hH&&prevMK?gPLHours(prevMK,da[prevMK]?.customDays,se.shifts,se.workDays):0;
+              const plH=hH&&prevMK?gPLHours(prevMK,da[prevMK]?.customDays,gShifts(prevMK),se.workDays):0;
               const plWage=Math.round(plH*se.hourlyWage);
               const tx=wage+plWage;
               const cT=MONTHS.slice(0,mI+1).reduce((s,x)=>s+gTx(da[x.key],x.key),0);
@@ -602,14 +603,13 @@
 
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Income</span></div>
-                  {(()=>{const bmPrev=gPrevMK(bm);const bdPLH=bd.hours>0&&bmPrev?gPLHours(bmPrev,da[bmPrev]?.customDays,se.shifts,se.workDays):0;const bdPLW=Math.round(bdPLH*se.hourlyWage);return(
                   <div style={{fontSize:13}}>
                     <div style={rw}><span style={{color:c.sub}}>Wage</span><span style={{fontWeight:500}}>{yn(bdW)}</span></div>
                     {bdPLH>0&&<div style={rw}><span style={{color:c.sub}}>Paid leave ({bdPLH.toFixed(1)}h)</span><span style={{fontWeight:500,color:c.blueD}}>{yn(bdPLW)}</span></div>}
                     <div style={rw}><span style={{color:c.sub}}>Transport Received</span><span style={{fontWeight:500}}>{yn(bdTr)}</span></div>
                     {bdDJFree>0&&<div style={rw}><span style={{color:c.sub}}>Dad (free spend)</span><span style={{fontWeight:500,color:c.greenD}}>{yn(bdDJFree)}</span></div>}
                     <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total</span><span style={{fontWeight:700,fontSize:16,color:c.greenD}}>{yn(bdI+bdPLW+bdDJFree)}</span></div>
-                  </div>);})()}
+                  </div>
                 </div>
 
                 <div style={crd}>
@@ -707,7 +707,7 @@
                 </div>
 
                 {/* ── Monthly breakdown bar chart ── */}
-                {(()=>{const maxW=Math.max(...MONTHS.map(mo=>gTx(da[mo.key])),1);return(
+                {(()=>{const maxW=Math.max(...MONTHS.map(mo=>gTx(da[mo.key],mo.key)),1);return(
                   <div style={crd}>
                     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
                       <div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/>
