@@ -53,7 +53,7 @@
     const DS = {
       hourlyWage:1400,annualLimit:1030000,commuteOneWay:178,
       trBefore:1040,trAfter:1100,food4wk:20000,food5wk:25000,
-      gbpToJpy:215,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,
+      gbpToJpy:215,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,subItems:[],
       shifts:{
         1:{start:"09:00",end:"16:00",breakMin:60,label:"Mon"},
         2:{start:"09:00",end:"12:00",breakMin:0,label:"Tue"},
@@ -75,7 +75,7 @@
       {id:"d3",note:"Lunch money",gbp:25},{id:"d4",note:"Student loan",gbp:150},
       {id:"d5",note:"Commuter pass",gbp:50},{id:"d6",note:"Japanese lessons",gbp:25},
     ];
-    const eM = () => ({hours:0,days:0,wageOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{}});
+    const eM = () => ({hours:0,days:0,wageOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{},subInc:{}});
     const PF = {"2026-01":{hours:0,days:4,wageOverride:28982},"2026-02":{hours:0,days:10,wageOverride:81143},"2026-03":{hours:0,days:14,wageOverride:107112},"2026-04":{hours:0,days:14,wageOverride:97207}};
     const gDef = () => { const d={}; MONTHS.forEach(mo=>{ const m=eM(); if(PF[mo.key]) Object.assign(m,PF[mo.key],{dadItems:DEF_DAD()}); else m.days=wDIM(mo.key,DS.workDays); d[mo.key]=m; }); return d; };
 
@@ -136,6 +136,8 @@
       const [nItem,setNItem]=useState({name:"",price:0,url:""});
       const [addingToGoal,setAddingToGoal]=useState(null);
       const [schedOpen,setSchedOpen]=useState(false);
+      const [nSub,setNSub]=useState({name:"",price:0,everyN:1});
+      const [eSub,setESub]=useState(null);
       const timer=useRef(null);
       const selfChange=useRef(false);
       useEffect(()=>{const fn=()=>setWide(window.innerWidth>=768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
@@ -168,12 +170,18 @@
         })();
       },[]);
 
-      // One-time seed: add Amazon Subscribe & Save as a variable (changes-monthly) fixed expense
+      // One-time seed: ensure an Amazon Subscribe & Save item-driven expense exists
       useEffect(()=>{
         if(!ld) return;
         setSe(p=>{
-          if(p.amazonSeeded) return p;
-          return {...p,amazonSeeded:true,fixed:[...(p.fixed||[]),{id:Date.now(),name:"Amazon Subscribe & Save",amount:0,variable:true}]};
+          const fixed=[...(p.fixed||[])];
+          const idx=fixed.findIndex(f=>f.name==="Amazon Subscribe & Save");
+          if(idx>=0){
+            if(!fixed[idx].sub){fixed[idx]={...fixed[idx],sub:true,variable:true};return{...p,fixed,amazonSeeded:true};}
+            return p.amazonSeeded?p:{...p,amazonSeeded:true};
+          }
+          if(!p.amazonSeeded) return {...p,amazonSeeded:true,fixed:[...fixed,{id:Date.now(),name:"Amazon Subscribe & Save",amount:0,variable:true,sub:true}]};
+          return p;
         });
       },[ld]);
 
@@ -314,7 +322,11 @@
       const bdPrevMK=gPrevMK(bm);const bdPLH=bd.hours>0&&bdPrevMK?gPLHours(bdPrevMK,da[bdPrevMK]?.customDays,gShifts(bdPrevMK),se.workDays):0;const bdPLW=Math.round(bdPLH*se.hourlyWage);
       const bdDJ=dTJ(bd),bdDJFree=(bd.dadItems||[]).filter(x=>(se.dadFreeSpend||{})[x.id]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0),bdI=bdW+bdTr,bdFd=bd.foodOverride!=null?bd.foodOverride:fF(bm),bdSkin=bd.skinTreatment||0,bdGenSav=bd.generalSavings||0;
       const bdMC=bd.mumChecked||[],bdPF=bd.paidFixed||{},bdPOO=bd.paidOneOffs||{},bdSF=bd.skippedFixed||{},bdFA=bd.fixedAmounts||{};
-      const fxAmt=f=>f.variable?(bdFA[f.id]||0):f.amount;
+      const mIdx=mk=>MONTHS.findIndex(x=>x.key===mk);
+      const subScheduled=(it,mk)=>{const ev=it.everyN||1;if(ev<=1)return true;const a=mIdx(mk),b=mIdx(it.startMK||MONTHS[0].key);return a>=0&&b>=0&&a>=b&&((a-b)%ev===0);};
+      const subIncluded=(it,mk)=>{const o=(da[mk]?.subInc||{})[it.id];return o===undefined?subScheduled(it,mk):o;};
+      const subTotal=mk=>(se.subItems||[]).filter(it=>subIncluded(it,mk)).reduce((s,it)=>s+(it.price||0),0);
+      const fxAmt=f=>f.sub?subTotal(bm):(f.variable?(bdFA[f.id]||0):f.amount);
       const bdFC=se.fixed.filter(f=>!bdSF[f.id]).reduce((s,f)=>s+fxAmt(f),0);
       const bdFT=bdFC+bdCm+bdFd+bdSkin+bdGenSav;
       const bdOY=bd.oneOffs.filter(x=>!x.mumPays).reduce((s,x)=>s+x.amount,0);
@@ -340,6 +352,10 @@
       const tPF=(k,id)=>sM(k,"paidFixed",{...(da[k].paidFixed||{}),[id]:!(da[k].paidFixed||{})[id]});
       const tPOO=(k,id)=>sM(k,"paidOneOffs",{...(da[k].paidOneOffs||{}),[id]:!(da[k].paidOneOffs||{})[id]});
       const tSF=(k,id)=>sM(k,"skippedFixed",{...(da[k].skippedFixed||{}),[id]:!(da[k].skippedFixed||{})[id]});
+      const aSub=()=>{if(!nSub.name)return;setSe(p=>({...p,subItems:[...(p.subItems||[]),{id:Date.now(),name:nSub.name,price:Number(nSub.price)||0,everyN:Number(nSub.everyN)||1,startMK:bm}]}));setNSub({name:"",price:0,everyN:1});};
+      const rSub=id=>setSe(p=>({...p,subItems:(p.subItems||[]).filter(x=>x.id!==id)}));
+      const uSub=(id,fld,v)=>setSe(p=>({...p,subItems:(p.subItems||[]).map(x=>x.id===id?{...x,[fld]:v}:x)}));
+      const tSubInc=it=>{const cur=subIncluded(it,bm);sM(bm,"subInc",{...(da[bm].subInc||{}),[it.id]:!cur});};
 
       const renderCal=()=>{
         const[y,mo]=bm.split("-").map(Number);
@@ -639,13 +655,22 @@
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.lavD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Fixed Expenses</span></div>
                   <div style={{fontSize:13}}>
-                    {se.fixed.map(f=>{const paid=bdPF[f.id],skipped=bdSF[f.id];return(<div key={f.id} style={{...rw,opacity:skipped?0.4:1}}>{eF===f.id?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><input value={f.name} onChange={e=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,name:e.target.value}:x)}))} style={{...inp,flex:2}}/>{f.variable?<span style={{flex:1,fontSize:11,color:c.sub,textAlign:"center"}}>varies monthly</span>:<NI prefix="¥" value={f.amount} onChange={v=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,amount:v}:x)}))} style={{flex:1}}/>}<button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>{!skipped&&<PaidBtn paid={paid} onToggle={()=>tPF(bm,f.id)}/>}<span onClick={()=>setEF(f.id)} style={{flex:1,color:paid||skipped?c.muted:c.text,textDecoration:paid||skipped?"line-through":"none",cursor:"pointer",fontWeight:paid||skipped?400:500}}>{f.name}{f.variable&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>monthly</span>}</span>{f.variable?<input type="number" inputMode="numeric" value={bdFA[f.id]||""} placeholder="0" onChange={e=>sM(bm,"fixedAmounts",{...bdFA,[f.id]:Number(e.target.value)||0})} style={{...inp,width:84,padding:"6px 10px",textAlign:"right",flexShrink:0}}/>:<span style={{fontWeight:500,color:paid||skipped?c.muted:c.text,flexShrink:0}}>{yn(f.amount)}</span>}<button onClick={()=>tSF(bm,f.id)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:skipped?c.peachD:c.muted,fontFamily:mn,padding:"0 2px",flexShrink:0,fontWeight:skipped?600:400}}>{skipped?"↩ Undo":"Skip"}</button></div>}</div>);})}
+                    {se.fixed.map(f=>{const paid=bdPF[f.id],skipped=bdSF[f.id];return(<div key={f.id} style={{...rw,opacity:skipped?0.4:1}}>{eF===f.id?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><input value={f.name} onChange={e=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,name:e.target.value}:x)}))} style={{...inp,flex:2}}/>{f.sub?<span style={{flex:1,fontSize:11,color:c.sub,textAlign:"center"}}>from items below</span>:f.variable?<span style={{flex:1,fontSize:11,color:c.sub,textAlign:"center"}}>varies monthly</span>:<NI prefix="¥" value={f.amount} onChange={v=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,amount:v}:x)}))} style={{flex:1}}/>}<button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>{!skipped&&<PaidBtn paid={paid} onToggle={()=>tPF(bm,f.id)}/>}<span onClick={()=>setEF(f.id)} style={{flex:1,color:paid||skipped?c.muted:c.text,textDecoration:paid||skipped?"line-through":"none",cursor:"pointer",fontWeight:paid||skipped?400:500}}>{f.name}{f.sub?<span style={{fontSize:10,color:c.sub,marginLeft:6}}>{(se.subItems||[]).filter(it=>subIncluded(it,bm)).length} items</span>:f.variable&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>monthly</span>}</span>{f.sub?<span style={{fontWeight:600,color:paid||skipped?c.muted:c.text,flexShrink:0}}>{yn(subTotal(bm))}</span>:f.variable?<input type="number" inputMode="numeric" value={bdFA[f.id]||""} placeholder="0" onChange={e=>sM(bm,"fixedAmounts",{...bdFA,[f.id]:Number(e.target.value)||0})} style={{...inp,width:84,padding:"6px 10px",textAlign:"right",flexShrink:0}}/>:<span style={{fontWeight:500,color:paid||skipped?c.muted:c.text,flexShrink:0}}>{yn(f.amount)}</span>}<button onClick={()=>tSF(bm,f.id)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:skipped?c.peachD:c.muted,fontFamily:mn,padding:"0 2px",flexShrink:0,fontWeight:skipped?600:400}}>{skipped?"↩ Undo":"Skip"}</button></div>}</div>);})}
                     <div style={rw}>{eF==="suica"?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>SUICA ({bdSI.start} → {bdSI.end} · {bdSI.days} days)</span><input type="number" inputMode="numeric" value={bd.suicaOverride??bdCm} onChange={e=>sM(bm,"suicaOverride",Number(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button>{bd.suicaOverride!=null&&<button onClick={()=>{sM(bm,"suicaOverride",null);setEF(null);}} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer"}}>reset</button>}</div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><PaidBtn paid={bdPF["suica"]} onToggle={()=>tPF(bm,"suica")}/><span onClick={()=>setEF("suica")} style={{flex:1,color:bdPF["suica"]?c.muted:c.text,textDecoration:bdPF["suica"]?"line-through":"none",cursor:"pointer",fontWeight:bdPF["suica"]?400:500}}>SUICA ({bdSI.start} → {bdSI.end} · {bdSI.days} days{bd.suicaOverride!=null?" · edited":""})</span><span style={{fontWeight:500,color:bdPF["suica"]?c.muted:c.text,flexShrink:0}}>{yn(bdCm)}</span></div>}</div>
                     <div style={rw}>{eF==="food"?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>Food budget</span><input type="number" inputMode="numeric" value={bd.foodOverride??bdFd} onChange={e=>sM(bm,"foodOverride",Number(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button>{bd.foodOverride!=null&&<button onClick={()=>{sM(bm,"foodOverride",null);setEF(null);}} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer"}}>reset</button>}</div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><PaidBtn paid={bdPF["food"]} onToggle={()=>tPF(bm,"food")}/><span onClick={()=>setEF("food")} style={{flex:1,color:bdPF["food"]?c.muted:c.text,textDecoration:bdPF["food"]?"line-through":"none",cursor:"pointer",fontWeight:bdPF["food"]?400:500}}>Food ({bd.foodOverride!=null?"custom":MONTHS.find(x=>x.key===bm)?.is5wk?"5-wk":"4-wk"})</span><span style={{fontWeight:500,color:bdPF["food"]?c.muted:c.text,flexShrink:0}}>{yn(bdFd)}</span></div>}</div>
                     {[{label:"Skin Treatment",field:"skinTreatment",val:bdSkin},{label:"General Savings",field:"generalSavings",val:bdGenSav}].map(({label,field,val})=>{const paid=bdPF[field];return(<div key={field} style={rw}>{eF===field?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>{label}</span><input type="number" inputMode="numeric" value={val||""} placeholder="0" onChange={e=>sM(bm,field,parseFloat(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><PaidBtn paid={paid} onToggle={()=>tPF(bm,field)}/><span onClick={()=>setEF(field)} style={{flex:1,color:paid?c.muted:c.text,textDecoration:paid?"line-through":"none",cursor:"pointer",fontWeight:paid?400:500}}>{label}</span><span style={{fontWeight:500,color:paid?c.muted:c.text,flexShrink:0}}>{yn(val)}</span></div>}</div>);})}
                     <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total Fixed</span><span style={{fontWeight:700,fontSize:16,color:c.lavD}}>{yn(bdFT)}</span></div>
                     {(()=>{let unpaid=0;se.fixed.forEach(f=>{if(!bdSF[f.id]&&!bdPF[f.id])unpaid+=fxAmt(f);});if(!bdPF["suica"])unpaid+=bdCm;if(!bdPF["food"])unpaid+=bdFd;if(!bdPF["skinTreatment"])unpaid+=bdSkin;if(!bdPF["generalSavings"])unpaid+=bdGenSav;const allPaid=unpaid===0;return(<div style={{marginTop:8,padding:14,borderRadius:14,background:allPaid?c.greenD:c.lavBg,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,fontWeight:600,color:allPaid?c.white:c.lavD}}>Left to pay</span><span style={{fontSize:18,fontWeight:800,color:allPaid?c.white:c.lavD}}>{allPaid?"All paid ✓":yn(unpaid)}</span></div>);})()}
                   </div>
+                </div>
+
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Subscribe & Save</span></div>
+                  <div style={{fontSize:11,color:c.sub,marginBottom:12}}>Tick what's arriving this month — scheduled items are pre-ticked. The total feeds the Amazon expense above.</div>
+                  {(se.subItems||[]).length===0&&<div style={{fontSize:13,color:c.muted,marginBottom:10}}>No items yet — add your Subscribe & Save products below.</div>}
+                  {(se.subItems||[]).map(it=>{const inc=subIncluded(it,bm);const sched=subScheduled(it,bm);const editing=eSub===it.id;return(<div key={it.id} style={{borderBottom:`1px solid ${c.border}`}}>{editing?<div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 0",flexWrap:"wrap"}}><input value={it.name} onChange={e=>uSub(it.id,"name",e.target.value)} placeholder="Item" style={{...inp,flex:2,minWidth:110}}/><div style={{flex:1,position:"relative",minWidth:80}}><span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:13,color:c.sub}}>¥</span><input type="number" inputMode="numeric" value={it.price||""} onChange={e=>uSub(it.id,"price",Number(e.target.value)||0)} style={{...inp,paddingLeft:22}}/></div><select value={it.everyN||1} onChange={e=>uSub(it.id,"everyN",Number(e.target.value))} style={{...inp,flex:1,minWidth:96}}>{[1,2,3,4,6].map(n=>(<option key={n} value={n}>{n===1?"monthly":`every ${n}mo`}</option>))}</select><button onClick={()=>setESub(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button><button onClick={()=>{rSub(it.id);setESub(null);}} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></div>:<div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",fontSize:13}}><button onClick={()=>tSubInc(it)} style={{width:24,height:24,borderRadius:8,border:`2px solid ${inc?c.greenD:c.border}`,background:inc?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:14,fontWeight:700,flexShrink:0,padding:0}}>{inc?"✓":""}</button><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,color:inc?c.text:c.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.name}</div><div style={{fontSize:11,color:c.sub}}>{(it.everyN||1)<=1?"every month":`every ${it.everyN} months`}{sched&&!inc?" · skipped":!sched&&inc?" · added":""}</div></div><span style={{fontWeight:600,color:inc?c.text:c.muted,flexShrink:0}}>{yn(it.price||0)}</span><button onClick={()=>setESub(it.id)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:12,color:c.muted,fontFamily:mn,padding:"0 4px",flexShrink:0}}>Edit</button></div>}</div>);})}
+                  {(se.subItems||[]).length>0&&<div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10,fontWeight:700}}><span>This month ({(se.subItems||[]).filter(it=>subIncluded(it,bm)).length} included)</span><span style={{color:c.peachD,fontSize:16}}>{yn(subTotal(bm))}</span></div>}
+                  <div style={{display:"flex",gap:6,marginTop:12,flexWrap:"wrap"}}><input placeholder="Item name" value={nSub.name} onChange={e=>setNSub(p=>({...p,name:e.target.value}))} style={{...inp,flex:2,minWidth:110}}/><div style={{flex:1,position:"relative",minWidth:70}}><span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:13,color:c.sub}}>¥</span><input type="number" inputMode="numeric" placeholder="0" value={nSub.price||""} onChange={e=>setNSub(p=>({...p,price:Number(e.target.value)||0}))} style={{...inp,paddingLeft:22}}/></div><select value={nSub.everyN} onChange={e=>setNSub(p=>({...p,everyN:Number(e.target.value)}))} style={{...inp,flex:1,minWidth:96}}>{[1,2,3,4,6].map(n=>(<option key={n} value={n}>{n===1?"monthly":`every ${n}mo`}</option>))}</select><button onClick={aSub} style={{border:"none",background:c.peachD,color:c.white,borderRadius:12,padding:"10px 16px",cursor:"pointer",fontFamily:ft,fontWeight:700,fontSize:16}}>+</button></div>
                 </div>
 
                 <div style={crd}>
