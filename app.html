@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Finance" />
-  <meta name="theme-color" content="#f0f5ee" />
+  <meta name="theme-color" content="#d0b88f" />
   <link rel="manifest" href="/finance-tracker/manifest.json" />
   <link rel="apple-touch-icon" href="/finance-tracker/apple-touch-icon-v6.png" />
   <link rel="apple-touch-icon-precomposed" href="/finance-tracker/apple-touch-icon-v6.png" />
@@ -19,7 +19,7 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
-    body { margin: 0; background: #f0f5ee; }
+    body { margin: 0; background: #d0b88f; }
     input, button { touch-action: manipulation; font-family: inherit; }
     ::-webkit-scrollbar { display: none; }
     @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 1000px; opacity: 1; } }
@@ -53,7 +53,7 @@
     const DS = {
       hourlyWage:1400,annualLimit:1030000,commuteOneWay:178,
       trBefore:1040,trAfter:1100,food4wk:20000,food5wk:25000,
-      gbpToJpy:215,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,subItems:[],
+      gbpToJpy:215,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,themeMigrated:false,subItems:[],
       shifts:{
         1:{start:"09:00",end:"16:00",breakMin:60,label:"Mon"},
         2:{start:"09:00",end:"12:00",breakMin:0,label:"Tue"},
@@ -100,13 +100,14 @@
     const SAGE={bg:"#f0f5ee",card:"#e4ebe1",cardAlt:"#d8e2d4",border:"#c8d4c3",text:"#1a1f18",sub:"#5a6656",muted:"#8a9685",greenD:"#2d6a3e",green:"#4a9960",greenBg:"#c8e6cf",blueD:"#3a6b8a",blue:"#6ba3c4",blueBg:"#c4dde8",lavD:"#6a5a8a",lavBg:"#d8d0e6",peachD:"#a87040",peach:"#d4a06a",peachBg:"#eedcc8",roseD:"#a84040",rose:"#d47070",roseBg:"#ecd0d0",white:"#ffffff",accent:"#2d6a3e"};
     const EMBER={bg:"#f5efe8",card:"#ebe0d4",cardAlt:"#e0d2c2",border:"#d4c4b0",text:"#2a1f14",sub:"#6b5540",muted:"#9a8672",greenD:"#6a7a2d",green:"#8a9a4a",greenBg:"#dae6b8",blueD:"#7a5a3a",blue:"#a48060",blueBg:"#e8d8c4",lavD:"#8a5a4a",lavBg:"#e6d0c8",peachD:"#b85e2a",peach:"#d4884a",peachBg:"#f0dcc4",roseD:"#a83030",rose:"#d06050",roseBg:"#ecc8c4",white:"#ffffff",accent:"#b85e2a"};
     const PUMP={bg:"#1a2a33",card:"#233d4d",cardAlt:"#2c4a5c",border:"#3a5a6a",text:"#f0e6dc",sub:"#c8d8e0",muted:"#7a9aa8",greenD:"#fe7f2d",green:"#fea05a",greenBg:"#3a3020",blueD:"#fe7f2d",blue:"#fea05a",blueBg:"#33281a",lavD:"#e09040",lavBg:"#2a2818",peachD:"#fe7f2d",peach:"#fea05a",peachBg:"#33281a",roseD:"#e05050",rose:"#f07070",roseBg:"#3a2020",white:"#f0e6dc",accent:"#fe7f2d"};
-    const _t={c:SAGE};
+    const LATTE={bg:"linear-gradient(180deg,#dcc8a8 0%,#d0b88f 50%,#c4a675 100%)",card:"rgba(248,241,229,0.55)",cardAlt:"rgba(238,227,205,0.62)",border:"rgba(255,251,242,0.45)",text:"#2f2113",sub:"#8a6c46",muted:"#ab9069",greenD:"#5f7a30",green:"#7d9a45",greenBg:"rgba(120,150,60,0.20)",blueD:"#4f5fd0",blue:"#7d8ae8",blueBg:"rgba(91,110,224,0.16)",lavD:"#6f5fd6",lavBg:"rgba(111,95,214,0.16)",peachD:"#b3672e",peach:"#cf9156",peachBg:"rgba(179,103,46,0.16)",roseD:"#c0506f",rose:"#d9779a",roseBg:"rgba(192,80,111,0.16)",white:"#ffffff",accent:"#6f4824"};
+    const _t={c:LATTE};
 
     function PaidBtn({paid,onToggle}){const c=_t.c;return(<button onClick={onToggle} style={{width:24,height:24,borderRadius:12,border:`2px solid ${paid?c.greenD:c.border}`,background:paid?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:12,fontWeight:700,padding:0,flexShrink:0}}>{paid?"✓":""}</button>);}
 
     function NI({value,onChange,prefix,style:sx,placeholder}){
       const c=_t.c;
-      const ist={fontSize:14,border:`2px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.bg,fontWeight:500,fontFamily:mn};
+      const ist={fontSize:14,border:`1px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.cardAlt,fontWeight:500,fontFamily:mn};
       return(<div style={{position:"relative",...sx}}>{prefix&&<span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,color:c.sub,fontWeight:500}}>{prefix}</span>}<input type="number" inputMode="numeric" step="any" value={value||""} onChange={e=>onChange(Number(e.target.value)||0)} placeholder={placeholder||"0"} style={{...ist,...(prefix?{paddingLeft:prefix.length>1?30:26}:{})}} /></div>);
     }
 
@@ -124,7 +125,7 @@
       const [pF,setPF2]=useState("");
       const [pT,setPT]=useState("");
       const [pH,setPH]=useState({pMon:0,pTue:0,pSun:0});
-      const [th,setTh]=useState("sage");
+      const [th,setTh]=useState("latte");
       const [nM,setNM]=useState({name:"",amount:""});
       const [eMI,setEMI]=useState(null);
       const [sv,setSv]=useState(false);
@@ -142,11 +143,11 @@
       const selfChange=useRef(false);
       useEffect(()=>{const fn=()=>setWide(window.innerWidth>=768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
 
-      _t.c=th==="ember"?EMBER:th==="pumpkin"?PUMP:SAGE;
+      _t.c=th==="ember"?EMBER:th==="pumpkin"?PUMP:th==="sage"?SAGE:LATTE;
       const c=_t.c;
-      const crd={background:c.card,borderRadius:20,padding:20,marginBottom:12};
-      const inp={fontSize:14,border:`2px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.bg,fontWeight:500,fontFamily:mn};
-      const lbl={fontSize:11,color:c.sub,marginBottom:6,display:"block",textTransform:"uppercase",letterSpacing:0.5,fontFamily:mn};
+      const crd={background:c.card,borderRadius:24,padding:20,marginBottom:12,border:`1px solid ${c.border}`,boxShadow:"0 1px 2px rgba(70,45,20,0.05)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)"};
+      const inp={fontSize:14,border:`1px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.cardAlt,fontWeight:500,fontFamily:mn};
+      const lbl={fontSize:11,color:c.sub,marginBottom:6,display:"block",textTransform:"uppercase",letterSpacing:0.8,fontWeight:600,fontFamily:mn};
 
       // Load
       useEffect(()=>{
@@ -183,6 +184,12 @@
           if(!p.amazonSeeded) return {...p,amazonSeeded:true,fixed:[...fixed,{id:Date.now(),name:"Amazon Subscribe & Save",amount:0,variable:true,sub:true}]};
           return p;
         });
+      },[ld]);
+
+      // One-time theme migration to the new Latte design (user can still switch afterwards)
+      useEffect(()=>{
+        if(!ld) return;
+        if(!se.themeMigrated){setTh("latte");setSe(p=>({...p,themeMigrated:true}));}
       },[ld]);
 
       // Save
@@ -424,10 +431,10 @@
 
       const px=wide?"40px":"20px";
       return(
-        <div style={{fontFamily:ft,background:c.bg,minHeight:"100vh",color:c.text,overflowY:"auto",height:"100vh"}}>
+        <div style={{fontFamily:ft,background:c.bg,backgroundAttachment:"fixed",minHeight:"100vh",color:c.text,overflowY:"auto",height:"100vh"}}>
           <div style={{maxWidth:wide?1100:480,margin:"0 auto"}}>
 
-          <div style={{background:c.card,padding:`20px ${px} 16px`,position:"sticky",top:0,zIndex:10,borderRadius:"0 0 22px 22px"}}>
+          <div style={{background:c.card,backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",padding:`22px ${px} 16px`,position:"sticky",top:0,zIndex:10,borderRadius:"0 0 24px 24px",borderBottom:`1px solid ${c.border}`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:12}}>
               <div>
                 <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.8,marginBottom:3}}>Income this year</div>
@@ -444,15 +451,7 @@
             </div>
           </div>
 
-          <div style={{display:"flex",gap:2,padding:`10px ${px} 4px`,overflowX:"auto",scrollbarWidth:"none",msOverflowStyle:"none"}}>
-            {tabs.map(t=>(
-              <button key={t} onClick={()=>setTab(t)} style={{flexShrink:0,padding:"8px 16px",border:"none",cursor:"pointer",borderRadius:20,fontFamily:ft,fontSize:13,fontWeight:tab===t?600:400,color:tab===t?c.white:c.sub,background:tab===t?c.accent:"transparent",whiteSpace:"nowrap"}}>
-                {t.charAt(0).toUpperCase()+t.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          <div style={{padding:`10px ${px} 80px`}}>
+          <div style={{padding:`14px ${px} 96px`}}>
 
             {tab==="wage"&&(
               <div style={{...crd,marginBottom:10,padding:0,overflow:"hidden"}}>
@@ -1184,7 +1183,7 @@
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.accent,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Theme</span></div>
                   <div style={{display:"flex",gap:10}}>
-                    {[{id:"sage",label:"Sage",col:"#2d6a3e",bg:"#f0f5ee"},{id:"ember",label:"Ember",col:"#b85e2a",bg:"#f5efe8"},{id:"pumpkin",label:"Pumpkin",col:"#fe7f2d",bg:"#233d4d"}].map(t2=>(<button key={t2.id} onClick={()=>setTh(t2.id)} style={{flex:1,padding:"14px 0",borderRadius:14,border:th===t2.id?`3px solid ${t2.col}`:`2px solid ${c.border}`,background:t2.bg,cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:th===t2.id?700:500,color:t2.col,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{width:24,height:24,borderRadius:12,background:t2.col}}/>{t2.label}</button>))}
+                    {[{id:"latte",label:"Latte",col:"#6f4824",bg:"#d0b88f"},{id:"sage",label:"Sage",col:"#2d6a3e",bg:"#f0f5ee"},{id:"ember",label:"Ember",col:"#b85e2a",bg:"#f5efe8"},{id:"pumpkin",label:"Pumpkin",col:"#fe7f2d",bg:"#233d4d"}].map(t2=>(<button key={t2.id} onClick={()=>setTh(t2.id)} style={{flex:1,padding:"14px 0",borderRadius:14,border:th===t2.id?`3px solid ${t2.col}`:`2px solid ${c.border}`,background:t2.bg,cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:th===t2.id?700:500,color:t2.col,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{width:24,height:24,borderRadius:12,background:t2.col}}/>{t2.label}</button>))}
                   </div>
                 </div>
                 <button onPointerDown={()=>{setSv(true);setTimeout(()=>setSv(false),2000);}} style={{width:"100%",padding:16,border:"none",background:sv?c.green:c.greenD,color:c.white,borderRadius:14,fontFamily:ft,fontSize:14,fontWeight:700,cursor:"pointer",marginTop:8}}>{sv?"Saved!":"Save Settings"}</button>
@@ -1195,6 +1194,11 @@
             )}
 
           </div>
+          </div>
+          <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:30}}>
+            <div style={{maxWidth:wide?1100:480,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:wide?"center":"flex-start",overflowX:"auto",scrollbarWidth:"none",msOverflowStyle:"none",padding:`12px ${px} 18px`,background:c.card,backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",borderTop:`1px solid ${c.border}`}}>
+              {tabs.map((t,i)=>(<React.Fragment key={t}>{i>0&&<span style={{width:1,height:14,background:c.border,flexShrink:0,margin:"0 3px",opacity:0.8}}/>}<button onClick={()=>setTab(t)} style={{flexShrink:0,padding:"4px 13px",border:"none",background:"transparent",cursor:"pointer",fontFamily:ft,fontSize:15,fontWeight:tab===t?800:500,color:tab===t?c.accent:c.muted,whiteSpace:"nowrap"}}>{t.charAt(0).toUpperCase()+t.slice(1)}</button></React.Fragment>))}
+            </div>
           </div>
         </div>
       );
