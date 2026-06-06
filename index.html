@@ -1222,7 +1222,7 @@
           </div>
           </div>
           <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:30}}>
-            <div style={{maxWidth:wide?1100:480,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:wide?"center":"flex-start",overflowX:"auto",scrollbarWidth:"none",msOverflowStyle:"none",padding:`12px ${px} calc(env(safe-area-inset-bottom) + 14px)`,background:c.card,backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",borderTop:`1px solid ${c.border}`}}>
+            <div style={{maxWidth:wide?1100:480,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:wide?"center":"flex-start",overflowX:"auto",scrollbarWidth:"none",msOverflowStyle:"none",padding:`12px ${px} calc(env(safe-area-inset-bottom) + 28px)`,background:c.card,backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",borderTop:`1px solid ${c.border}`}}>
               {tabs.map((t,i)=>(<React.Fragment key={t}>{i>0&&<span style={{width:1,height:14,background:c.border,flexShrink:0,margin:"0 3px",opacity:0.8}}/>}<button onClick={()=>setTab(t)} style={{flexShrink:0,padding:"4px 13px",border:"none",background:"transparent",cursor:"pointer",fontFamily:ft,fontSize:15,fontWeight:tab===t?800:500,color:tab===t?c.accent:c.muted,whiteSpace:"nowrap"}}>{t.charAt(0).toUpperCase()+t.slice(1)}</button></React.Fragment>))}
             </div>
           </div>
