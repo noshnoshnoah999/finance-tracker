@@ -6,20 +6,23 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Finance" />
-  <meta name="theme-color" content="#d0b88f" />
+  <meta name="theme-color" content="#b38f57" />
   <link rel="manifest" href="/finance-tracker/manifest.json" />
   <link rel="apple-touch-icon" href="/finance-tracker/apple-touch-icon-v6.png" />
   <link rel="apple-touch-icon-precomposed" href="/finance-tracker/apple-touch-icon-v6.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="/finance-tracker/icon-192-v6.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="/finance-tracker/icon-512-v6.png" />
   <title>Finance Tracker</title>
+  <link rel="preconnect" href="https://unpkg.com" crossorigin />
+  <link rel="preconnect" href="https://ipjwpkqcuztahumijici.supabase.co" crossorigin />
+  <link rel="dns-prefetch" href="https://unpkg.com" />
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
-    body { margin: 0; background: #d0b88f; }
+    body { margin: 0; background: #b38f57; }
     input, button { touch-action: manipulation; font-family: inherit; }
     ::-webkit-scrollbar { display: none; }
     @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 1000px; opacity: 1; } }
@@ -108,7 +111,7 @@
     const SAGE={bg:"#f0f5ee",card:"#e4ebe1",cardAlt:"#d8e2d4",border:"#c8d4c3",text:"#1a1f18",sub:"#5a6656",muted:"#8a9685",greenD:"#2d6a3e",green:"#4a9960",greenBg:"#c8e6cf",blueD:"#3a6b8a",blue:"#6ba3c4",blueBg:"#c4dde8",lavD:"#6a5a8a",lavBg:"#d8d0e6",peachD:"#a87040",peach:"#d4a06a",peachBg:"#eedcc8",roseD:"#a84040",rose:"#d47070",roseBg:"#ecd0d0",white:"#ffffff",accent:"#2d6a3e"};
     const EMBER={bg:"#f5efe8",card:"#ebe0d4",cardAlt:"#e0d2c2",border:"#d4c4b0",text:"#2a1f14",sub:"#6b5540",muted:"#9a8672",greenD:"#6a7a2d",green:"#8a9a4a",greenBg:"#dae6b8",blueD:"#7a5a3a",blue:"#a48060",blueBg:"#e8d8c4",lavD:"#8a5a4a",lavBg:"#e6d0c8",peachD:"#b85e2a",peach:"#d4884a",peachBg:"#f0dcc4",roseD:"#a83030",rose:"#d06050",roseBg:"#ecc8c4",white:"#ffffff",accent:"#b85e2a"};
     const PUMP={bg:"#1a2a33",card:"#233d4d",cardAlt:"#2c4a5c",border:"#3a5a6a",text:"#f0e6dc",sub:"#c8d8e0",muted:"#7a9aa8",greenD:"#fe7f2d",green:"#fea05a",greenBg:"#3a3020",blueD:"#fe7f2d",blue:"#fea05a",blueBg:"#33281a",lavD:"#e09040",lavBg:"#2a2818",peachD:"#fe7f2d",peach:"#fea05a",peachBg:"#33281a",roseD:"#e05050",rose:"#f07070",roseBg:"#3a2020",white:"#f0e6dc",accent:"#fe7f2d"};
-    const LATTE={bg:"linear-gradient(180deg,#dcc8a8 0%,#d0b88f 50%,#c4a675 100%)",card:"rgba(248,241,229,0.55)",cardAlt:"rgba(238,227,205,0.62)",border:"rgba(255,251,242,0.45)",text:"#2f2113",sub:"#8a6c46",muted:"#ab9069",greenD:"#5f7a30",green:"#7d9a45",greenBg:"rgba(120,150,60,0.20)",blueD:"#4f5fd0",blue:"#7d8ae8",blueBg:"rgba(91,110,224,0.16)",lavD:"#6f5fd6",lavBg:"rgba(111,95,214,0.16)",peachD:"#b3672e",peach:"#cf9156",peachBg:"rgba(179,103,46,0.16)",roseD:"#c0506f",rose:"#d9779a",roseBg:"rgba(192,80,111,0.16)",white:"#ffffff",accent:"#6f4824"};
+    const LATTE={bg:"linear-gradient(180deg,#c4a778 0%,#b38f57 50%,#9e7842 100%)",card:"rgba(243,231,210,0.52)",cardAlt:"rgba(228,210,180,0.6)",border:"rgba(255,248,232,0.38)",text:"#2a1c0e",sub:"#7d5f3a",muted:"#9c7e54",greenD:"#5a7330",green:"#7a9442",greenBg:"rgba(110,140,55,0.22)",blueD:"#4f5fd0",blue:"#7d8ae8",blueBg:"rgba(91,110,224,0.18)",lavD:"#6f5fd6",lavBg:"rgba(111,95,214,0.18)",peachD:"#a85d28",peach:"#c98748",peachBg:"rgba(168,93,40,0.18)",roseD:"#bb4a68",rose:"#d9779a",roseBg:"rgba(187,74,104,0.18)",white:"#ffffff",accent:"#643f1f"};
     const _t={c:LATTE};
 
     function PaidBtn({paid,onToggle}){const c=_t.c;return(<button onClick={onToggle} style={{width:24,height:24,borderRadius:12,border:`2px solid ${paid?c.greenD:c.border}`,background:paid?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:12,fontWeight:700,padding:0,flexShrink:0}}>{paid?"✓":""}</button>);}
@@ -134,13 +137,18 @@
       return v;
     }
 
+    // Read last-saved state synchronously so the app paints instantly (no network wait)
+    const CACHED=(()=>{try{return JSON.parse(localStorage.getItem(SK)||"null");}catch(_){return null;}})();
+    const initSe=()=>CACHED&&CACHED.settings?{...DS,...CACHED.settings,fixed:CACHED.settings.fixed||DS.fixed.map(f=>({...f}))}:DS;
+    const initDa=()=>{const x=gDef();if(CACHED&&CACHED.data)Object.keys(CACHED.data).forEach(k=>{if(x[k]!==undefined)x[k]={...eM(),...CACHED.data[k]};});return x;};
+
     function App() {
       const [tab,setTab]=useState("wage");
-      const [se,setSe]=useState(DS);
-      const [da,setDa]=useState(gDef);
+      const [se,setSe]=useState(initSe);
+      const [da,setDa]=useState(initDa);
       const [bm,setBm]=useState(()=>{const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;});
       const [xp,setXp]=useState({});
-      const [ld,setLd]=useState(false);
+      const [ld,setLd]=useState(!!CACHED);
       const [eF,setEF]=useState(null);
       const [nE,setNE]=useState({name:"",amount:""});
       const [nD,setND]=useState({note:"",gbp:""});
@@ -148,7 +156,7 @@
       const [pF,setPF2]=useState("");
       const [pT,setPT]=useState("");
       const [pH,setPH]=useState({pMon:0,pTue:0,pSun:0});
-      const [th,setTh]=useState("latte");
+      const [th,setTh]=useState(CACHED&&CACHED.theme?CACHED.theme:"latte");
       const [nM,setNM]=useState({name:"",amount:""});
       const [eMI,setEMI]=useState(null);
       const [sv,setSv]=useState(false);
@@ -1216,7 +1224,7 @@
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.accent,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Theme</span></div>
                   <div style={{display:"flex",gap:10}}>
-                    {[{id:"latte",label:"Latte",col:"#6f4824",bg:"#d0b88f"},{id:"sage",label:"Sage",col:"#2d6a3e",bg:"#f0f5ee"},{id:"ember",label:"Ember",col:"#b85e2a",bg:"#f5efe8"},{id:"pumpkin",label:"Pumpkin",col:"#fe7f2d",bg:"#233d4d"}].map(t2=>(<button key={t2.id} onClick={()=>setTh(t2.id)} style={{flex:1,padding:"14px 0",borderRadius:14,border:th===t2.id?`3px solid ${t2.col}`:`2px solid ${c.border}`,background:t2.bg,cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:th===t2.id?700:500,color:t2.col,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{width:24,height:24,borderRadius:12,background:t2.col}}/>{t2.label}</button>))}
+                    {[{id:"latte",label:"Latte",col:"#643f1f",bg:"#b38f57"},{id:"sage",label:"Sage",col:"#2d6a3e",bg:"#f0f5ee"},{id:"ember",label:"Ember",col:"#b85e2a",bg:"#f5efe8"},{id:"pumpkin",label:"Pumpkin",col:"#fe7f2d",bg:"#233d4d"}].map(t2=>(<button key={t2.id} onClick={()=>setTh(t2.id)} style={{flex:1,padding:"14px 0",borderRadius:14,border:th===t2.id?`3px solid ${t2.col}`:`2px solid ${c.border}`,background:t2.bg,cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:th===t2.id?700:500,color:t2.col,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{width:24,height:24,borderRadius:12,background:t2.col}}/>{t2.label}</button>))}
                   </div>
                 </div>
                 <button onPointerDown={()=>{setSv(true);setTimeout(()=>setSv(false),2000);}} style={{width:"100%",padding:16,border:"none",background:sv?c.green:c.greenD,color:c.white,borderRadius:14,fontFamily:ft,fontSize:14,fontWeight:700,cursor:"pointer",marginTop:8}}>{sv?"Saved!":"Save Settings"}</button>
