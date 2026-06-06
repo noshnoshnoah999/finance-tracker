@@ -460,7 +460,7 @@
         <div style={{fontFamily:ft,background:c.bg,backgroundAttachment:"fixed",minHeight:"100vh",color:c.text,overflowY:"auto",height:"100vh"}}>
           <div style={{maxWidth:wide?1100:480,margin:"0 auto"}}>
 
-          <div style={{background:c.card,backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",padding:`22px ${px} 16px`,position:"sticky",top:0,zIndex:10,borderRadius:"0 0 24px 24px",borderBottom:`1px solid ${c.border}`}}>
+          <div style={{background:c.card,backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",padding:`calc(env(safe-area-inset-top) + 16px) ${px} 16px`,position:"sticky",top:0,zIndex:10,borderRadius:"0 0 24px 24px",borderBottom:`1px solid ${c.border}`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:12}}>
               <div>
                 <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.8,marginBottom:3}}>Income this year</div>
@@ -477,7 +477,7 @@
             </div>
           </div>
 
-          <div key={tab} className="tabpane" style={{padding:`14px ${px} 96px`}}>
+          <div key={tab} className="tabpane" style={{padding:`14px ${px} calc(env(safe-area-inset-bottom) + 96px)`}}>
 
             {tab==="wage"&&(
               <div style={{...crd,marginBottom:10,padding:0,overflow:"hidden"}}>
@@ -1222,7 +1222,7 @@
           </div>
           </div>
           <div style={{position:"fixed",left:0,right:0,bottom:0,zIndex:30}}>
-            <div style={{maxWidth:wide?1100:480,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:wide?"center":"flex-start",overflowX:"auto",scrollbarWidth:"none",msOverflowStyle:"none",padding:`12px ${px} 18px`,background:c.card,backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",borderTop:`1px solid ${c.border}`}}>
+            <div style={{maxWidth:wide?1100:480,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:wide?"center":"flex-start",overflowX:"auto",scrollbarWidth:"none",msOverflowStyle:"none",padding:`12px ${px} calc(env(safe-area-inset-bottom) + 14px)`,background:c.card,backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",borderTop:`1px solid ${c.border}`}}>
               {tabs.map((t,i)=>(<React.Fragment key={t}>{i>0&&<span style={{width:1,height:14,background:c.border,flexShrink:0,margin:"0 3px",opacity:0.8}}/>}<button onClick={()=>setTab(t)} style={{flexShrink:0,padding:"4px 13px",border:"none",background:"transparent",cursor:"pointer",fontFamily:ft,fontSize:15,fontWeight:tab===t?800:500,color:tab===t?c.accent:c.muted,whiteSpace:"nowrap"}}>{t.charAt(0).toUpperCase()+t.slice(1)}</button></React.Fragment>))}
             </div>
           </div>
