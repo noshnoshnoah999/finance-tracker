@@ -23,6 +23,14 @@
     input, button { touch-action: manipulation; font-family: inherit; }
     ::-webkit-scrollbar { display: none; }
     @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 1000px; opacity: 1; } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes popIn { 0% { opacity: 0; transform: scale(0.85); } 100% { opacity: 1; transform: scale(1); } }
+    button { transition: transform 0.12s ease, background 0.18s ease, color 0.18s ease, border-color 0.18s ease, opacity 0.18s ease; }
+    button:active { transform: scale(0.95); }
+    .tabpane { animation: fadeUp 0.34s cubic-bezier(0.22, 1, 0.36, 1); }
+    .row-anim { animation: fadeIn 0.25s ease; }
+    @media (prefers-reduced-motion: reduce) { *, .tabpane { animation: none !important; transition: none !important; } }
   </style>
 </head>
 <body>
@@ -109,6 +117,21 @@
       const c=_t.c;
       const ist={fontSize:14,border:`1px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.cardAlt,fontWeight:500,fontFamily:mn};
       return(<div style={{position:"relative",...sx}}>{prefix&&<span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,color:c.sub,fontWeight:500}}>{prefix}</span>}<input type="number" inputMode="numeric" step="any" value={value||""} onChange={e=>onChange(Number(e.target.value)||0)} placeholder={placeholder||"0"} style={{...ist,...(prefix?{paddingLeft:prefix.length>1?30:26}:{})}} /></div>);
+    }
+
+    // Smoothly animate a number toward its target (ease-out cubic)
+    function useCountUp(target,dur=650){
+      const [v,setV]=useState(0);
+      const prev=useRef(0);
+      useEffect(()=>{
+        const from=prev.current,to=Number(target)||0;prev.current=to;
+        if(from===to){setV(to);return;}
+        let raf,start;
+        const tick=t=>{if(!start)start=t;const p=Math.min(1,(t-start)/dur);const e=1-Math.pow(1-p,3);setV(Math.round(from+(to-from)*e));if(p<1)raf=requestAnimationFrame(tick);else setV(to);};
+        raf=requestAnimationFrame(tick);
+        return()=>cancelAnimationFrame(raf);
+      },[target]);
+      return v;
     }
 
     function App() {
@@ -293,6 +316,7 @@
       const gSuicaInfo=mk=>{const[y,mo]=mk.split("-").map(Number);const pd1=gPD(mk);const nextMK=mo===12?`${y+1}-01`:`${y}-${String(mo+1).padStart(2,"0")}`;const[y2,mo2]=nextMK.split("-").map(Number);const endD=new Date(y2,mo2-1,gPD(nextMK)-1);const s0=MONTHS.find(x=>x.key===mk)?.short||'';const s1=MONTHS.find(x=>x.key===nextMK)?.short||endD.toLocaleString('en-GB',{month:'short'});return{start:`${s0} ${pd1}`,end:`${s1} ${endD.getDate()}`,days:gSuicaDays(mk)};};
 
       const aT=MONTHS.reduce((s,mo)=>s+gTx(da[mo.key],mo.key),0);
+      const aTd=useCountUp(aT);
       const rem=se.annualLimit-aT;
       const pct=Math.min(100,(aT/se.annualLimit)*100);
       const o85=pct>85;
@@ -300,10 +324,12 @@
       const cMN=nw.getFullYear()===2026?nw.getMonth()+1:4;
       const mxP=Math.floor(rem/Math.max(1,12-cMN+1));
       const tS=MONTHS.reduce((s,mo)=>s+(da[mo.key]?.savings||0),0);
+      const tSd=useCountUp(tS);
       const sA=cMN>0?tS/cMN:0;
       const eMs=MONTHS.filter((_,i)=>i<cMN);
       const fMs=MONTHS.filter((_,i)=>i>=cMN);
       const eT=eMs.reduce((s,mo)=>s+gTx(da[mo.key],mo.key),0);
+      const eTd=useCountUp(eT);
       const rL=se.annualLimit-eT;
       const nFM=fMs.length;
       const eS=nFM>0?Math.floor(rL/nFM):0;
@@ -438,7 +464,7 @@
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:12}}>
               <div>
                 <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.8,marginBottom:3}}>Income this year</div>
-                <div style={{fontSize:32,fontWeight:800,letterSpacing:-1,lineHeight:1.1}}>{yn(aT)}</div>
+                <div style={{fontSize:32,fontWeight:800,letterSpacing:-1,lineHeight:1.1}}>{yn(aTd)}</div>
               </div>
               <div style={{textAlign:"right",paddingBottom:2}}>
                 {syncLabel&&<div style={{fontSize:11,color:syncCol,fontWeight:700,marginBottom:2}}>{syncLabel}</div>}
@@ -451,7 +477,7 @@
             </div>
           </div>
 
-          <div style={{padding:`14px ${px} 96px`}}>
+          <div key={tab} className="tabpane" style={{padding:`14px ${px} 96px`}}>
 
             {tab==="wage"&&(
               <div style={{...crd,marginBottom:10,padding:0,overflow:"hidden"}}>
@@ -714,7 +740,7 @@
                 <div style={{...crd,padding:22}}>
                   <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Annual limit used</div>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:12}}>
-                    <div style={{fontSize:34,fontWeight:800,letterSpacing:-1}}>{yn(eT)}</div>
+                    <div style={{fontSize:34,fontWeight:800,letterSpacing:-1}}>{yn(eTd)}</div>
                     <div style={{fontSize:13,color:c.sub}}>of {yn(se.annualLimit)}</div>
                   </div>
                   <div style={{background:c.cardAlt,borderRadius:8,height:12,marginBottom:14,overflow:"hidden"}}>
@@ -878,7 +904,7 @@
                 {/* ── Hero ── */}
                 <div style={{...crd,background:c.blueD,padding:22}}>
                   <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:4}}>Total Saved in 2026</div>
-                  <div style={{fontSize:38,fontWeight:800,color:c.white,letterSpacing:-1,marginBottom:8}}>{yn(tS)}</div>
+                  <div style={{fontSize:38,fontWeight:800,color:c.white,letterSpacing:-1,marginBottom:8}}>{yn(tSd)}</div>
                   {se.savingsGoal>0&&(
                     <div style={{marginBottom:8}}>
                       <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"rgba(255,255,255,0.7)",marginBottom:6}}>
