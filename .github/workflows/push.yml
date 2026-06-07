@@ -1,0 +1,19 @@
+name: Daily reminder push
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # 08:00 UTC daily (= 17:00 Japan / 09:00 UK summer). Change to taste.
+  workflow_dispatch: {}    # lets you run it manually from the Actions tab to test
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install web-push@3
+      - run: node scripts/send-push.js
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}

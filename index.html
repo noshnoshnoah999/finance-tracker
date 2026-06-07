@@ -44,6 +44,7 @@
     const SUPABASE_URL = 'https://ipjwpkqcuztahumijici.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwandwa3FjdXp0YWh1bWlqaWNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMTg0NjAsImV4cCI6MjA5MjU5NDQ2MH0.aCrIwHvNLkCtA_RXPdzIybRp2EMCrBeIVS5ABCtjl48';
     const USER_KEY = 'f7e2a914-3b8c-4d5e-9a1f-6c2d7b0e8f3a';
+    const VAPID_PUBLIC = 'BBPHf6asV97ce62K0Emyf33g9Mx7gWagQxjSEPp4ZUa6VYUn7tiOm0qSGxDJgbNUbVZwi8Yx8LCyGBj9lTbVGgc';
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     const SK = 'finance-app-v24';
 
@@ -142,6 +143,7 @@
     const initSe=()=>CACHED&&CACHED.settings?{...DS,...CACHED.settings,fixed:CACHED.settings.fixed||DS.fixed.map(f=>({...f}))}:DS;
     const initDa=()=>{const x=gDef();if(CACHED&&CACHED.data)Object.keys(CACHED.data).forEach(k=>{if(x[k]!==undefined)x[k]={...eM(),...CACHED.data[k]};});return x;};
 
+    function urlB64ToU8(s){const pad="=".repeat((4-s.length%4)%4);const r=(s+pad).replace(/-/g,"+").replace(/_/g,"/");const raw=atob(r);const a=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)a[i]=raw.charCodeAt(i);return a;}
     // Show a notification via the service worker (works in installed iOS PWAs), falling back to the constructor.
     function notify(title,body,tag){
       const opts={body:body||"",icon:"/finance-tracker/icon-512-v6.png",badge:"/finance-tracker/icon-192-v6.png",tag};
@@ -186,6 +188,8 @@
       const selfChange=useRef(false);
       useEffect(()=>{const fn=()=>setWide(window.innerWidth>=768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
       useEffect(()=>{if('serviceWorker' in navigator){navigator.serviceWorker.register('/finance-tracker/sw.js').catch(()=>{});}},[]);
+      const subscribePush=async()=>{try{if(!('serviceWorker' in navigator)||!('PushManager' in window))return;const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(VAPID_PUBLIC)});const js=sub.toJSON();setSe(p=>(JSON.stringify(p.pushSub||null)===JSON.stringify(js)?p:{...p,pushSub:js}));}catch(_){}};
+      useEffect(()=>{if(ld&&se.notifs&&'Notification' in window&&Notification.permission==='granted')subscribePush();},[ld,se.notifs]);
 
       _t.c=th==="ember"?EMBER:th==="pumpkin"?PUMP:th==="sage"?SAGE:LATTE;
       const c=_t.c;
@@ -1217,7 +1221,7 @@
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
                         <div><div style={{fontSize:14,fontWeight:500}}>Daily reminders</div><div style={{fontSize:12,color:c.sub,marginTop:2}}>Payday alerts & limit warnings</div></div>
                         <button onClick={async()=>{
-                          if(!se.notifs){const p=await Notification.requestPermission();if(p==='granted')setSe(v=>({...v,notifs:true}));}
+                          if(!se.notifs){const p=await Notification.requestPermission();if(p==='granted'){setSe(v=>({...v,notifs:true}));subscribePush();}}
                           else setSe(v=>({...v,notifs:false}));
                         }} style={{padding:"9px 20px",borderRadius:20,border:"none",cursor:"pointer",background:se.notifs?c.greenD:c.cardAlt,color:se.notifs?c.white:c.sub,fontWeight:700,fontSize:13,fontFamily:ft}}>
                           {se.notifs?"On":"Off"}
