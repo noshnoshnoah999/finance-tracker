@@ -53,6 +53,12 @@ function gPD(y, mo) {
   const pf = tmd.paidFixed || {};
   const mc = tmd.mumChecked || [];
 
+  if (process.env.TEST === 'true') {
+    await webpush.sendNotification(sub, JSON.stringify({ title: 'Finance Tracker ✓', body: 'Background push is working!', tag: 'ft-test' }));
+    console.log('Sent test push.');
+    return;
+  }
+
   const list = [];
   if (dleft === 0) list.push('💰 Payday today — log your hours');
   else if (dleft === 1) list.push('💰 Payday tomorrow');
