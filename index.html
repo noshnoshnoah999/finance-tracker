@@ -142,6 +142,18 @@
     const initSe=()=>CACHED&&CACHED.settings?{...DS,...CACHED.settings,fixed:CACHED.settings.fixed||DS.fixed.map(f=>({...f}))}:DS;
     const initDa=()=>{const x=gDef();if(CACHED&&CACHED.data)Object.keys(CACHED.data).forEach(k=>{if(x[k]!==undefined)x[k]={...eM(),...CACHED.data[k]};});return x;};
 
+    // Show a notification via the service worker (works in installed iOS PWAs), falling back to the constructor.
+    function notify(title,body,tag){
+      const opts={body:body||"",icon:"/finance-tracker/icon-512-v6.png",badge:"/finance-tracker/icon-192-v6.png",tag};
+      try{
+        if(navigator.serviceWorker&&navigator.serviceWorker.ready){
+          navigator.serviceWorker.ready.then(r=>r.showNotification(title,opts)).catch(()=>{try{new Notification(title,opts);}catch(_){}});
+          return;
+        }
+      }catch(_){}
+      try{new Notification(title,opts);}catch(_){}
+    }
+
     function App() {
       const [tab,setTab]=useState("wage");
       const [se,setSe]=useState(initSe);
@@ -173,6 +185,7 @@
       const timer=useRef(null);
       const selfChange=useRef(false);
       useEffect(()=>{const fn=()=>setWide(window.innerWidth>=768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
+      useEffect(()=>{if('serviceWorker' in navigator){navigator.serviceWorker.register('/finance-tracker/sw.js').catch(()=>{});}},[]);
 
       _t.c=th==="ember"?EMBER:th==="pumpkin"?PUMP:th==="sage"?SAGE:LATTE;
       const c=_t.c;
@@ -276,17 +289,17 @@
         const rem2=se.annualLimit-tot;
         const curMo=MONTHS.find(m=>m.key===mk);
         // daily de-dup per notification type
-        const fire=(key,title,body)=>{const k='fn-'+key+'-'+todayStr;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/finance-tracker/icon-512-v6.png'}),200);};
+        const fire=(key,title,body)=>{const k='fn-'+key+'-'+todayStr;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>notify(title,body,key),200);};
         // once-ever de-dup for milestones
-        const fireOnce=(key,title,body)=>{const k='fn1-'+key;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>new Notification(title,{body,icon:'/finance-tracker/icon-512-v6.png'}),200);};
+        const fireOnce=(key,title,body)=>{const k='fn1-'+key;if(localStorage.getItem(k))return;localStorage.setItem(k,'1');setTimeout(()=>notify(title,body,key),200);};
         // ── Existing ──
         if(d===pd) fire('payday','💰 Pay Day!','Today is your payday — log your hours!');
         else if(d===pd-1) fire('payday-eve','💰 Pay Day Tomorrow',`Payday is tomorrow (${pd}th). Get ready!`);
         if(pct>=90) fire('limit90','⚠️ Limit Almost Full',`${pct}% used — only ¥${rem2.toLocaleString()} left!`);
         else if(pct>=80) fire('limit80','⚡ Nearing Annual Limit',`${pct}% of your ¥${se.annualLimit.toLocaleString()} limit used`);
         // ── Money ──
-        if(d===pd-3) fire('suica','🚇 Top up your SUICA',`Payday is in 3 days (${pd}th) — load up your SUICA for the new pay period`);
-        if(d===pd&&(se.mumItems||[]).length>0) fire('mum','👩 Send to Mum?',`Don't forget to send Mum her money today!`);
+        if(d>=pd-3&&d<=pd-1) fire('suica','🚇 Top up your SUICA',`Payday is in ${pd-d} day${pd-d>1?'s':''} (${pd}th) — load up your SUICA for the new pay period`);
+        if(d>=pd&&d<=pd+2&&(se.mumItems||[]).length>0) fire('mum','👩 Send to Mum?',`Don't forget to send Mum her money for this pay period!`);
         // ── Budget prep reminders ──
         const currBudget=da[mk]||{};
         const hasOneOffs=(currBudget.oneOffs||[]).length>0;
@@ -328,6 +341,15 @@
       const rem=se.annualLimit-aT;
       const pct=Math.min(100,(aT/se.annualLimit)*100);
       const o85=pct>85;
+      const reminders=(()=>{const r=[];const nowD=new Date();const tmk=`${nowD.getFullYear()}-${String(nowD.getMonth()+1).padStart(2,"0")}`;const tmd=da[tmk];const pdT=gPD(tmk);const dleft=pdT-nowD.getDate();const tmPF=(tmd&&tmd.paidFixed)||{};const tmMC=(tmd&&tmd.mumChecked)||[];
+        if(dleft===0)r.push({i:"💰",t:"Payday is today — log your hours"});else if(dleft>0&&dleft<=7)r.push({i:"💰",t:`Payday in ${dleft} day${dleft>1?"s":""} (the ${pdT}th)`});
+        if(dleft>=0&&dleft<=3&&!tmPF["suica"])r.push({i:"🚇",t:"Top up your SUICA for the new pay period"});
+        if(dleft>=0&&dleft<=7){const sorted=Object.values(tmPF).some(Boolean);if(!sorted)r.push({i:"📋",t:"Sort this month's bills before payday"});}
+        if(dleft<=0&&dleft>=-3&&tmMC.length===0&&(se.mumItems||[]).length>0)r.push({i:"👩",t:"Send Mum her money this payday"});
+        const plS=PAID_LEAVE.find(ds=>{const diff=(new Date(ds)-nowD)/86400000;return diff>=0&&diff<=7;});if(plS)r.push({i:"🏖️",t:`Paid leave coming up on ${plS}`});
+        if(nowD.getDay()===0&&tmd&&!(tmd.hours>0||tmd.wageOverride>0))r.push({i:"⏱️",t:"Log your hours for this month"});
+        if(pct>=80)r.push({i:"⚠️",t:`${Math.round(pct)}% of your annual limit used`});
+        return r;})();
       const nw=new Date();
       const cMN=nw.getFullYear()===2026?nw.getMonth()+1:4;
       const mxP=Math.floor(rem/Math.max(1,12-cMN+1));
@@ -486,6 +508,13 @@
           </div>}
 
           <div key={tab} className="tabpane" style={{padding:`${tab==="wage"?"14px":"calc(env(safe-area-inset-top) + 14px)"} ${px} calc(env(safe-area-inset-bottom) + 96px)`}}>
+
+            {tab==="wage"&&reminders.length>0&&(
+              <div style={{...crd,padding:16,marginBottom:10}}>
+                <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.8,fontWeight:600,marginBottom:8}}>Coming up</div>
+                {reminders.map((rm,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",fontSize:14,fontWeight:500,color:c.text,borderTop:i>0?`1px solid ${c.border}`:"none"}}><span style={{fontSize:17,flexShrink:0}}>{rm.i}</span><span>{rm.t}</span></div>))}
+              </div>
+            )}
 
             {tab==="wage"&&(
               <div style={{...crd,marginBottom:10,padding:0,overflow:"hidden"}}>
@@ -1156,7 +1185,7 @@
                         setSe(p=>({...p,gbpToJpy:rate}));
                         setFxLoad("done");
                         setTimeout(()=>setFxLoad("idle"),3000);
-                        if(se.notifs&&Notification.permission==='granted'&&rate>oldRate) new Notification('💷 Rate improved!',{body:`£1 = ¥${rate} today (up from ¥${oldRate}) — good time for Dad to send money!`,icon:'/finance-tracker/icon-512-v6.png'});
+                        if(se.notifs&&Notification.permission==='granted'&&rate>oldRate) notify('💷 Rate improved!',`£1 = ¥${rate} today (up from ¥${oldRate}) — good time for Dad to send money!`,'rate');
                       }catch(e){
                         setFxLoad("error");
                         setTimeout(()=>setFxLoad("idle"),3000);
@@ -1195,7 +1224,7 @@
                         </button>
                       </div>
                       {se.notifs&&Notification.permission==='granted'&&(
-                        <button onClick={()=>new Notification('Finance Tracker ✓',{body:'Notifications are working!',icon:'/finance-tracker/icon-512-v6.png'})} style={{width:"100%",padding:10,border:`1px solid ${c.border}`,background:"transparent",color:c.sub,borderRadius:10,cursor:"pointer",fontFamily:ft,fontSize:12,marginBottom:12}}>
+                        <button onClick={()=>notify('Finance Tracker ✓','Notifications are working!','test')} style={{width:"100%",padding:10,border:`1px solid ${c.border}`,background:"transparent",color:c.sub,borderRadius:10,cursor:"pointer",fontFamily:ft,fontSize:12,marginBottom:12}}>
                           Send test notification
                         </button>
                       )}
@@ -1215,6 +1244,7 @@
                         <div>Your next shift could exceed the limit</div>
                         <div>Halfway point reached (¥515,000)</div>
                         <div>All fixed expenses paid for the month</div>
+                        <div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${c.border}`,color:c.muted}}>Pop-up alerts appear while the app is open. Whatever's due also shows in the <b>Coming up</b> panel on the home screen every time you open it. (Alerts while the app is fully closed need background push — ask to set this up.)</div>
                       </div>
                     </div>
                   ):(
