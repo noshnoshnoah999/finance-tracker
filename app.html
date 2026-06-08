@@ -65,7 +65,7 @@
     const DS = {
       hourlyWage:1400,annualLimit:1030000,commuteOneWay:178,
       trBefore:1040,trAfter:1100,food4wk:20000,food5wk:25000,
-      gbpToJpy:215,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,themeMigrated:false,subItems:[],showSkin:true,showGenSav:true,
+      gbpToJpy:215,usdToJpy:155,silverSpot:0,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,themeMigrated:false,subItems:[],showSkin:true,showGenSav:true,
       shifts:{
         1:{start:"09:00",end:"16:00",breakMin:60,label:"Mon"},
         2:{start:"09:00",end:"12:00",breakMin:0,label:"Tue"},
@@ -87,7 +87,7 @@
       {id:"d3",note:"Lunch money",gbp:25},{id:"d4",note:"Student loan",gbp:150},
       {id:"d5",note:"Commuter pass",gbp:50},{id:"d6",note:"Japanese lessons",gbp:25},
     ];
-    const eM = () => ({hours:0,days:0,wageOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{},subInc:{}});
+    const eM = () => ({hours:0,days:0,wageOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0});
     const PF = {"2026-01":{hours:0,days:4,wageOverride:28982},"2026-02":{hours:0,days:10,wageOverride:81143},"2026-03":{hours:0,days:14,wageOverride:107112},"2026-04":{hours:0,days:14,wageOverride:97207}};
     const gDef = () => { const d={}; MONTHS.forEach(mo=>{ const m=eM(); if(PF[mo.key]) Object.assign(m,PF[mo.key],{dadItems:DEF_DAD()}); else m.days=wDIM(mo.key,DS.workDays); d[mo.key]=m; }); return d; };
 
@@ -103,6 +103,8 @@
 
     const yn=n=>"¥"+Math.round(n).toLocaleString();
     const gf=n=>"£"+n.toFixed(2);
+    const ud=n=>"$"+Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+    const ozf=n=>Number(n||0).toLocaleString("en-US",{maximumFractionDigits:2})+" oz";
     const DCL=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
     const DN=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
     const ft="-apple-system,BlinkMacSystemFont,'SF Pro Rounded','Helvetica Neue',sans-serif";
@@ -360,6 +362,16 @@
       const tS=MONTHS.reduce((s,mo)=>s+(da[mo.key]?.savings||0),0);
       const tSd=useCountUp(tS);
       const sA=cMN>0?tS/cMN:0;
+      // ── Silver / investment tracking (USD) ──
+      const slvOz=MONTHS.reduce((s,mo)=>s+(da[mo.key]?.silverOz||0),0);
+      const slvUsd=MONTHS.reduce((s,mo)=>s+(da[mo.key]?.silverUsd||0),0);
+      const slvAvg=slvOz>0?slvUsd/slvOz:0;
+      const slvSpot=se.silverSpot||0;
+      const slvVal=slvSpot>0?slvOz*slvSpot:0;
+      const slvGain=slvVal>0?slvVal-slvUsd:0;
+      const slvGainPct=slvVal>0&&slvUsd>0?(slvGain/slvUsd)*100:0;
+      const usdJpy=se.usdToJpy||155;
+      const slvUsdD=useCountUp(Math.round(slvUsd));
       const eMs=MONTHS.filter((_,i)=>i<cMN);
       const fMs=MONTHS.filter((_,i)=>i>=cMN);
       const eT=eMs.reduce((s,mo)=>s+gTx(da[mo.key],mo.key),0);
@@ -1005,6 +1017,84 @@
                   <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12,fontWeight:700,fontSize:14}}>
                     <span>Total saved</span><span style={{color:c.blueD,fontSize:18}}>{yn(tS)}</span>
                   </div>
+                </div>
+
+                {/* ── Silver / Investments ── */}
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+                    <div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/>
+                    <span style={{fontSize:15,fontWeight:700}}>Silver · Investments</span>
+                    <span style={{marginLeft:"auto",fontSize:18}}>🪙</span>
+                  </div>
+
+                  {/* Summary tiles */}
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:slvSpot>0?10:14}}>
+                    <div style={{background:c.cardAlt,borderRadius:16,padding:14,textAlign:"center"}}>
+                      <div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:5}}>Stack</div>
+                      <div style={{fontSize:21,fontWeight:800,color:c.peachD}}>{Number(slvOz).toLocaleString("en-US",{maximumFractionDigits:2})}<span style={{fontSize:12,fontWeight:600,color:c.sub}}> oz</span></div>
+                    </div>
+                    <div style={{background:c.cardAlt,borderRadius:16,padding:14,textAlign:"center"}}>
+                      <div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:5}}>Invested</div>
+                      <div style={{fontSize:21,fontWeight:800,color:c.peachD}}>{ud(slvUsdD)}</div>
+                      <div style={{fontSize:10,color:c.muted,marginTop:2}}>≈ {yn(slvUsd*usdJpy)}</div>
+                    </div>
+                  </div>
+
+                  {/* Live value (only when spot price set) */}
+                  {slvSpot>0&&(
+                    <div style={{background:slvGain>=0?c.greenBg:c.roseBg,borderRadius:16,padding:14,marginBottom:14}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
+                        <span style={{fontSize:12,color:c.sub,fontWeight:600}}>Current value</span>
+                        <span style={{fontSize:20,fontWeight:800,color:slvGain>=0?c.greenD:c.roseD}}>{ud(slvVal)}</span>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{fontSize:11,color:c.muted}}>≈ {yn(slvVal*usdJpy)} · @ ${slvSpot}/oz</span>
+                        <span style={{fontSize:13,fontWeight:700,color:slvGain>=0?c.greenD:c.roseD}}>{slvGain>=0?"▲":"▼"} {ud(Math.abs(slvGain))} ({slvGain>=0?"+":""}{slvGainPct.toFixed(1)}%)</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Per-month entries */}
+                  {(()=>{
+                    const maxU=Math.max(...MONTHS.map(mo=>da[mo.key].silverUsd||0),1);
+                    return MONTHS.map(mo=>{
+                      const oz=da[mo.key].silverOz||0,u=da[mo.key].silverUsd||0;
+                      const isFut=mo.key>(MONTHS[cMN-1]?.key||"");
+                      const ppo=oz>0?u/oz:0;
+                      return(
+                        <div key={mo.key} style={{marginBottom:14,opacity:isFut?0.5:1}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                            <span style={{fontSize:13,fontWeight:600,color:u>0?c.text:c.muted}}>{mo.label}</span>
+                            {u>0&&<span style={{fontSize:12,fontWeight:600,color:c.peachD}}>{ozf(oz)} · {ud(u)}{ppo>0?` · $${ppo.toFixed(2)}/oz`:""}</span>}
+                          </div>
+                          <div style={{display:"flex",gap:8}}>
+                            <div style={{flex:1}}><NI prefix="oz" value={oz} onChange={v=>sM(mo.key,"silverOz",v)} placeholder={isFut?"—":"Ounces…"}/></div>
+                            <div style={{flex:1}}><NI prefix="$" value={u} onChange={v=>sM(mo.key,"silverUsd",v)} placeholder={isFut?"—":"Spent…"}/></div>
+                          </div>
+                          {u>0&&<div style={{height:4,borderRadius:4,background:c.cardAlt,overflow:"hidden",marginTop:6}}><div style={{height:"100%",borderRadius:4,width:`${(u/maxU)*100}%`,background:c.peachD,transition:"width 0.3s"}}/></div>}
+                        </div>
+                      );
+                    });
+                  })()}
+
+                  {slvOz>0&&(
+                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12,fontWeight:700,fontSize:14}}>
+                      <span>Avg cost</span><span style={{color:c.peachD,fontSize:16}}>${slvAvg.toFixed(2)}/oz</span>
+                    </div>
+                  )}
+
+                  {/* Spot price + USD rate */}
+                  <div style={{display:"flex",gap:10,marginTop:14}}>
+                    <div style={{flex:1}}>
+                      <label style={lbl}>Silver spot (USD/oz)</label>
+                      <NI prefix="$" value={se.silverSpot||0} onChange={v=>setSe(p=>({...p,silverSpot:v}))} placeholder="e.g. 31.50"/>
+                    </div>
+                    <div style={{flex:1}}>
+                      <label style={lbl}>USD → JPY rate</label>
+                      <NI prefix="¥" value={se.usdToJpy||0} onChange={v=>setSe(p=>({...p,usdToJpy:v}))} placeholder="e.g. 155"/>
+                    </div>
+                  </div>
+                  <div style={{fontSize:11,color:c.muted,marginTop:8}}>Set the spot price to see your stack's live value & gain. Leave it blank to just track what you've put in.</div>
                 </div>
 
                 {/* ── Goal setting ── */}
