@@ -186,6 +186,7 @@
       const [schedOpen,setSchedOpen]=useState(false);
       const [nSub,setNSub]=useState({name:"",price:0,everyN:1});
       const [eSub,setESub]=useState(null);
+      const [savView,setSavView]=useState("cash");
       const timer=useRef(null);
       const selfChange=useRef(false);
       useEffect(()=>{const fn=()=>setWide(window.innerWidth>=768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
@@ -956,6 +957,14 @@
             {tab==="savings"&&(
               <div>
 
+                {/* ── Cash / Silver toggle ── */}
+                <div style={{display:"flex",gap:6,background:c.cardAlt,borderRadius:16,padding:4,marginBottom:12}}>
+                  {[{k:"cash",label:"💴 Cash"},{k:"silver",label:"🪙 Silver"}].map(({k,label})=>(
+                    <button key={k} onClick={()=>setSavView(k)} style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",cursor:"pointer",fontFamily:ft,fontSize:14,fontWeight:savView===k?800:600,color:savView===k?c.white:c.sub,background:savView===k?(k==="silver"?c.peachD:c.blueD):"transparent",transition:"all 0.2s"}}>{label}</button>
+                  ))}
+                </div>
+
+                {savView==="cash"&&(<React.Fragment>
                 {/* ── Hero ── */}
                 <div style={{...crd,background:c.blueD,padding:22}}>
                   <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:4}}>Total Saved in 2026</div>
@@ -1019,6 +1028,30 @@
                   </div>
                 </div>
 
+                {/* ── Goal setting ── */}
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+                    <div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/>
+                    <span style={{fontSize:15,fontWeight:700}}>Savings Goal</span>
+                  </div>
+                  <label style={lbl}>Target amount</label>
+                  <NI prefix="¥" value={se.savingsGoal||0} onChange={v=>setSe(p=>({...p,savingsGoal:v}))} placeholder="e.g. 500000"/>
+                  {se.savingsGoal>0&&(
+                    <div style={{marginTop:12,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
+                      {tS>=se.savingsGoal?(
+                        <div style={{color:c.greenD,fontWeight:700,fontSize:14,textAlign:"center"}}>Goal reached!</div>
+                      ):(
+                        <div>
+                          <div style={rw}><span style={{color:c.sub}}>Still needed</span><span style={{fontWeight:700,color:c.blueD}}>{yn(se.savingsGoal-tS)}</span></div>
+                          {sA>0&&<div style={rw}><span style={{color:c.sub}}>At current rate</span><span style={{fontWeight:600}}>{Math.ceil((se.savingsGoal-tS)/sA)} more months</span></div>}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                </React.Fragment>)}
+
+                {savView==="silver"&&(<React.Fragment>
                 {/* ── Silver / Investments ── */}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
@@ -1096,28 +1129,7 @@
                   </div>
                   <div style={{fontSize:11,color:c.muted,marginTop:8}}>Set the spot price to see your stack's live value & gain. Leave it blank to just track what you've put in.</div>
                 </div>
-
-                {/* ── Goal setting ── */}
-                <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-                    <div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/>
-                    <span style={{fontSize:15,fontWeight:700}}>Savings Goal</span>
-                  </div>
-                  <label style={lbl}>Target amount</label>
-                  <NI prefix="¥" value={se.savingsGoal||0} onChange={v=>setSe(p=>({...p,savingsGoal:v}))} placeholder="e.g. 500000"/>
-                  {se.savingsGoal>0&&(
-                    <div style={{marginTop:12,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
-                      {tS>=se.savingsGoal?(
-                        <div style={{color:c.greenD,fontWeight:700,fontSize:14,textAlign:"center"}}>Goal reached!</div>
-                      ):(
-                        <div>
-                          <div style={rw}><span style={{color:c.sub}}>Still needed</span><span style={{fontWeight:700,color:c.blueD}}>{yn(se.savingsGoal-tS)}</span></div>
-                          {sA>0&&<div style={rw}><span style={{color:c.sub}}>At current rate</span><span style={{fontWeight:600}}>{Math.ceil((se.savingsGoal-tS)/sA)} more months</span></div>}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                </React.Fragment>)}
 
               </div>
             )}
