@@ -182,15 +182,18 @@ Deno.serve(async (req: Request) => {
     : { type: "image", source: { type: "base64", media_type: mediaType, data: fileBase64 } };
 
   try {
-    const msg = await client.messages.create({
+    // Stream server-side so long PDF reads keep the upstream connection alive
+    // (avoids idle-timeout drops); we still return one JSON blob to the client.
+    const stream = client.messages.stream({
       model: "claude-sonnet-4-6",
       max_tokens: 16000,
       thinking: { type: "adaptive" },
-      output_config: { format: { type: "json_schema", schema: SCHEMA } },
+      output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
       messages: [
         { role: "user", content: [mediaBlock as never, { type: "text", text: PROMPT(budgetContext || "") }] },
       ],
     });
+    const msg = await stream.finalMessage();
     const textBlock = msg.content.find((b: { type: string }) => b.type === "text") as { text?: string } | undefined;
     if (!textBlock?.text) return json({ error: "No analysis returned" }, 502);
     let data: unknown;

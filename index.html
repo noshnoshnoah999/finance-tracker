@@ -477,15 +477,24 @@
             "Mum repayments: "+(se.mumItems||[]).map(m=>`${m.name} ¥${m.amount}`).join(", "),
             "Hourly wage ¥"+se.hourlyWage+", monthly silver investing in USD.",
           ].join("\n");
-          const r=await fetch(`${SUPABASE_URL}/functions/v1/analyze-passbook`,{
-            method:"POST",
-            headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
-            body:JSON.stringify({fileBase64:b64,mediaType,budgetContext:ctx}),
-          });
+          const ctrl=new AbortController();
+          const to=setTimeout(()=>ctrl.abort(),150000);
+          let r;
+          try{
+            r=await fetch(`${SUPABASE_URL}/functions/v1/analyze-passbook`,{
+              method:"POST",
+              headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
+              body:JSON.stringify({fileBase64:b64,mediaType,budgetContext:ctx}),
+              signal:ctrl.signal,
+            });
+          }finally{clearTimeout(to);}
           const j=await r.json();
           if(!r.ok||j.error)throw new Error(j.error||("HTTP "+r.status));
           setPbRes(j.data);
-        }catch(e){setPbErr(String(e&&e.message||e));}
+        }catch(e){
+          const ab=e&&(e.name==="AbortError");
+          setPbErr(ab?"Took too long (over 2½ min). Try one page at a time, or a clearer / smaller photo.":String(e&&e.message||e));
+        }
         finally{setPbLoading(false);}
       };
       const tPF=(k,id)=>sM(k,"paidFixed",{...(da[k].paidFixed||{}),[id]:!(da[k].paidFixed||{})[id]});
