@@ -183,19 +183,61 @@ Be accurate; never invent transactions you cannot read. Amounts are whole yen un
 The user's current budget tracked in their app:
 ${budgetContext || "(none provided)"}`;
 
+// Mode B — insights only, over already-extracted transactions (no re-extraction).
+const INSIGHTS_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    categories: (SCHEMA as { properties: Record<string, unknown> }).properties.categories,
+    recurring: (SCHEMA as { properties: Record<string, unknown> }).properties.recurring,
+    summary: (SCHEMA as { properties: Record<string, unknown> }).properties.summary,
+    anomalies: (SCHEMA as { properties: Record<string, unknown> }).properties.anomalies,
+    budget_matches: (SCHEMA as { properties: Record<string, unknown> }).properties.budget_matches,
+    suggestions: (SCHEMA as { properties: Record<string, unknown> }).properties.suggestions,
+    insights: (SCHEMA as { properties: Record<string, unknown> }).properties.insights,
+  },
+  required: ["categories", "recurring", "summary", "anomalies", "budget_matches", "suggestions", "insights"],
+};
+
+const INSIGHTS_PROMPT = (budgetContext: string, txText: string) => `You are a friendly, sharp personal-finance coach for a 16-year-old part-time worker in Japan. Below is their full transaction history (already extracted from their bank passbook), one per line as: DATE | +/-AMOUNT | CATEGORY | DESCRIPTION. Amounts are in yen.
+
+Analyse the WHOLE picture across all months and produce:
+- categories: per-category spending totals ("out" only) with counts, biggest first.
+- recurring: subscriptions or repeating bills you can spot; short note each.
+- summary: total in, total out, net, savings_rate_pct = round(net / income_total * 100) (0 if no income).
+- anomalies: unusual or wasteful spending — spikes, likely duplicate charges, ATM/bank fees, creeping habits. Explain why in "reason".
+- budget_matches: reconcile against the budget below. status ∈ "matched" / "missing_from_app" (spent but not tracked) / "not_seen" (tracked but no spending found).
+- suggestions: 3-6 concrete, encouraging, actionable recommendations tailored to a teen saver (specific yen amounts where possible).
+- insights: 3-6 short plain-English observations about their spending habits and trends over time.
+
+Be specific and genuinely useful. Output strictly matches the provided JSON schema.
+
+The user's budget tracked in their app:
+${budgetContext || "(none provided)"}
+
+Transactions:
+${txText}`;
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
 
-  let body: { fileBase64?: string; mediaType?: string; budgetContext?: string };
+  let body: {
+    fileBase64?: string;
+    mediaType?: string;
+    budgetContext?: string;
+    transactions?: Array<Record<string, unknown>>;
+  };
   try {
     body = await req.json();
   } catch {
     return json({ error: "Invalid JSON body" }, 400);
   }
-  const { fileBase64, mediaType, budgetContext } = body;
-  if (!fileBase64 || !mediaType) {
-    return json({ error: "Missing fileBase64 or mediaType" }, 400);
+  const { fileBase64, mediaType, budgetContext, transactions } = body;
+  // Mode A = file upload (extract + analyse). Mode B = insights-only over given transactions.
+  const insightsMode = Array.isArray(transactions) && transactions.length > 0;
+  if (!insightsMode && (!fileBase64 || !mediaType)) {
+    return json({ error: "Missing fileBase64/mediaType (or a transactions array)" }, 400);
   }
 
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
@@ -211,21 +253,34 @@ Deno.serve(async (req: Request) => {
   }
 
   const client = new Anthropic({ apiKey });
-  const isPdf = mediaType === "application/pdf";
-  const mediaBlock = isPdf
-    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
-    : { type: "image", source: { type: "base64", media_type: mediaType, data: fileBase64 } };
 
   try {
-    // Stream server-side so long PDF reads keep the upstream connection alive
+    let content: unknown[];
+    let schema: unknown;
+    if (insightsMode) {
+      // Mode B: analyse already-extracted transactions, no file.
+      const txText = (transactions as Array<Record<string, unknown>>)
+        .map((t) => `${t.date} | ${t.direction === "in" ? "+" : "-"}${t.amount} | ${t.category} | ${t.description}`)
+        .join("\n");
+      schema = INSIGHTS_SCHEMA;
+      content = [{ type: "text", text: INSIGHTS_PROMPT(budgetContext || "", txText) }];
+    } else {
+      const isPdf = mediaType === "application/pdf";
+      const mediaBlock = isPdf
+        ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
+        : { type: "image", source: { type: "base64", media_type: mediaType, data: fileBase64 } };
+      schema = SCHEMA;
+      content = [mediaBlock as never, { type: "text", text: PROMPT(budgetContext || "") }];
+    }
+    // Stream server-side so long reads keep the upstream connection alive
     // (avoids idle-timeout drops); we still return one JSON blob to the client.
     const stream = client.messages.stream({
       model: "claude-sonnet-4-6",
       max_tokens: 16000,
       thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
+      output_config: { effort: "medium", format: { type: "json_schema", schema } },
       messages: [
-        { role: "user", content: [mediaBlock as never, { type: "text", text: PROMPT(budgetContext || "") }] },
+        { role: "user", content: content as never },
       ],
     });
     const msg = await stream.finalMessage();
