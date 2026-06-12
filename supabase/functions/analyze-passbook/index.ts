@@ -27,6 +27,37 @@ const json = (body: unknown, status = 200) =>
     headers: { ...CORS, "Content-Type": "application/json" },
   });
 
+// Best-effort daily call cap. The app calls this function with the *public*
+// anon key (it's in the GitHub Pages source), so anyone could invoke it and
+// burn Anthropic credit. This caps total calls/day. It is FAIL-OPEN: any error
+// (e.g. the fn_usage table not existing yet) simply lets the request through,
+// so the feature never breaks — the cap just won't be enforced until the table
+// exists. One-time setup SQL (run in Supabase SQL editor):
+//   create table if not exists fn_usage (day date primary key, count int not null default 0);
+const DAILY_CAP = 15;
+async function underDailyCap(): Promise<boolean> {
+  try {
+    const url = Deno.env.get("SUPABASE_URL");
+    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !key) return true; // can't check → allow
+    const day = new Date().toISOString().slice(0, 10);
+    const h = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+    const r = await fetch(`${url}/rest/v1/fn_usage?day=eq.${day}&select=count`, { headers: h });
+    if (!r.ok) return true; // table missing / error → allow
+    const rows = await r.json();
+    const count = (rows[0] && rows[0].count) || 0;
+    if (count >= DAILY_CAP) return false;
+    await fetch(`${url}/rest/v1/fn_usage`, {
+      method: "POST",
+      headers: { ...h, Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({ day, count: count + 1 }),
+    });
+    return true;
+  } catch {
+    return true; // never block legitimate use on an internal error
+  }
+}
+
 // Structured-output schema — guarantees clean JSON we can render in-app.
 const SCHEMA = {
   type: "object",
@@ -173,6 +204,10 @@ Deno.serve(async (req: Request) => {
       { error: "Server is missing the ANTHROPIC_API_KEY secret. Set it in Supabase -> Edge Functions -> Secrets." },
       500,
     );
+  }
+
+  if (!(await underDailyCap())) {
+    return json({ error: "Daily scan limit reached — please try again tomorrow." }, 429);
   }
 
   const client = new Anthropic({ apiKey });

@@ -327,7 +327,7 @@
         const currDa2=da[mk]||{};const pF2=currDa2.paidFixed||{};
         const sF2=currDa2.skippedFixed||{};
         const allBillsPaid=(se.fixed||[]).length>0&&(se.fixed||[]).every(f=>sF2[f.id]||pF2[f.id])&&pF2['suica']&&pF2['food']&&(!currDa2.skinTreatment||pF2['skinTreatment'])&&(!currDa2.generalSavings||pF2['generalSavings']);
-        if(allBillsPaid) fire('allpaid','✅ All Bills Paid!',`Every fixed expense is marked as paid for ${curMo?.label||'this month'} — nice work!`);
+        if(allBillsPaid) fireOnce('allpaid-'+mk,'✅ All Bills Paid!',`Every fixed expense is marked as paid for ${curMo?.label||'this month'} — nice work!`);
         const dayEarnings=se.hourlyWage*6;
         if(rem2>0&&rem2<dayEarnings*2) fire('lastday','📆 Almost at the Limit',`Only ¥${rem2.toLocaleString()} left — your next shift could exceed your annual limit!`);
       },[ld,se.notifs]);
@@ -362,7 +362,7 @@
         if(pct>=80)r.push({i:"⚠️",t:`${Math.round(pct)}% of your annual limit used`});
         return r;})();
       const nw=new Date();
-      const cMN=nw.getFullYear()===2026?nw.getMonth()+1:4;
+      const cMN=nw.getFullYear()===2026?nw.getMonth()+1:(nw.getFullYear()>2026?12:0);
       const mxP=Math.floor(rem/Math.max(1,12-cMN+1));
       const tS=MONTHS.reduce((s,mo)=>s+(da[mo.key]?.savings||0),0);
       const tSd=useCountUp(tS);
@@ -385,6 +385,8 @@
       const nFM=fMs.length;
       const eS=nFM>0?Math.floor(rL/nFM):0;
       const mHP=se.hourlyWage>0?eS/se.hourlyWage:0;
+      const nML=cMN<=11?MONTHS[cMN].label:"—";
+      const nMK=cMN<=11?MONTHS[cMN].key:null;
       const nMShifts=nMK?gShifts(nMK):se.shifts||{};
       const monH=sH(nMShifts[1]);
       const tueH=sH(nMShifts[2]);
@@ -398,8 +400,6 @@
       const pFH=se.hourlyWage>0?pFA/se.hourlyWage:0;
       const pOL=pNT>se.annualLimit;
       const pHasInput=(pH.pMon||0)+(pH.pTue||0)+(pH.pSun||0)>0;
-      const nML=cMN<=11?MONTHS[cMN].label:"—";
-      const nMK=cMN<=11?MONTHS[cMN].key:null;
 
       const bd=da[bm]||eM();
       const bdW=gW(bd),bdTr=gTr(bd,bm),bdCm=bd.suicaOverride!=null?bd.suicaOverride:gCm(bd,bm);const bdSI=gSuicaInfo(bm);
@@ -423,7 +423,7 @@
       const bdFrD=useCountUp(bdFr);
       // ── Dashboard helpers ──
       const bdLeftPay=(()=>{let u=0;se.fixed.forEach(f=>{if(!bdSF[f.id]&&!bdPF[f.id])u+=fxAmt(f);});if(!bdPF["suica"])u+=bdCm;if(!bdPF["food"])u+=bdFd;if(!bdPF["skinTreatment"])u+=bdSkin;if(!bdPF["generalSavings"])u+=bdGenSav;return u;})();
-      const homeBillIds=[...se.fixed.filter(f=>!bdSF[f.id]).map(f=>f.id),"suica","food",...(se.showSkin!==false?["skinTreatment"]:[]),...(se.showGenSav!==false?["generalSavings"]:[])];
+      const homeBillIds=[...se.fixed.filter(f=>!bdSF[f.id]).map(f=>f.id),"suica","food",...(se.showSkin!==false&&bdSkin>0?["skinTreatment"]:[]),...(se.showGenSav!==false&&bdGenSav>0?["generalSavings"]:[])];
       const homeBillCount=homeBillIds.length;
       const homePaidCount=homeBillIds.filter(id=>bdPF[id]).length;
       const bmLabel=MONTHS.find(x=>x.key===bm)?.label||"";
@@ -436,6 +436,8 @@
       const _curPD=gPD(_curMK);
       const _miCur=MONTHS.findIndex(x=>x.key===_curMK);
       const payMK=(_today.getDate()<=_curPD)?_curMK:(_miCur>=0&&_miCur<MONTHS.length-1?MONTHS[_miCur+1].key:_curMK);
+      // Past the final (December) payday: no further months exist, so payMK can't advance.
+      const payIsLast=_today.getDate()>_curPD&&_miCur===MONTHS.length-1;
       const payPD=gPD(payMK);
       const _payDate=(()=>{const[y,mo]=payMK.split("-").map(Number);return new Date(y,mo-1,payPD);})();
       const daysToPay=Math.max(0,Math.round((_payDate-new Date(_today.getFullYear(),_today.getMonth(),_today.getDate()))/86400000));
@@ -516,13 +518,16 @@
         const cd=da[bm]?.customDays||{};
         const toggleDay=(ds,dt)=>{
           const isSched=se.workDays.includes(dt.getDay());
+          const isPL=PAID_LEAVE.includes(ds);
           const state=getDayState(ds,dt,cd,se.workDays);
           let next;
+          // PL days (default "pl") cycle pl→off→work→hol→pl via overrides;
+          // normal days keep work→hol→pl→off→(reset) and none↔work.
           if(state==="work"&&isSched)next="hol";
+          else if(state==="work"&&!isSched)next=isPL?"hol":null;
           else if(state==="hol")next="pl";
-          else if(state==="pl"&&isSched)next="off";
-          else if(state==="off"||state==="pl")next=null;
-          else if(state==="work"&&!isSched)next=null;
+          else if(state==="pl")next="off";
+          else if(state==="off")next=isPL?"work":null;
           else if(state==="none")next="work";
           const newCD={...cd};
           if(next==null)delete newCD[ds]; else newCD[ds]=next;
@@ -609,7 +614,7 @@
                     <span style={{fontSize:11,color:"rgba(255,255,255,0.65)",fontWeight:600}}>Wages →</span>
                   </div>
                   <div style={{fontSize:40,fontWeight:800,color:c.white,letterSpacing:-1,lineHeight:1}}>{yn(payTotalD)}</div>
-                  <div style={{fontSize:13,color:"rgba(255,255,255,0.82)",marginTop:6}}>{daysToPay===0?"Payday is today 🎉":`in ${daysToPay} day${daysToPay===1?"":"s"} · the ${payPD}th`}</div>
+                  <div style={{fontSize:13,color:"rgba(255,255,255,0.82)",marginTop:6}}>{payIsLast?`Paid on the ${payPD}th ✓ · next payday in January`:daysToPay===0?"Payday is today 🎉":`in ${daysToPay} day${daysToPay===1?"":"s"} · the ${payPD}th`}</div>
                   {payTotal>0?(
                     <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:7}}>
                       <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"rgba(255,255,255,0.9)"}}><span>Wage</span><span style={{fontWeight:700}}>{yn(_pcWage)}</span></div>
@@ -1415,7 +1420,7 @@
                   <div style={{fontSize:12,color:c.sub,marginBottom:12}}>Upload a photo or PDF of your bank passbook. Claude reads the transactions and breaks down your spending — categories, subscriptions, fees, and tips.</div>
                   <label style={{display:"block",padding:14,borderRadius:14,border:`1.5px dashed ${c.border}`,background:c.cardAlt,textAlign:"center",cursor:pbLoading?"default":"pointer",color:c.sub,fontSize:13,fontWeight:600}}>
                     {pbLoading?"Analysing… ~15-30s":(pbName?`Scan another (last: ${pbName})`:"📷 Choose passbook image or PDF")}
-                    <input type="file" accept="image/*,application/pdf" disabled={pbLoading} onChange={e=>analyzePassbook(e.target.files&&e.target.files[0])} style={{display:"none"}}/>
+                    <input type="file" accept="image/*,application/pdf" disabled={pbLoading} onChange={e=>{const f=e.target.files&&e.target.files[0];e.target.value="";analyzePassbook(f);}} style={{display:"none"}}/>
                   </label>
                   {pbErr&&<div style={{marginTop:10,padding:12,borderRadius:12,background:c.roseBg,color:c.roseD,fontSize:12,fontWeight:600}}>{pbErr}</div>}
                   {pbRes&&(()=>{const R=pbRes;const S=R.summary||{};const tile=(lbl2,val,col,bg)=>(<div style={{background:bg,borderRadius:12,padding:12}}><div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.4}}>{lbl2}</div><div style={{fontSize:18,fontWeight:800,color:col}}>{val}</div></div>);const sec=(title)=>(<div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.6,fontWeight:700,margin:"14px 0 8px"}}>{title}</div>);return(
@@ -1548,7 +1553,7 @@
                         <div>80% of your annual limit reached</div>
                         <div>90% of your annual limit reached</div>
                         <div>Your next shift could exceed the limit</div>
-                        <div>Halfway point reached (¥515,000)</div>
+                        <div>Halfway point reached ({yn(se.annualLimit/2)})</div>
                         <div>All fixed expenses paid for the month</div>
                         <div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${c.border}`,color:c.muted}}>Pop-up alerts appear while the app is open. Whatever's due also shows in the <b>Coming up</b> panel on the home screen every time you open it. (Alerts while the app is fully closed need background push — ask to set this up.)</div>
                       </div>
