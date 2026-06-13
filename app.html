@@ -195,6 +195,7 @@
       const [pbRes,setPbRes]=useState(null);
       const [pbName,setPbName]=useState("");
       const [pbMsg,setPbMsg]=useState("");
+      const [pbProg,setPbProg]=useState("");
       const [pbm,setPbm]=useState(()=>{const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;});
       const [spendLoading,setSpendLoading]=useState(false);
       const [spendErr,setSpendErr]=useState("");
@@ -516,45 +517,64 @@
         "Mum repayments: "+(se.mumItems||[]).map(m=>`${m.name} ¥${m.amount}`).join(", "),
         "Hourly wage ¥"+se.hourlyWage+", monthly silver investing in USD.",
       ].join("\n");
-      const analyzePassbook=async(file)=>{
-        if(!file)return;
-        setPbErr("");setPbRes(null);setPbMsg("");setPbName(file.name||"passbook");setPbLoading(true);
+      // Analyse one file → parsed data (or throws). No UI side-effects.
+      const analyzeOne=async(file)=>{
+        const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
+        const mediaType=file.type||(file.name&&file.name.toLowerCase().endsWith(".pdf")?"application/pdf":"image/jpeg");
+        const ctrl=new AbortController();
+        const to=setTimeout(()=>ctrl.abort(),150000);
+        let r;
         try{
-          const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
-          const mediaType=file.type||(file.name&&file.name.toLowerCase().endsWith(".pdf")?"application/pdf":"image/jpeg");
-          const ctrl=new AbortController();
-          const to=setTimeout(()=>ctrl.abort(),150000);
-          let r;
+          r=await fetch(`${SUPABASE_URL}/functions/v1/analyze-passbook`,{
+            method:"POST",
+            headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
+            body:JSON.stringify({fileBase64:b64,mediaType,budgetContext:budgetCtx()}),
+            signal:ctrl.signal,
+          });
+        }finally{clearTimeout(to);}
+        const j=await r.json();
+        if(!r.ok||j.error)throw new Error(j.error||("HTTP "+r.status));
+        return j.data||{};
+      };
+      // Import up to 5 passbooks at once — analysed one after another, merged in one pass.
+      const analyzePassbooks=async(fileList)=>{
+        const files=Array.from(fileList||[]).slice(0,5);
+        if(!files.length)return;
+        setPbErr("");setPbRes(null);setPbMsg("");setPbLoading(true);
+        const combined=[];const errs=[];let lastData=null;
+        for(let i=0;i<files.length;i++){
+          const file=files[i];
+          setPbName(file.name||"passbook");
+          setPbProg(files.length>1?`Reading passbook ${i+1} of ${files.length}… ~15-40s each`:"Reading your passbook… ~15-40s");
           try{
-            r=await fetch(`${SUPABASE_URL}/functions/v1/analyze-passbook`,{
-              method:"POST",
-              headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
-              body:JSON.stringify({fileBase64:b64,mediaType,budgetContext:budgetCtx()}),
-              signal:ctrl.signal,
-            });
-          }finally{clearTimeout(to);}
-          const j=await r.json();
-          if(!r.ok||j.error)throw new Error(j.error||("HTTP "+r.status));
-          const data=j.data||{};
-          setPbRes(data);
-          // Bucket transactions into their months (2026 only) and merge, de-duping
-          let added=0;const monthsTouched=new Set();
-          if(Array.isArray(data.transactions)&&data.transactions.length){
-            setDa(p=>{
-              const np={...p};const byM={};
-              data.transactions.forEach(t=>{const mk=String(t.date||"").slice(0,7);if(!/^\d{4}-\d{2}$/.test(mk))return;(byM[mk]=byM[mk]||[]).push(t);});
-              Object.keys(byM).forEach(mk=>{if(!np[mk])return;const existing=np[mk].txns||[];const seen=new Set(existing.map(txKey));const fresh=byM[mk].filter(t=>!seen.has(txKey(t)));if(fresh.length){added+=fresh.length;monthsTouched.add(mk);np[mk]={...np[mk],txns:[...existing,...fresh]};}});
-              return np;
-            });
-          }
-          // Stash the AI insights from this scan
-          setSe(p=>({...p,spendInsights:{categories:data.categories||[],recurring:data.recurring||[],anomalies:data.anomalies||[],budget_matches:data.budget_matches||[],suggestions:data.suggestions||[],insights:data.insights||[],summary:data.summary||{},at:Date.now()}}));
-          setPbMsg(added>0?`Imported ${added} transaction${added===1?"":"s"} across ${monthsTouched.size} month${monthsTouched.size===1?"":"s"}.`:"Scan complete — no new transactions to add (already imported).");
-        }catch(e){
-          const ab=e&&(e.name==="AbortError");
-          setPbErr(ab?"Took too long (over 2½ min). Try one page at a time, or a clearer / smaller photo.":String(e&&e.message||e));
+            const data=await analyzeOne(file);
+            lastData=data;
+            if(Array.isArray(data.transactions))data.transactions.forEach(t=>combined.push(t));
+          }catch(e){errs.push((file.name||`file ${i+1}`)+": "+(e&&e.name==="AbortError"?"timed out":String(e&&e.message||e)));}
         }
-        finally{setPbLoading(false);}
+        // Bucket every collected transaction into its month (2026 only), de-duping against
+        // what's stored AND within this batch (in case passbooks overlap).
+        let added=0;const monthsTouched=new Set();const additions={};
+        const byM={};
+        combined.forEach(t=>{const mk=String(t.date||"").slice(0,7);if(!/^\d{4}-\d{2}$/.test(mk))return;(byM[mk]=byM[mk]||[]).push(t);});
+        Object.keys(byM).forEach(mk=>{
+          if(!da[mk])return;
+          const seen=new Set((da[mk].txns||[]).map(txKey));const fresh=[];
+          byM[mk].forEach(t=>{const k=txKey(t);if(!seen.has(k)){seen.add(k);fresh.push(t);}});
+          if(fresh.length){added+=fresh.length;monthsTouched.add(mk);additions[mk]=fresh;}
+        });
+        if(added>0)setDa(p=>{const np={...p};Object.keys(additions).forEach(mk=>{np[mk]={...np[mk],txns:[...(np[mk].txns||[]),...additions[mk]]};});return np;});
+        if(lastData)setSe(p=>({...p,spendInsights:{categories:lastData.categories||[],recurring:lastData.recurring||[],anomalies:lastData.anomalies||[],budget_matches:lastData.budget_matches||[],suggestions:lastData.suggestions||[],insights:lastData.insights||[],summary:lastData.summary||{},at:Date.now()}}));
+        const ok=files.length-errs.length;
+        if(ok===0)setPbErr(errs.length===1?errs[0]:`Couldn't read any of them:\n${errs.join("\n")}`);
+        else{
+          let msg=added>0?`Imported ${added} transaction${added===1?"":"s"} across ${monthsTouched.size} month${monthsTouched.size===1?"":"s"}`:"No new transactions to add (already imported)";
+          if(files.length>1)msg+=` · ${ok} of ${files.length} passbooks read`;
+          msg+=".";
+          if(errs.length)msg+=` ${errs.length} couldn't be read.`;
+          setPbMsg(msg);
+        }
+        setPbProg("");setPbLoading(false);
       };
       // On-demand: re-analyse all stored transactions for fresh cross-month insights (no re-upload)
       const analyzeSpending=async()=>{
@@ -1144,11 +1164,12 @@
                 {/* ── Upload passbook ── */}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Import a passbook</span><span style={{marginLeft:"auto",fontSize:16}}>🏦</span></div>
-                  <div style={{fontSize:12,color:c.sub,marginBottom:12}}>Upload a photo or PDF of your bank passbook (通帳). Claude reads every transaction and files them into the right month automatically.</div>
+                  <div style={{fontSize:12,color:c.sub,marginBottom:12}}>Upload up to <b>5</b> photos or PDFs of your bank passbook (通帳) at once. Claude reads every transaction and files them into the right month automatically.</div>
                   <label style={{display:"block",padding:14,borderRadius:14,border:`1.5px dashed ${c.border}`,background:c.cardAlt,textAlign:"center",cursor:pbLoading?"default":"pointer",color:c.sub,fontSize:13,fontWeight:600}}>
-                    {pbLoading?"Reading your passbook… ~15-40s":(pbName?`Import another (last: ${pbName})`:"📷 Choose passbook image or PDF")}
-                    <input type="file" accept="image/*,application/pdf" disabled={pbLoading} onChange={e=>{const f=e.target.files&&e.target.files[0];e.target.value="";analyzePassbook(f);}} style={{display:"none"}}/>
+                    {pbLoading?(pbProg||"Reading your passbook… ~15-40s"):(pbName?`Import more (last: ${pbName})`:"📷 Choose passbooks (up to 5)")}
+                    <input type="file" accept="image/*,application/pdf" multiple disabled={pbLoading} onChange={e=>{const fs=e.target.files;e.target.value="";analyzePassbooks(fs);}} style={{display:"none"}}/>
                   </label>
+                  <div style={{fontSize:11,color:c.muted,marginTop:8,textAlign:"center"}}>Pick several at once — they're read one after another.</div>
                   {pbErr&&<div style={{marginTop:10,padding:12,borderRadius:12,background:c.roseBg,color:c.roseD,fontSize:12,fontWeight:600}}>{pbErr}</div>}
                   {pbMsg&&!pbErr&&<div style={{marginTop:10,padding:12,borderRadius:12,background:c.greenBg,color:c.greenD,fontSize:12,fontWeight:600}}>{pbMsg}</div>}
                 </div>
