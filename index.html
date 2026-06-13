@@ -429,11 +429,25 @@
       const bdFr=bdI+bdPLW+bdDJFree-bdFT-bdOY;
       const bdFrD=useCountUp(bdFr);
       // ── Dashboard helpers ──
-      const bdLeftPay=(()=>{let u=0;se.fixed.forEach(f=>{if(!bdSF[f.id]&&!bdPF[f.id])u+=fxAmt(f);});if(!bdPF["suica"])u+=bdCm;if(!bdPF["food"])u+=bdFd;if(!bdPF["skinTreatment"])u+=bdSkin;if(!bdPF["generalSavings"])u+=bdGenSav;return u;})();
-      const homeBillIds=[...se.fixed.filter(f=>!bdSF[f.id]).map(f=>f.id),"suica","food",...(se.showSkin!==false&&bdSkin>0?["skinTreatment"]:[]),...(se.showGenSav!==false&&bdGenSav>0?["generalSavings"]:[])];
+      // Home always reflects the CURRENT month, independent of the Budget tab's selected month (bm)
+      const cmk=(()=>{const k=`${nw.getFullYear()}-${String(nw.getMonth()+1).padStart(2,'0')}`;return da[k]?k:bm;})();
+      const cmd=da[cmk]||eM();
+      const cmPF=cmd.paidFixed||{},cmSF=cmd.skippedFixed||{},cmFA=cmd.fixedAmounts||{};
+      const cmFx=f=>f.sub?subTotal(cmk):(f.variable?(cmFA[f.id]||0):f.amount);
+      const cmCm=cmd.suicaOverride!=null?cmd.suicaOverride:gCm(cmd,cmk);
+      const cmFd=cmd.foodOverride!=null?cmd.foodOverride:fF(cmk);
+      const cmSkin=(se.showSkin!==false)?(cmd.skinTreatment||0):0;
+      const cmGenSav=(se.showGenSav!==false)?(cmd.generalSavings||0):0;
+      const cmDadFree=(cmd.dadItems||[]).filter(x=>(se.dadFreeSpend||{})[x.id]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
+      const cmPayOnly=gTx(cmd,cmk)+gTr(cmd,cmk);
+      const cmSpending=(()=>{let s=0;se.fixed.forEach(f=>{if(!cmSF[f.id])s+=cmFx(f);});s+=cmCm+cmFd+cmSkin+cmGenSav;(cmd.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;})();
+      const cmFree=cmPayOnly+cmDadFree-cmSpending;
+      const cmFreeD=useCountUp(cmFree);
+      const bdLeftPay=(()=>{let u=0;se.fixed.forEach(f=>{if(!cmSF[f.id]&&!cmPF[f.id])u+=cmFx(f);});if(!cmPF["suica"])u+=cmCm;if(!cmPF["food"])u+=cmFd;if(!cmPF["skinTreatment"])u+=cmSkin;if(!cmPF["generalSavings"])u+=cmGenSav;return u;})();
+      const homeBillIds=[...se.fixed.filter(f=>!cmSF[f.id]).map(f=>f.id),"suica","food",...(se.showSkin!==false&&cmSkin>0?["skinTreatment"]:[]),...(se.showGenSav!==false&&cmGenSav>0?["generalSavings"]:[])];
       const homeBillCount=homeBillIds.length;
-      const homePaidCount=homeBillIds.filter(id=>bdPF[id]).length;
-      const bmLabel=MONTHS.find(x=>x.key===bm)?.label||"";
+      const homePaidCount=homeBillIds.filter(id=>cmPF[id]).length;
+      const bmLabel=MONTHS.find(x=>x.key===cmk)?.label||"";
       const _hr=new Date().getHours();
       const greeting=_hr<12?"Good morning":_hr<18?"Good afternoon":"Good evening";
       const dateStr=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
@@ -704,16 +718,16 @@
                 )}
 
                 {/* MONEY LEFT THIS MONTH */}
-                <div onClick={()=>setTab("budget")} style={{...crd,cursor:"pointer"}}>
+                <div onClick={()=>{setBm(cmk);setTab("budget");}} style={{...crd,cursor:"pointer"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                     <span style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,fontWeight:600}}>Left to spend · {bmLabel}</span>
                     <span style={{fontSize:11,color:c.muted,fontWeight:600}}>Budget →</span>
                   </div>
-                  <div style={{fontSize:30,fontWeight:800,color:bdFr<0?c.roseD:c.text,letterSpacing:-0.5,marginBottom:10}}>{yn(bdFrD)}</div>
+                  <div style={{fontSize:30,fontWeight:800,color:cmFree<0?c.roseD:c.text,letterSpacing:-0.5,marginBottom:10}}>{yn(cmFreeD)}</div>
                   <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Income</span><span style={{fontWeight:600,color:c.text}}>{yn(bdI+bdPLW)}</span></div>
-                    {bdDJFree>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>From Dad</span><span style={{fontWeight:600,color:c.text}}>+{yn(bdDJFree)}</span></div>}
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Bills & spending</span><span style={{fontWeight:600,color:c.text}}>−{yn(bdFT+bdOY)}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Income</span><span style={{fontWeight:600,color:c.text}}>{yn(cmPayOnly)}</span></div>
+                    {cmDadFree>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>From Dad</span><span style={{fontWeight:600,color:c.text}}>+{yn(cmDadFree)}</span></div>}
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Bills & spending</span><span style={{fontWeight:600,color:c.text}}>−{yn(cmSpending)}</span></div>
                   </div>
                   <div style={{paddingTop:12,borderTop:`1px solid ${c.border}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:c.sub,marginBottom:6}}><span>Bills paid</span><span style={{fontWeight:600,color:bdLeftPay>0?c.lavD:c.greenD}}>{homePaidCount} of {homeBillCount}{bdLeftPay>0?` · ${yn(bdLeftPay)} left`:" · all done ✓"}</span></div>
