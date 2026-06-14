@@ -518,9 +518,21 @@
         "Hourly wage ¥"+se.hourlyWage+", monthly silver investing in USD.",
       ].join("\n");
       // Analyse one file → parsed data (or throws). No UI side-effects.
+      // Shrink big images to ≤1536px on the long edge before upload — Claude rejects
+      // images over 8000px (full-page screenshots), and smaller is faster anyway. PDFs pass through.
+      const prepFile=(file)=>new Promise((resolve)=>{
+        const isPdf=(file.type==="application/pdf")||(file.name&&file.name.toLowerCase().endsWith(".pdf"));
+        if(isPdf){const r=new FileReader();r.onload=()=>resolve({b64:String(r.result).split(",")[1],mediaType:"application/pdf"});r.onerror=()=>resolve(null);r.readAsDataURL(file);return;}
+        const img=new Image();
+        img.onload=()=>{const max=1536;const scale=Math.min(1,max/Math.max(img.width,img.height));const cw=Math.max(1,Math.round(img.width*scale)),ch=Math.max(1,Math.round(img.height*scale));const c=document.createElement("canvas");c.width=cw;c.height=ch;c.getContext("2d").drawImage(img,0,0,cw,ch);URL.revokeObjectURL(img.src);resolve({b64:c.toDataURL("image/jpeg",0.85).split(",")[1],mediaType:"image/jpeg"});};
+        img.onerror=()=>{const r=new FileReader();r.onload=()=>resolve({b64:String(r.result).split(",")[1],mediaType:file.type||"image/jpeg"});r.onerror=()=>resolve(null);r.readAsDataURL(file);};
+        img.src=URL.createObjectURL(file);
+      });
       const analyzeOne=async(file)=>{
-        const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
-        const mediaType=file.type||(file.name&&file.name.toLowerCase().endsWith(".pdf")?"application/pdf":"image/jpeg");
+        const prepped=await prepFile(file);
+        if(!prepped)throw new Error("Couldn't read that file");
+        const b64=prepped.b64;
+        const mediaType=prepped.mediaType;
         const ctrl=new AbortController();
         const to=setTimeout(()=>ctrl.abort(),150000);
         let r;

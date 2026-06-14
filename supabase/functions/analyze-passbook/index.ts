@@ -272,13 +272,22 @@ Deno.serve(async (req: Request) => {
       schema = SCHEMA;
       content = [mediaBlock as never, { type: "text", text: PROMPT(budgetContext || "") }];
     }
+    // Speed: disable thinking in both modes (adaptive thinking was the main
+    // latency cost, and extraction/insight quality holds without it). Mode A
+    // (passbook OCR/extraction) stays on Sonnet for vision accuracy but at
+    // effort "low"; Mode B (insights over already-extracted text) drops to
+    // Haiku 4.5 — much faster and cheaper, and plenty for summarising text.
+    // Note: Haiku 4.5 does NOT accept the `effort` param (400s), so only set
+    // it for Sonnet.
+    const outputConfig: Record<string, unknown> = { format: { type: "json_schema", schema } };
+    if (!insightsMode) outputConfig.effort = "low";
     // Stream server-side so long reads keep the upstream connection alive
     // (avoids idle-timeout drops); we still return one JSON blob to the client.
     const stream = client.messages.stream({
-      model: "claude-sonnet-4-6",
+      model: insightsMode ? "claude-haiku-4-5" : "claude-sonnet-4-6",
       max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: { type: "json_schema", schema } },
+      thinking: { type: "disabled" },
+      output_config: outputConfig as never,
       messages: [
         { role: "user", content: content as never },
       ],

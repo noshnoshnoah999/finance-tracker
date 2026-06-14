@@ -4,11 +4,14 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import PhotosUI
+import UIKit
 
 struct PassbookView: View {
     @EnvironmentObject var store: BudgetStore
     @State private var pbm = currentMonthKeyClamped()
     @State private var importing = false
+    @State private var photoItems: [PhotosPickerItem] = []
 
     var body: some View {
         let c = store.calc
@@ -27,6 +30,32 @@ struct PassbookView: View {
         .fileImporter(isPresented: $importing, allowedContentTypes: [.image, .pdf], allowsMultipleSelection: true) { result in
             handleImport(result)
         }
+        .onChange(of: photoItems) { _, items in
+            guard !items.isEmpty else { return }
+            Task {
+                var files: [(data: Data, type: String)] = []
+                for item in items.prefix(5) {
+                    if let data = try? await item.loadTransferable(type: Data.self) {
+                        files.append(downscale(data, "image/jpeg"))
+                    }
+                }
+                photoItems = []
+                if !files.isEmpty { await store.analyzePassbooks(files) }
+            }
+        }
+    }
+
+    /// Shrink an image to <= 1536px on the long edge (Claude caps at 8000px; full-page
+    /// screenshots exceed it). PDFs pass through untouched.
+    private func downscale(_ data: Data, _ type: String) -> (data: Data, type: String) {
+        guard type != "application/pdf", let img = UIImage(data: data) else { return (data, type) }
+        let maxDim: CGFloat = 1536
+        let w = img.size.width, h = img.size.height
+        let scale = min(1, maxDim / max(w, h))
+        let newSize = CGSize(width: w * scale, height: h * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let out = renderer.image { _ in img.draw(in: CGRect(origin: .zero, size: newSize)) }
+        return (out.jpegData(compressionQuality: 0.85) ?? data, "image/jpeg")
     }
 
     // MARK: Year overview
@@ -231,12 +260,23 @@ struct PassbookView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack { header("Import a passbook", T.peachD); Spacer(); Text("🏦") }
             Text("Upload up to 5 photos or PDFs of your bank passbook (通帳). Claude reads every transaction and files them into the right month.").font(.caption2).foregroundStyle(T.sub)
-            Button { importing = true } label: {
-                Text(store.pbLoading ? "Reading your passbook… ~15-40s" : "📷 Choose passbooks (up to 5)")
-                    .fontWeight(.semibold).foregroundStyle(T.sub)
+            if store.pbLoading {
+                Text("Reading your passbook… ~15-40s").fontWeight(.semibold).foregroundStyle(T.sub)
                     .frame(maxWidth: .infinity).padding(14)
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(T.border, style: StrokeStyle(lineWidth: 1.5, dash: [5])))
-            }.buttonStyle(.plain).disabled(store.pbLoading)
+            } else {
+                HStack(spacing: 10) {
+                    PhotosPicker(selection: $photoItems, maxSelectionCount: 5, matching: .images) {
+                        Label("Photos", systemImage: "photo").fontWeight(.semibold).foregroundStyle(.white)
+                            .frame(maxWidth: .infinity).padding(.vertical, 13).background(T.peachD).clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    Button { importing = true } label: {
+                        Label("Files / PDF", systemImage: "doc").fontWeight(.semibold).foregroundStyle(T.sub)
+                            .frame(maxWidth: .infinity).padding(.vertical, 13)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(T.border, lineWidth: 1.5))
+                    }.buttonStyle(.plain)
+                }
+            }
             if !store.pbErr.isEmpty { errBox(store.pbErr) }
             if !store.pbMsg.isEmpty && store.pbErr.isEmpty {
                 Text(store.pbMsg).font(.caption).fontWeight(.semibold).foregroundStyle(T.greenD)
@@ -255,7 +295,7 @@ struct PassbookView: View {
             guard let d = try? Data(contentsOf: u) else { continue }
             let ext = u.pathExtension.lowercased()
             let type = ext == "pdf" ? "application/pdf" : ext == "png" ? "image/png" : "image/jpeg"
-            files.append((d, type))
+            files.append(downscale(d, type))
         }
         Task { await store.analyzePassbooks(files) }
     }
