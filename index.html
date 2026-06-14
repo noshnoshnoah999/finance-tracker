@@ -588,6 +588,32 @@
         }
         setPbProg("");setPbLoading(false);
       };
+      // Import Sony Bank WALLET transaction emails (Gmail label) via the edge
+      // function, then merge into months with the same dedup as the passbook importer.
+      const importBankEmails=async()=>{
+        setPbErr("");setPbMsg("");setPbLoading(true);setPbProg("Reading your bank emails…");
+        try{
+          const r=await fetch(`${SUPABASE_URL}/functions/v1/import-bank-emails`,{
+            method:"POST",
+            headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
+            body:JSON.stringify({sinceDays:120}),
+          });
+          const j=await r.json();
+          if(!r.ok||j.error)throw new Error(j.error||("HTTP "+r.status));
+          const combined=Array.isArray(j.transactions)?j.transactions:[];
+          let added=0;const monthsTouched=new Set();const additions={};const byM={};
+          combined.forEach(t=>{const mk=String(t.date||"").slice(0,7);if(!/^\d{4}-\d{2}$/.test(mk))return;(byM[mk]=byM[mk]||[]).push(t);});
+          Object.keys(byM).forEach(mk=>{
+            if(!da[mk])return;
+            const seen=new Set((da[mk].txns||[]).map(txKey));const fresh=[];
+            byM[mk].forEach(t=>{const k=txKey(t);if(!seen.has(k)){seen.add(k);fresh.push(t);}});
+            if(fresh.length){added+=fresh.length;monthsTouched.add(mk);additions[mk]=fresh;}
+          });
+          if(added>0)setDa(p=>{const np={...p};Object.keys(additions).forEach(mk=>{np[mk]={...np[mk],txns:[...(np[mk].txns||[]),...additions[mk]]};});return np;});
+          setPbMsg(added>0?`Imported ${added} bank transaction${added===1?"":"s"} across ${monthsTouched.size} month${monthsTouched.size===1?"":"s"}. (${combined.length} email${combined.length===1?"":"s"} scanned)`:`No new bank transactions to add (${combined.length} scanned, already imported).`);
+        }catch(e){setPbErr("Bank email import failed: "+String(e&&e.message||e));}
+        setPbProg("");setPbLoading(false);
+      };
       // On-demand: re-analyse all stored transactions for fresh cross-month insights (no re-upload)
       const analyzeSpending=async()=>{
         const allTx=[];MONTHS.forEach(mo=>{(da[mo.key]?.txns||[]).forEach(t=>allTx.push(t));});
@@ -1025,7 +1051,7 @@
 
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Subscribe & Save</span></div>
-                  <div style={{fontSize:11,color:c.sub,marginBottom:12}}>Tick what's arriving this month — scheduled items are pre-ticked. The total feeds the Amazon expense above.</div>
+                  <div style={{fontSize:11,color:c.sub,marginBottom:12}}>Tick what's arriving this month — scheduled items are pre-ticked. The total feeds the Amazon expense above.<br/>💡 This pay period (paid on the 15th) covers the Amazon delivery on the <b>4th of next month</b>.</div>
                   {(se.subItems||[]).length===0&&<div style={{fontSize:13,color:c.muted,marginBottom:10}}>No items yet — add your Subscribe & Save products below.</div>}
                   {(se.subItems||[]).map(it=>{const inc=subIncluded(it,bm);const sched=subScheduled(it,bm);const editing=eSub===it.id;return(<div key={it.id} style={{borderBottom:`1px solid ${c.border}`}}>{editing?<div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 0",flexWrap:"wrap"}}><input value={it.name} onChange={e=>uSub(it.id,"name",e.target.value)} placeholder="Item" style={{...inp,flex:2,minWidth:110}}/><div style={{flex:1,position:"relative",minWidth:80}}><span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:13,color:c.sub}}>¥</span><input type="number" inputMode="numeric" value={it.price||""} onChange={e=>uSub(it.id,"price",Number(e.target.value)||0)} style={{...inp,paddingLeft:22}}/></div><select value={it.everyN||1} onChange={e=>uSub(it.id,"everyN",Number(e.target.value))} style={{...inp,flex:1,minWidth:96}}>{[1,2,3,4,6].map(n=>(<option key={n} value={n}>{n===1?"monthly":`every ${n}mo`}</option>))}</select><button onClick={()=>uSub(it.id,"payer",(it.payer||"me")==="dad"?"me":"dad")} style={{border:`2px solid ${(it.payer||"me")==="dad"?c.greenD:c.border}`,background:(it.payer||"me")==="dad"?c.greenD:"transparent",color:(it.payer||"me")==="dad"?c.white:c.sub,borderRadius:8,padding:"7px 10px",cursor:"pointer",fontSize:10,fontWeight:600,fontFamily:mn,whiteSpace:"nowrap"}}>{(it.payer||"me")==="dad"?"Dad pays":"I pay"}</button><button onClick={()=>setESub(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button><button onClick={()=>{rSub(it.id);setESub(null);}} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></div>:<div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",fontSize:13}}><button onClick={()=>tSubInc(it)} style={{width:24,height:24,borderRadius:8,border:`2px solid ${inc?c.greenD:c.border}`,background:inc?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:14,fontWeight:700,flexShrink:0,padding:0}}>{inc?"✓":""}</button><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,color:inc?c.text:c.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.name}</div><div style={{fontSize:11,color:c.sub}}>{(it.everyN||1)<=1?"every month":`every ${it.everyN} months`}{(it.payer||"me")==="dad"?" · 👨 Dad pays":""}{sched&&!inc?" · skipped":!sched&&inc?" · added":""}</div></div><span style={{fontWeight:600,color:inc?c.text:c.muted,flexShrink:0}}>{yn(it.price||0)}</span><button onClick={()=>setESub(it.id)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:12,color:c.muted,fontFamily:mn,padding:"0 4px",flexShrink:0}}>Edit</button></div>}</div>);})}
                   {subTotalDad(bm)>0&&<div style={{...rw,paddingTop:6}}><span style={{color:c.sub}}>👨 Dad pays</span><span style={{fontWeight:600,color:c.greenD}}>{yn(subTotalDad(bm))}</span></div>}
@@ -1182,6 +1208,8 @@
                     <input type="file" accept="image/*,application/pdf" multiple disabled={pbLoading} onChange={e=>{const fs=e.target.files;e.target.value="";analyzePassbooks(fs);}} style={{display:"none"}}/>
                   </label>
                   <div style={{fontSize:11,color:c.muted,marginTop:8,textAlign:"center"}}>Pick several at once — they're read one after another.</div>
+                  <button onClick={importBankEmails} disabled={pbLoading} style={{width:"100%",marginTop:10,padding:12,borderRadius:12,border:"none",cursor:pbLoading?"default":"pointer",background:c.greenD,color:c.white,fontWeight:700,fontSize:13,fontFamily:ft,opacity:pbLoading?0.6:1}}>✉️ Import Sony Bank emails</button>
+                  <div style={{fontSize:11,color:c.muted,marginTop:6,textAlign:"center"}}>Pulls Sony Bank WALLET transaction emails from Gmail automatically.</div>
                   {pbErr&&<div style={{marginTop:10,padding:12,borderRadius:12,background:c.roseBg,color:c.roseD,fontSize:12,fontWeight:600}}>{pbErr}</div>}
                   {pbMsg&&!pbErr&&<div style={{marginTop:10,padding:12,borderRadius:12,background:c.greenBg,color:c.greenD,fontSize:12,fontWeight:600}}>{pbMsg}</div>}
                 </div>

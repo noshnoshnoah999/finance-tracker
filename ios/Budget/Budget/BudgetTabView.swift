@@ -20,6 +20,7 @@ struct BudgetTabView: View {
                 calendarCard(c)
                 incomeCard(c)
                 fixedCard(c)
+                subCard(c)
                 oneOffCard(c)
                 mumCard(c)
                 freeCard(c)
@@ -156,6 +157,47 @@ struct BudgetTabView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .card()
+    }
+
+    // MARK: Subscribe & Save — per-month include ticks (#9, was web-only)
+    @ViewBuilder private func subCard(_ c: Calc) -> some View {
+        if !c.subItems.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionHeader("Subscribe & Save", color: T.peachD)
+                Text("Tick which items arrive this month.").font(.caption2).foregroundStyle(T.sub)
+                Text("💡 This pay period (paid on the 15th) covers the Amazon delivery on the 4th of next month.").font(.caption2).foregroundStyle(T.sub)
+                ForEach(Array(c.subItems.enumerated()), id: \.offset) { _, s in
+                    let id = c.idStr(s["id"])
+                    let inc = c.subIncluded(s, bm)
+                    let sched = c.subScheduled(s, bm)
+                    let ev = s.i("everyN", 1)
+                    let dad = s.s("payer", "me") == "dad"
+                    let note = (ev <= 1 ? "every month" : "every \(ev) months")
+                        + (dad ? " · Dad pays" : "")
+                        + (sched && !inc ? " · skipped" : (!sched && inc ? " · added" : ""))
+                    HStack(spacing: 10) {
+                        Button { store.setSubInc(bm, id, !inc) } label: {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(inc ? T.greenD : Color.clear)
+                                .frame(width: 22, height: 22)
+                                .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).stroke(inc ? T.greenD : T.border, lineWidth: 2))
+                                .overlay(inc ? Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(.white) : nil)
+                        }.buttonStyle(.plain)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(s.s("name")).font(.footnote).foregroundStyle(inc ? T.text : T.muted)
+                            Text(note).font(.caption2).foregroundStyle(T.sub)
+                        }
+                        Spacer()
+                        Text(yen(s.d("price"))).font(.footnote).fontWeight(.semibold).foregroundStyle(inc ? T.text : T.muted)
+                    }
+                    .padding(.vertical, 2)
+                }
+                Divider().overlay(T.border)
+                let n = c.subItems.filter { c.subIncluded($0, bm) && $0.s("payer", "me") != "dad" }.count
+                row("You pay this month (\(n))", yen(c.subTotal(bm)), bold: true, color: T.peachD)
+            }
+            .card()
+        }
     }
 
     @ViewBuilder private func fixedRow(_ c: Calc, _ f: JSONValue) -> some View {

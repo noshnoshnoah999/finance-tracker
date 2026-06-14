@@ -341,6 +341,32 @@ final class BudgetStore: ObservableObject {
         blob.settings["subItems"] = .array(arr)
         persist()
     }
+    /// Edit a Subscribe & Save item's name / price / delivery frequency / payer.
+    /// Only non-nil arguments are changed (mirrors the web `uSub`).
+    func updateSubItem(_ id: String, name: String? = nil, price: Double? = nil, everyN: Int? = nil, payer: String? = nil) {
+        let c = calc
+        var arr = blob.settings["subItems"]?.array ?? []
+        arr = arr.map { item in
+            guard c.idStr(item["id"]) == id, var obj = item.object else { return item }
+            if let name = name { obj["name"] = .string(name) }
+            if let price = price { obj["price"] = .number(price) }
+            if let everyN = everyN { obj["everyN"] = .number(Double(everyN)) }
+            if let payer = payer { obj["payer"] = .string(payer) }
+            return .object(obj)
+        }
+        blob.settings["subItems"] = .array(arr)
+        persist()
+    }
+    /// Per-month include override for a S&S item (the budget-tab tick). Writes the
+    /// explicit boolean into that month's `subInc` map, same as the web `tSubInc`.
+    func setSubInc(_ mk: String, _ id: String, _ included: Bool) {
+        var m = blob.data[mk] ?? .object([:])
+        var map = m["subInc"]?.object ?? [:]
+        map[id] = .bool(included)
+        m["subInc"] = .object(map)
+        blob.data[mk] = m
+        persist()
+    }
 
     // MARK: - Passbook AI (upload → analyse → bucket into months; same edge function as the web)
     func budgetContextString() -> String {

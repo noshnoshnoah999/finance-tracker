@@ -9,7 +9,7 @@ struct SettingsView: View {
     @EnvironmentObject var store: BudgetStore
     @EnvironmentObject var lock: BiometricLock
     @State private var nfName = ""; @State private var nfAmount = ""; @State private var nfVariable = false
-    @State private var nsName = ""; @State private var nsPrice = ""
+    @State private var nsName = ""; @State private var nsPrice = ""; @State private var nsEveryN = 1
     @State private var notifsOn = Notifs.isEnabled
 
     var body: some View {
@@ -161,15 +161,29 @@ struct SettingsView: View {
             .padding(.top, 4)
         }
     }
+    private static let subFreqs = [1, 2, 3, 4, 6]
+    private func freqLabel(_ n: Int) -> String { n <= 1 ? "every month" : "every \(n) months" }
+
     @ViewBuilder private func subItems(_ c: Calc) -> some View {
         card("Subscribe & Save", T.peachD) {
             if c.subItems.isEmpty { Text("No items yet.").font(.footnote).foregroundStyle(T.muted) }
             ForEach(Array(c.subItems.enumerated()), id: \.offset) { _, s in
                 let id = c.idStr(s["id"])
+                let ev = s.i("everyN", 1)
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(s.s("name")).font(.footnote)
-                        Text((s.i("everyN", 1) <= 1 ? "every month" : "every \(s.i("everyN", 1)) months")).font(.caption2).foregroundStyle(T.sub)
+                        // Tap the cadence to change delivery frequency (#4 — was web-only).
+                        Menu {
+                            ForEach(Self.subFreqs, id: \.self) { n in
+                                Button(freqLabel(n)) { store.updateSubItem(id, everyN: n) }
+                            }
+                        } label: {
+                            HStack(spacing: 3) {
+                                Text(freqLabel(ev))
+                                Image(systemName: "chevron.up.chevron.down").font(.system(size: 8))
+                            }.font(.caption2).foregroundStyle(T.blueD)
+                        }
                     }
                     Spacer()
                     Text(yen(s.d("price"))).font(.footnote).fontWeight(.semibold)
@@ -179,9 +193,19 @@ struct SettingsView: View {
             }
             HStack(spacing: 8) {
                 TextField("Item name", text: $nsName).modifier(FieldStyle())
-                HStack(spacing: 6) { Text("¥").foregroundStyle(T.sub); TextField("0", text: $nsPrice).keyboardType(.numberPad) }.modifier(FieldStyle()).frame(width: 100)
+                HStack(spacing: 6) { Text("¥").foregroundStyle(T.sub); TextField("0", text: $nsPrice).keyboardType(.numberPad) }.modifier(FieldStyle()).frame(width: 80)
+                Menu {
+                    ForEach(Self.subFreqs, id: \.self) { n in Button(freqLabel(n)) { nsEveryN = n } }
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(nsEveryN <= 1 ? "1mo" : "\(nsEveryN)mo")
+                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 8))
+                    }.font(.caption2).foregroundStyle(T.sub)
+                     .padding(.horizontal, 8).padding(.vertical, 11)
+                     .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 10))
+                }.buttonStyle(.plain)
                 Button {
-                    if !nsName.isEmpty { store.addSubItem(name: nsName, price: Double(nsPrice) ?? 0, everyN: 1); nsName = ""; nsPrice = "" }
+                    if !nsName.isEmpty { store.addSubItem(name: nsName, price: Double(nsPrice) ?? 0, everyN: nsEveryN); nsName = ""; nsPrice = ""; nsEveryN = 1 }
                 } label: { Image(systemName: "plus").fontWeight(.bold).foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 10).background(T.peachD).clipShape(RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain)
             }
             .padding(.top, 4)
