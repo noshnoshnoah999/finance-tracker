@@ -75,9 +75,12 @@ struct BudgetTabView: View {
                 Text("\(c.workDaysInMonth(bm)) days").font(.footnote).fontWeight(.semibold)
             }
             HStack {
-                Text("SUICA needed").font(.subheadline).fontWeight(.bold)
+                // SUICA you actually load covers the pay period (payday → day
+                // before next payday), not the calendar month — match the Fixed
+                // Expenses SUICA row (commute + suicaDays), incl. any override.
+                Text("SUICA needed (\(c.suicaDays(bm)) days)").font(.subheadline).fontWeight(.bold)
                 Spacer()
-                Text(yen(Double(c.workDaysInMonth(bm)) * c.rt)).font(.subheadline).fontWeight(.bold).foregroundStyle(T.blueD)
+                Text(yen(c.commute(bm))).font(.subheadline).fontWeight(.bold).foregroundStyle(T.blueD)
             }
             .padding(.top, 4)
         }

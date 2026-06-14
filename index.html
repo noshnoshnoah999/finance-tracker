@@ -969,7 +969,7 @@
                   {renderCal()}
                   <div style={{marginTop:14,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
                     <div style={rw}><span style={{color:c.sub}}>Work days this month</span><span style={{fontWeight:600}}>{mWD} days</span></div>
-                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:700}}>SUICA needed</span><span style={{fontWeight:700,color:c.blueD}}>{yn(mPC)}</span></div>
+                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:700}}>SUICA needed <span style={{fontWeight:400,color:c.sub}}>({bdSI.days} days · {bdSI.start} → {bdSI.end})</span></span><span style={{fontWeight:700,color:c.blueD}}>{yn(bdCm)}</span></div>
                   </div>
                   <div style={{marginTop:14}}>
                     <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:8}}>SUICA Date Range</div>
