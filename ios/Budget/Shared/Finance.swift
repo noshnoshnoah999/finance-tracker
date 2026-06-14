@@ -333,6 +333,14 @@ func txKey(_ t: JSONValue) -> String {
     "\(t.s("date"))|\(t.s("description").trimmingCharacters(in: .whitespaces))|\(t.d("amount"))|\(t.s("direction"))"
 }
 
+/// Current month "YYYY-MM" clamped to a valid 2026 month (the app is 2026-only).
+func currentMonthKeyClamped() -> String {
+    let cal = Calendar.current
+    let mk = String(format: "%04d-%02d", cal.component(.year, from: Date()), cal.component(.month, from: Date()))
+    if monthMeta(mk) != nil { return mk }
+    return mk < "2026-01" ? "2026-01" : "2026-12"
+}
+
 /// Format a USD amount ($ + 2 decimals).
 func usd(_ n: Double) -> String {
     let f = NumberFormatter()

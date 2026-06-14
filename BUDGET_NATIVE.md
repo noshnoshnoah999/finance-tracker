@@ -41,14 +41,20 @@ either side sync through the one `finance_data` row.
   (calendar + fixed/subs/one-offs/mum), Passbook (transactions + upload + insights), Limit
   ("what to work"), Savings (cash + silver), Goals, Settings. Each writes via
   `store.setMonth(...)` / `store.setSetting(...)` (lossless).
-- **Phase 3 — IN PROGRESS.** On-device notifications DONE (`Notifications.swift` — payday /
-  SUICA / bills / paid-leave scheduled via `UNCalendarNotificationTrigger`; toggle in
-  Settings → Privacy & Alerts; replaces the flaky web push). Face ID / passcode app lock
-  DONE (`BiometricLock.swift` + `LockView`; single-prompt guard; locks on background;
-  toggle in Settings). **Widgets TODO** — deliberately deferred: needs a new Xcode target
-  + on-device testing to verify, so do it with Noah present (plan: widget fetches the
-  Supabase blob directly in its TimelineProvider → no App Group needed → show next
-  paycheck / room-left / free-to-spend).
+- **Phase 3 — DONE.** On-device notifications (`Notifications.swift` — payday / SUICA / bills /
+  paid-leave via `UNCalendarNotificationTrigger`; toggle in Settings → Privacy & Alerts;
+  replaces the flaky web push). Face ID / passcode app lock (`BiometricLock.swift` + `LockView`;
+  single-prompt guard; locks on background; toggle in Settings). **Widget** (`BudgetWidgets`
+  target — Home `.systemSmall/.systemMedium` + Lock Screen `.accessoryRectangular/.accessoryInline`)
+  showing next paycheck / room-left / free-to-spend; its `TimelineProvider` fetches the Supabase
+  blob directly (no App Group), refreshes ~3h.
+
+## Project structure note (post-widget)
+Two targets now: **Budget** (app, synchronized `Budget/` folder) and **BudgetWidgets** (extension,
+explicit files in `BudgetWidgets/`). Shared code lives in **`Shared/`** (`Models.swift`,
+`Finance.swift`, `Theme.swift`) and is compiled into BOTH targets via explicit build-file refs
+(see project.pbxproj) — so adding a new shared type means adding it to `Shared/` AND both targets'
+Sources phases. App-only files stay in `Budget/` (auto-included by the synchronized group).
 
 ## Build & run
 ```bash
