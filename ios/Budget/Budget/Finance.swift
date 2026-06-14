@@ -66,6 +66,13 @@ struct Calc {
         }
     }
 
+    /// Is this calendar day one of the scheduled work weekdays?
+    func isScheduled(_ y: Int, _ m: Int, _ d: Int) -> Bool { workDays.contains(jsDay(y, m, d)) }
+    /// Number of days in the month (exposed for the calendar grid).
+    func daysIn(_ mk: String) -> Int { let (y, m) = ym(mk); return daysInMonth(y, m) }
+    /// JS weekday (0=Sun) of the 1st of the month — for calendar leading blanks.
+    func firstWeekday(_ mk: String) -> Int { let (y, m) = ym(mk); return jsDay(y, m, 1) }
+
     // MARK: Day state (work / hol / pl / off / none)
     func dayState(_ ds: String, _ y: Int, _ m: Int, _ d: Int, _ customDays: JSONValue) -> String {
         if let ov = customDays[ds]?.string { return ov }
@@ -162,6 +169,14 @@ struct Calc {
         let d = month(mk)
         if let ov = d["suicaOverride"]?.double, d["suicaOverride"] != .null { return ov }
         return Double(suicaDays(mk)) * rt
+    }
+    /// Work days within the calendar month (for the "SUICA needed" figure on the Budget tab).
+    func workDaysInMonth(_ mk: String) -> Int {
+        let (y, m) = ym(mk)
+        let cd = month(mk)["customDays"] ?? .object([:])
+        var n = 0
+        for d in 1...daysInMonth(y, m) where dayState(dstr(y, m, d), y, m, d, cd) == "work" { n += 1 }
+        return n
     }
 
     // MARK: Food

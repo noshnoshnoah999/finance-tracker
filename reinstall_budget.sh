@@ -78,8 +78,20 @@ fi
 # ---------- Mac (Catalyst) ----------
 if xcodebuild -project Budget.xcodeproj -scheme Budget -destination 'platform=macOS,variant=Mac Catalyst' -allowProvisioningUpdates CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build 2>&1 | tail -3; then
   MACAPP=$(find "$HOME/Library/Developer/Xcode/DerivedData/Budget-"*/Build/Products/Debug-maccatalyst -maxdepth 1 -name Budget.app 2>/dev/null | head -1)
-  [ -n "$MACAPP" ] && { pkill -x Budget >/dev/null 2>&1; sleep 1; /usr/bin/open "$MACAPP"; }
-  echo "Mac refreshed."
+  if [ -n "$MACAPP" ]; then
+    # Install ONE canonical copy into /Applications and always open that — so the Dock
+    # icon is stable and we never spawn a second "version" from a temp build folder.
+    pkill -x Budget >/dev/null 2>&1; sleep 1
+    rm -rf "/Applications/Budget.app"
+    cp -R "$MACAPP" "/Applications/Budget.app"
+    # Remove the DerivedData build copy + its LaunchServices registration so it doesn't
+    # show up as a duplicate "Budget" in Launchpad/Spotlight.
+    LSREG="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+    [ -x "$LSREG" ] && "$LSREG" -u "$MACAPP" >/dev/null 2>&1
+    rm -rf "$MACAPP"
+    /usr/bin/open "/Applications/Budget.app"
+  fi
+  echo "Mac refreshed (/Applications/Budget.app)."
 else
   notify "Budget Mac refresh failed" "The Mac app couldn't rebuild." "Basso"
 fi

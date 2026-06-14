@@ -25,7 +25,10 @@ either side sync through the one `finance_data` row.
   paycheck, left-to-spend for the current month, room-left-to-earn, saved/silver). Verified
   building + running on Mac Catalyst against live data.
 - **Phase 2 — IN PROGRESS.** Wage tab DONE (log hours/min + days per month, manual wage,
-  live pay breakdown, cumulative-vs-limit, editing writes via `setMonth`). Still TODO: Budget
+  live pay breakdown, cumulative-vs-limit). Budget tab DONE (interactive calendar with day
+  cycling, SUICA-needed, income, fixed expenses with paid/skip + variable-amount editing,
+  one-offs add/remove/paid/mum, Send to Mum, Free to Spend). Editing writes via store
+  helpers (toggleBoolMap / setNumberMap / toggleArrayMember / addOneOff / toggleDay). Still TODO:
   (calendar + fixed/subs/one-offs/mum), Passbook (transactions + upload + insights), Limit
   ("what to work"), Savings (cash + silver), Goals, Settings. Each writes via
   `store.setMonth(...)` / `store.setSetting(...)` (lossless).

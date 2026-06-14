@@ -128,6 +128,95 @@ final class BudgetStore: ObservableObject {
         persist()
     }
 
+    /// Flip a boolean inside a month map field (paidFixed / skippedFixed / paidOneOffs / subInc).
+    func toggleBoolMap(_ mk: String, _ field: String, _ key: String) {
+        var m = blob.data[mk] ?? .object([:])
+        var map = m[field]?.object ?? [:]
+        map[key] = .bool(!(map[key]?.bool ?? false))
+        m[field] = .object(map)
+        blob.data[mk] = m
+        persist()
+    }
+    /// Set a number inside a month map field (fixedAmounts).
+    func setNumberMap(_ mk: String, _ field: String, _ key: String, _ v: Double) {
+        var m = blob.data[mk] ?? .object([:])
+        var map = m[field]?.object ?? [:]
+        map[key] = .number(v)
+        m[field] = .object(map)
+        blob.data[mk] = m
+        persist()
+    }
+    /// Toggle membership of an id in a month array field (mumChecked).
+    func toggleArrayMember(_ mk: String, _ field: String, _ id: String) {
+        var m = blob.data[mk] ?? .object([:])
+        var arr = m[field]?.array ?? []
+        if let idx = arr.firstIndex(where: { $0.string == id }) { arr.remove(at: idx) } else { arr.append(.string(id)) }
+        m[field] = .array(arr)
+        blob.data[mk] = m
+        persist()
+    }
+    /// Set a month-level override that can be null (suicaOverride / foodOverride). Pass nil to clear.
+    func setMonthNullable(_ mk: String, _ field: String, _ v: Double?) {
+        var m = blob.data[mk] ?? .object([:])
+        m[field] = v == nil ? .null : .number(v!)
+        blob.data[mk] = m
+        persist()
+    }
+
+    // MARK: One-offs
+    func addOneOff(_ mk: String, name: String, amount: Double) {
+        var m = blob.data[mk] ?? .object([:])
+        var arr = m["oneOffs"]?.array ?? []
+        let id = "o" + String(UUID().uuidString.prefix(12))
+        arr.append(.object(["id": .string(id), "name": .string(name), "amount": .number(amount), "mumPays": .bool(false)]))
+        m["oneOffs"] = .array(arr)
+        blob.data[mk] = m
+        persist()
+    }
+    func removeOneOff(_ mk: String, _ id: String) {
+        let c = calc
+        var m = blob.data[mk] ?? .object([:])
+        var arr = m["oneOffs"]?.array ?? []
+        arr.removeAll { c.idStr($0["id"]) == id }
+        m["oneOffs"] = .array(arr)
+        blob.data[mk] = m
+        persist()
+    }
+    func toggleOneOffMum(_ mk: String, _ id: String) {
+        let c = calc
+        var m = blob.data[mk] ?? .object([:])
+        let arr = (m["oneOffs"]?.array ?? []).map { o -> JSONValue in
+            guard c.idStr(o["id"]) == id else { return o }
+            var oo = o.object ?? [:]
+            oo["mumPays"] = .bool(!(o["mumPays"]?.bool ?? false))
+            return .object(oo)
+        }
+        m["oneOffs"] = .array(arr)
+        blob.data[mk] = m
+        persist()
+    }
+
+    // MARK: Calendar day cycling (mirrors the web toggleDay)
+    func toggleDay(_ mk: String, _ ds: String, _ y: Int, _ mo: Int, _ d: Int) {
+        let c = calc
+        let isPL = PAID_LEAVE.contains(ds)
+        var m = blob.data[mk] ?? .object([:])
+        var cd = m["customDays"]?.object ?? [:]
+        let state = c.dayState(ds, y, mo, d, .object(cd))
+        let isSched = c.isScheduled(y, mo, d)
+        var next: String?
+        if state == "work" && isSched { next = "hol" }
+        else if state == "work" && !isSched { next = isPL ? "hol" : nil }
+        else if state == "hol" { next = "pl" }
+        else if state == "pl" { next = "off" }
+        else if state == "off" { next = isPL ? "work" : nil }
+        else if state == "none" { next = "work" }
+        if let n = next { cd[ds] = .string(n) } else { cd[ds] = nil }
+        m["customDays"] = .object(cd)
+        blob.data[mk] = m
+        persist()
+    }
+
     // MARK: - Backups (rotating local snapshots, keep 60, throttle 10 min)
     private lazy var backupDir: URL = {
         let d = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
