@@ -24,14 +24,20 @@ either side sync through the one `finance_data` row.
 - **Phase 1 — DONE.** Scaffold, models, sync, theme, and a working **Home** dashboard (next
   paycheck, left-to-spend for the current month, room-left-to-earn, saved/silver). Verified
   building + running on Mac Catalyst against live data.
-- **Phase 2 — IN PROGRESS.** Wage tab DONE (log hours/min + days per month, manual wage,
-  live pay breakdown, cumulative-vs-limit). Budget tab DONE (interactive calendar with day
-  cycling, SUICA-needed, income, fixed expenses with paid/skip + variable-amount editing,
-  one-offs add/remove/paid/mum, Send to Mum, Free to Spend). Savings tab DONE (cash
-  savings per month + goal, and silver/investment tracking in USD with spot value/gain;
-  all editable). Goals tab DONE (goals with item lists, progress, saved/monthly editing,
-  add/remove). App icon added (bold ¥ on the Latte gradient, `Assets.xcassets`).
-  Editing writes via store helpers. Still TODO:
+- **Phase 2 — DONE.** All 8 tabs functional & editable over the shared blob:
+  - **Wage** — log hours/min + days, manual wage, live pay breakdown, cumulative-vs-limit.
+  - **Budget** — interactive calendar (day cycling), SUICA-needed, income, fixed expenses
+    (paid/skip + variable amount), one-offs (add/remove/paid/mum), Send to Mum, Free to Spend.
+  - **Passbook** — 2026 overview, per-month statement (real txns or budgeted), category bars,
+    transaction list, AI Spending Insights, and passbook upload (up to 5 via fileImporter →
+    edge function → bucketed into months). Edge-function Mode B powers "Analyse my spending".
+  - **Limit** — ¥1.03M used/remaining/safe-per-month, status banner, monthly earnings chart.
+  - **Savings** — cash per month + goal; silver/investment in USD (spot value/gain, per-month
+    oz/$, avg cost, spot + USD-rate inputs).
+  - **Goals** — goals with item lists, progress, saved/monthly editing, add/remove.
+  - **Settings** — wage/limit, transport, food, FX rate (+live fetch), budget-extra toggles,
+    work-schedule shift editing, fixed-expense + Subscribe&Save management.
+  - App icon: rising bar-chart on the Latte gradient (`Assets.xcassets`).
   (calendar + fixed/subs/one-offs/mum), Passbook (transactions + upload + insights), Limit
   ("what to work"), Savings (cash + silver), Goals, Settings. Each writes via
   `store.setMonth(...)` / `store.setSetting(...)` (lossless).

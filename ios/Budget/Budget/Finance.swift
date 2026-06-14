@@ -284,6 +284,53 @@ struct Calc {
     // MARK: Transactions (Passbook)
     func txns(_ mk: String) -> [JSONValue] { month(mk).arr("txns") }
     var totalTxns: Int { MONTHS.reduce(0) { $0 + txns($1.key).count } }
+    func hasRealTxns(_ mk: String) -> Bool { !txns(mk).isEmpty }
+    func outReal(_ mk: String) -> Double { txns(mk).filter { $0.s("direction") == "out" }.reduce(0) { $0 + $1.d("amount") } }
+    /// Spending for the month: real imported transactions if present, else the budgeted estimate.
+    func passbookOut(_ mk: String) -> Double { hasRealTxns(mk) ? outReal(mk) : spending(mk) }
+
+    struct CatTotal: Identifiable { let cat: String; let total: Double; let count: Int; var id: String { cat } }
+    func cats(_ mk: String) -> [CatTotal] {
+        var m: [String: (Double, Int)] = [:]
+        for t in txns(mk) where t.s("direction") == "out" {
+            let k = t.s("category", "other"); let cur = m[k] ?? (0, 0)
+            m[k] = (cur.0 + t.d("amount"), cur.1 + 1)
+        }
+        return m.map { CatTotal(cat: $0.key, total: $0.value.0, count: $0.value.1) }.sorted { $0.total > $1.total }
+    }
+
+    struct BudgetLine: Identifiable { let name: String; let amount: Double; let cat: String; var id: String { name } }
+    func budgetLines(_ mk: String) -> [BudgetLine] {
+        let d = month(mk); var out: [BudgetLine] = []
+        for f in fixed {
+            let amt = fixedAmount(f, mk)
+            if amt > 0 { out.append(.init(name: f.s("name"), amount: amt, cat: f.b("sub") ? "subscriptions" : "bills")) }
+        }
+        let su = commute(mk); if su > 0 { out.append(.init(name: "SUICA / commute", amount: su, cat: "transport")) }
+        let fd = food(mk); if fd > 0 { out.append(.init(name: "Food budget", amount: fd, cat: "food")) }
+        if showSkin && skin(mk) > 0 { out.append(.init(name: "Skin treatment", amount: skin(mk), cat: "shopping")) }
+        if showGenSav && genSav(mk) > 0 { out.append(.init(name: "General savings", amount: genSav(mk), cat: "savings")) }
+        for o in d.arr("oneOffs") where o["mumPays"]?.bool != true { out.append(.init(name: o.s("name"), amount: o.d("amount"), cat: "other")) }
+        return out
+    }
+
+    private var elapsedKeys: [String] { MONTHS.enumerated().filter { $0.offset < currentMonthNumber }.map { $0.element.key } }
+    var passbookYearIn: Double { elapsedKeys.reduce(0) { $0 + monthlyPay($1) } }
+    var passbookYearOut: Double { elapsedKeys.reduce(0) { $0 + passbookOut($1) } }
+}
+
+/// Emoji + label for an imported-transaction category.
+let TX_CATS: [String: (emoji: String, label: String)] = [
+    "income": ("💰", "Income"), "food": ("🍜", "Food"), "transport": ("🚇", "Transport"),
+    "subscriptions": ("🔁", "Subscriptions"), "shopping": ("🛍️", "Shopping"), "bills": ("📄", "Bills"),
+    "savings": ("🏦", "Savings"), "investment": ("📈", "Investment"), "fees": ("⚠️", "Fees"),
+    "transfer": ("↔︎", "Transfer"), "cash": ("💴", "Cash"), "other": ("•", "Other"),
+]
+func txCat(_ k: String) -> (emoji: String, label: String) { TX_CATS[k] ?? ("•", "Other") }
+
+/// De-dup key for an imported transaction (mirrors the web txKey).
+func txKey(_ t: JSONValue) -> String {
+    "\(t.s("date"))|\(t.s("description").trimmingCharacters(in: .whitespaces))|\(t.d("amount"))|\(t.s("direction"))"
 }
 
 /// Format a USD amount ($ + 2 decimals).

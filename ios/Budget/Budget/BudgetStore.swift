@@ -11,6 +11,13 @@ final class BudgetStore: ObservableObject {
     @Published var syncState: String = "Local"
     @Published var loaded = false
 
+    // Passbook AI UI state
+    @Published var pbLoading = false
+    @Published var pbMsg = ""
+    @Published var pbErr = ""
+    @Published var spendLoading = false
+    @Published var spendErr = ""
+
     /// True from a local edit until its debounced push lands — guards against an older
     /// cloud copy stomping an un-pushed edit (same rule as NudgeStore).
     private var hasPendingPush = false
@@ -119,6 +126,28 @@ final class BudgetStore: ObservableObject {
     func setSetting(_ key: String, _ value: JSONValue) {
         blob.settings[key] = value
         persist()
+    }
+    /// Edit one field of one weekday's shift (settings.shifts."1".start, etc.).
+    func setShift(_ day: String, _ field: String, _ value: JSONValue) {
+        var shifts = blob.settings["shifts"]?.object ?? [:]
+        var sh = shifts[day]?.object ?? [:]
+        sh[field] = value
+        shifts[day] = .object(sh)
+        blob.settings["shifts"] = .object(shifts)
+        persist()
+    }
+
+    // Live GBP→JPY rate (Settings).
+    @Published var fxLoading = false
+    func fetchRate() async {
+        fxLoading = true
+        defer { fxLoading = false }
+        guard let u = URL(string: "https://open.er-api.com/v6/latest/GBP") else { return }
+        if let (d, _) = try? await URLSession.shared.data(from: u),
+           let j = try? JSONDecoder().decode(JSONValue.self, from: d),
+           let jpy = j["rates"]?["JPY"]?.double {
+            setSetting("gbpToJpy", .number((jpy * 10).rounded() / 10))
+        }
     }
     /// Set data.<monthKey>.<field> = value and persist.
     func setMonth(_ mk: String, _ field: String, _ value: JSONValue) {
@@ -265,6 +294,139 @@ final class BudgetStore: ObservableObject {
         m["customDays"] = .object(cd)
         blob.data[mk] = m
         persist()
+    }
+
+    // MARK: - Settings arrays (fixed expenses, Subscribe & Save items)
+    func addFixed(name: String, amount: Double, variable: Bool) {
+        var arr = blob.settings["fixed"]?.array ?? []
+        let id = "f" + String(UUID().uuidString.prefix(12))
+        var o: [String: JSONValue] = ["id": .string(id), "name": .string(name), "amount": .number(amount)]
+        if variable { o["variable"] = .bool(true) }
+        arr.append(.object(o))
+        blob.settings["fixed"] = .array(arr)
+        persist()
+    }
+    func removeFixed(_ id: String) {
+        let c = calc
+        var arr = blob.settings["fixed"]?.array ?? []
+        arr.removeAll { c.idStr($0["id"]) == id }
+        blob.settings["fixed"] = .array(arr)
+        persist()
+    }
+    func updateFixed(_ id: String, name: String? = nil, amount: Double? = nil, variable: Bool? = nil) {
+        let c = calc
+        let arr = (blob.settings["fixed"]?.array ?? []).map { f -> JSONValue in
+            guard c.idStr(f["id"]) == id else { return f }
+            var o = f.object ?? [:]
+            if let name { o["name"] = .string(name) }
+            if let amount { o["amount"] = .number(amount) }
+            if let variable { o["variable"] = .bool(variable) }
+            return .object(o)
+        }
+        blob.settings["fixed"] = .array(arr)
+        persist()
+    }
+    func addSubItem(name: String, price: Double, everyN: Int) {
+        var arr = blob.settings["subItems"]?.array ?? []
+        let id = "s" + String(UUID().uuidString.prefix(12))
+        arr.append(.object(["id": .string(id), "name": .string(name), "price": .number(price),
+                            "everyN": .number(Double(everyN)), "startMK": .string(currentMonthKeyClamped()), "payer": .string("me")]))
+        blob.settings["subItems"] = .array(arr)
+        persist()
+    }
+    func removeSubItem(_ id: String) {
+        let c = calc
+        var arr = blob.settings["subItems"]?.array ?? []
+        arr.removeAll { c.idStr($0["id"]) == id }
+        blob.settings["subItems"] = .array(arr)
+        persist()
+    }
+
+    // MARK: - Passbook AI (upload → analyse → bucket into months; same edge function as the web)
+    func budgetContextString() -> String {
+        let c = calc
+        let fixed = c.fixed.map { "\($0.s("name")) ¥\(Int($0.d("amount")))" }.joined(separator: ", ")
+        let subs = c.subItems.map { "\($0.s("name")) ¥\(Int($0.d("price")))" }.joined(separator: ", ")
+        let mum = c.se.arr("mumItems").map { "\($0.s("name")) ¥\(Int($0.d("amount")))" }.joined(separator: ", ")
+        return "Fixed expenses: \(fixed)\nSubscribe & Save: \(subs)\nMum repayments: \(mum)\nHourly wage ¥\(Int(c.hourlyWage)), monthly silver investing in USD."
+    }
+    private func callAnalyze(_ body: [String: JSONValue]) async throws -> JSONValue {
+        guard let u = URL(string: "\(baseURL)/functions/v1/analyze-passbook") else { throw URLError(.badURL) }
+        var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = 150
+        req.setValue(anon, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(anon)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(JSONValue.object(body))
+        let (data, _) = try await URLSession.shared.data(for: req)
+        let resp = try JSONDecoder().decode(JSONValue.self, from: data)
+        if let e = resp["error"]?.string { throw NSError(domain: "fn", code: 1, userInfo: [NSLocalizedDescriptionKey: e]) }
+        return resp["data"] ?? .object([:])
+    }
+    /// Import up to 5 passbook files: analyse each, bucket transactions into their months
+    /// (de-duped), and stash the latest AI insights.
+    func analyzePassbooks(_ files: [(data: Data, type: String)]) async {
+        let picked = Array(files.prefix(5))
+        guard !picked.isEmpty else { return }
+        pbErr = ""; pbMsg = ""; pbLoading = true
+        var combined: [JSONValue] = []
+        var errs: [String] = []
+        var last: JSONValue? = nil
+        for (i, f) in picked.enumerated() {
+            do {
+                let d = try await callAnalyze(["fileBase64": .string(f.data.base64EncodedString()),
+                                               "mediaType": .string(f.type),
+                                               "budgetContext": .string(budgetContextString())])
+                last = d
+                if let txs = d["transactions"]?.array { combined.append(contentsOf: txs) }
+            } catch { errs.append("file \(i + 1): \(error.localizedDescription)") }
+        }
+        // Bucket into months (2026 only), de-dup vs stored AND within the batch.
+        var added = 0; var months = Set<String>()
+        var byM: [String: [JSONValue]] = [:]
+        for t in combined {
+            let mk = String((t["date"]?.string ?? "").prefix(7))
+            guard monthMeta(mk) != nil else { continue }
+            byM[mk, default: []].append(t)
+        }
+        for (mk, txs) in byM {
+            guard var m = blob.data[mk]?.object else { continue }   // only known 2026 months
+            var existing = m["txns"]?.array ?? []
+            var seen = Set(existing.map { txKey($0) })
+            for t in txs where !seen.contains(txKey(t)) { seen.insert(txKey(t)); existing.append(t); added += 1; months.insert(mk) }
+            m["txns"] = .array(existing)
+            blob.data[mk] = .object(m)
+        }
+        if let last { stashInsights(last) }
+        if added > 0 { persist() }
+        let ok = picked.count - errs.count
+        if ok == 0 { pbErr = errs.first ?? "Couldn't read the passbook." }
+        else {
+            var msg = added > 0 ? "Imported \(added) transaction\(added == 1 ? "" : "s") across \(months.count) month\(months.count == 1 ? "" : "s")" : "No new transactions (already imported)"
+            if picked.count > 1 { msg += " · \(ok) of \(picked.count) read" }
+            pbMsg = msg + "."
+        }
+        pbLoading = false
+    }
+    /// On-demand cross-month insights over all stored transactions (edge-function Mode B).
+    func analyzeSpending() async {
+        var all: [JSONValue] = []
+        for mo in MONTHS { all.append(contentsOf: calc.txns(mo.key)) }
+        guard !all.isEmpty else { spendErr = "Import a passbook first — then I can analyse your spending."; return }
+        spendErr = ""; spendLoading = true
+        do {
+            let d = try await callAnalyze(["transactions": .array(all), "budgetContext": .string(budgetContextString())])
+            stashInsights(d)
+            persist()
+        } catch { spendErr = error.localizedDescription }
+        spendLoading = false
+    }
+    private func stashInsights(_ d: JSONValue) {
+        var ins: [String: JSONValue] = [:]
+        for k in ["categories", "recurring", "anomalies", "budget_matches", "suggestions", "insights", "summary"] {
+            ins[k] = d[k] ?? (k == "summary" ? .object([:]) : .array([]))
+        }
+        ins["at"] = .number(Date().timeIntervalSince1970)
+        blob.settings["spendInsights"] = .object(ins)
     }
 
     // MARK: - Backups (rotating local snapshots, keep 60, throttle 10 min)

@@ -11,11 +11,11 @@ struct ContentView: View {
             HomeView().tabItem { Label("Home", systemImage: "house.fill") }
             WageView().tabItem { Label("Wage", systemImage: "yensign.circle") }
             BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }
-            PlaceholderView(title: "Passbook").tabItem { Label("Passbook", systemImage: "building.columns") }
-            PlaceholderView(title: "Limit").tabItem { Label("Limit", systemImage: "gauge.with.dots.needle.bottom.50percent") }
+            PassbookView().tabItem { Label("Passbook", systemImage: "building.columns") }
+            LimitView().tabItem { Label("Limit", systemImage: "gauge.with.dots.needle.bottom.50percent") }
             SavingsView().tabItem { Label("Savings", systemImage: "banknote") }
             GoalsView().tabItem { Label("Goals", systemImage: "target") }
-            PlaceholderView(title: "Settings").tabItem { Label("Settings", systemImage: "gearshape") }
+            SettingsView().tabItem { Label("Settings", systemImage: "gearshape") }
         }
     }
 }
