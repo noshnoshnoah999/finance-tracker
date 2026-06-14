@@ -9,7 +9,7 @@ struct ContentView: View {
     var body: some View {
         TabView {
             HomeView().tabItem { Label("Home", systemImage: "house.fill") }
-            PlaceholderView(title: "Wage").tabItem { Label("Wage", systemImage: "yensign.circle") }
+            WageView().tabItem { Label("Wage", systemImage: "yensign.circle") }
             PlaceholderView(title: "Budget").tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }
             PlaceholderView(title: "Passbook").tabItem { Label("Passbook", systemImage: "building.columns") }
             PlaceholderView(title: "Limit").tabItem { Label("Limit", systemImage: "gauge.with.dots.needle.bottom.50percent") }

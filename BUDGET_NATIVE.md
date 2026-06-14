@@ -24,7 +24,8 @@ either side sync through the one `finance_data` row.
 - **Phase 1 — DONE.** Scaffold, models, sync, theme, and a working **Home** dashboard (next
   paycheck, left-to-spend for the current month, room-left-to-earn, saved/silver). Verified
   building + running on Mac Catalyst against live data.
-- **Phase 2 — TODO.** Build out the remaining tabs natively with editing: Wage, Budget
+- **Phase 2 — IN PROGRESS.** Wage tab DONE (log hours/min + days per month, manual wage,
+  live pay breakdown, cumulative-vs-limit, editing writes via `setMonth`). Still TODO: Budget
   (calendar + fixed/subs/one-offs/mum), Passbook (transactions + upload + insights), Limit
   ("what to work"), Savings (cash + silver), Goals, Settings. Each writes via
   `store.setMonth(...)` / `store.setSetting(...)` (lossless).
