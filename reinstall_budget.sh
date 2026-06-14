@@ -76,7 +76,9 @@ else
 fi
 
 # ---------- Mac (Catalyst) ----------
-if xcodebuild -project Budget.xcodeproj -scheme Budget -destination 'platform=macOS,variant=Mac Catalyst' -allowProvisioningUpdates CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build 2>&1 | tail -3; then
+# Sign the Mac build properly (Apple Development identity) — NOT ad-hoc — so macOS
+# lets the app register for notifications (ad-hoc Catalyst builds are silently blocked).
+if xcodebuild -project Budget.xcodeproj -scheme Budget -destination 'platform=macOS,variant=Mac Catalyst' -allowProvisioningUpdates build 2>&1 | tail -3; then
   MACAPP=$(find "$HOME/Library/Developer/Xcode/DerivedData/Budget-"*/Build/Products/Debug-maccatalyst -maxdepth 1 -name Budget.app 2>/dev/null | head -1)
   if [ -n "$MACAPP" ]; then
     # Install ONE canonical copy into /Applications and always open that — so the Dock
