@@ -41,7 +41,14 @@ either side sync through the one `finance_data` row.
   (calendar + fixed/subs/one-offs/mum), Passbook (transactions + upload + insights), Limit
   ("what to work"), Savings (cash + silver), Goals, Settings. Each writes via
   `store.setMonth(...)` / `store.setSetting(...)` (lossless).
-- **Phase 3 — TODO.** Notifications (payday/limit), Face ID lock, widgets, polish.
+- **Phase 3 — IN PROGRESS.** On-device notifications DONE (`Notifications.swift` — payday /
+  SUICA / bills / paid-leave scheduled via `UNCalendarNotificationTrigger`; toggle in
+  Settings → Privacy & Alerts; replaces the flaky web push). Face ID / passcode app lock
+  DONE (`BiometricLock.swift` + `LockView`; single-prompt guard; locks on background;
+  toggle in Settings). **Widgets TODO** — deliberately deferred: needs a new Xcode target
+  + on-device testing to verify, so do it with Noah present (plan: widget fetches the
+  Supabase blob directly in its TimelineProvider → no App Group needed → show next
+  paycheck / room-left / free-to-spend).
 
 ## Build & run
 ```bash

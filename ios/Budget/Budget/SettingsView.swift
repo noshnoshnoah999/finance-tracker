@@ -7,13 +7,16 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var store: BudgetStore
+    @EnvironmentObject var lock: BiometricLock
     @State private var nfName = ""; @State private var nfAmount = ""; @State private var nfVariable = false
     @State private var nsName = ""; @State private var nsPrice = ""
+    @State private var notifsOn = Notifs.isEnabled
 
     var body: some View {
         let c = store.calc
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                privacyAlerts()
                 wageLimits()
                 transport(c)
                 food()
@@ -27,6 +30,32 @@ struct SettingsView: View {
         }
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
+    }
+
+    // MARK: Privacy & alerts
+    @ViewBuilder private func privacyAlerts() -> some View {
+        card("Privacy & Alerts", T.accent) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Notifications").font(.subheadline)
+                    Text("Payday, SUICA & bill reminders on this device").font(.caption2).foregroundStyle(T.sub)
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { notifsOn },
+                    set: { on in notifsOn = on; if on { Notifs.enable(store) } else { Notifs.disable() } }
+                )).labelsHidden().tint(T.greenD)
+            }
+            Divider().overlay(T.border)
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("App Lock (Face ID)").font(.subheadline)
+                    Text("Require Face ID / passcode to open").font(.caption2).foregroundStyle(T.sub)
+                }
+                Spacer()
+                Toggle("", isOn: Binding(get: { lock.enabled }, set: { lock.setEnabled($0) })).labelsHidden().tint(T.greenD)
+            }
+        }
     }
 
     // MARK: Wage & limits

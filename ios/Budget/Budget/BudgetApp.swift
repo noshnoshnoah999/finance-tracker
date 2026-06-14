@@ -5,16 +5,33 @@ import SwiftUI
 @main
 struct BudgetApp: App {
     @StateObject private var store = BudgetStore()
+    @StateObject private var lock = BiometricLock()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(store)
+                .environmentObject(lock)
                 .tint(T.accent)
-                .task { await store.refresh(); poll() }
+                .overlay {
+                    if lock.locked { LockView { lock.authenticate() } }
+                }
+                .task {
+                    if lock.locked { lock.authenticate() }
+                    await store.refresh()
+                    Notifs.schedule(store)
+                    poll()
+                }
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { Task { await store.refresh() } }
+                    switch phase {
+                    case .active:
+                        if lock.locked { lock.authenticate() }
+                        Task { await store.refresh(); Notifs.schedule(store) }
+                    case .background:
+                        lock.lockOnBackground()
+                    default: break
+                    }
                 }
         }
     }
