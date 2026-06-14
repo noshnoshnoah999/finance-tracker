@@ -237,7 +237,7 @@ struct BudgetTabView: View {
     }
 
     // MARK: Send to Mum
-    @ViewBuilder private func mumCard(_ c: Calc) -> some View {
+    private func mumCard(_ c: Calc) -> some View {
         let checked = Set((store.blob.data[bm]?["mumChecked"]?.array ?? []).compactMap { $0.string })
         var items: [(id: String, name: String, amount: Double)] = [("food", "Food Budget", c.food(bm))]
         for m in c.se.arr("mumItems") { items.append((c.idStr(m["id"]), m.s("name"), m.d("amount"))) }
