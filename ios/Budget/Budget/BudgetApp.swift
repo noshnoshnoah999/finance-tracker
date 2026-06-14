@@ -1,6 +1,7 @@
 // BudgetApp.swift — Budget (iOS/Mac)
 
 import SwiftUI
+import UserNotifications
 
 @main
 struct BudgetApp: App {
@@ -18,6 +19,7 @@ struct BudgetApp: App {
                     if lock.locked { LockView { lock.authenticate() } }
                 }
                 .task {
+                    UNUserNotificationCenter.current().delegate = NotifDelegate.shared
                     if lock.locked { lock.authenticate() }
                     await store.refresh()
                     Notifs.schedule(store)

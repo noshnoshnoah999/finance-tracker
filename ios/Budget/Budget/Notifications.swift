@@ -6,6 +6,16 @@
 import Foundation
 import UserNotifications
 
+/// Lets notifications show as a banner even while the app is in the foreground.
+final class NotifDelegate: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotifDelegate()
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            willPresent notification: UNNotification,
+                                            withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound, .list])
+    }
+}
+
 enum Notifs {
     static let enabledKey = "nativeNotifs"
     static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
@@ -51,6 +61,21 @@ enum Notifs {
             let p = ds.split(separator: "-").compactMap { Int($0) }
             guard p.count == 3, let d = cal.date(from: DateComponents(year: p[0], month: p[1], day: p[2], hour: 9)), d > now else { continue }
             add(center, "pl-\(ds)", d, "🏖️ Paid leave today", "Enjoy the time off.")
+        }
+    }
+
+    /// Fire a test notification ~2s from now on THIS device (asks permission if needed).
+    static func sendTest() {
+        let center = UNUserNotificationCenter.current()
+        func fire() {
+            let content = UNMutableNotificationContent()
+            content.title = "Budget ✓"; content.body = "Notifications are working on this device."; content.sound = .default
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false)
+            center.add(UNNotificationRequest(identifier: "test-\(UUID().uuidString)", content: content, trigger: trigger))
+        }
+        center.getNotificationSettings { s in
+            if s.authorizationStatus == .authorized || s.authorizationStatus == .provisional { fire() }
+            else { center.requestAuthorization(options: [.alert, .sound, .badge]) { ok, _ in if ok { fire() } } }
         }
     }
 

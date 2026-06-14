@@ -18,12 +18,19 @@ final class BiometricLock: ObservableObject {
         locked = e   // start locked if the user had it on
     }
 
-    /// Turn the lock on/off. Enabling doesn't lock the user out of the current session —
-    /// it takes effect the next time the app goes to the background.
+    /// Turn the lock on/off.
     func setEnabled(_ on: Bool) {
         enabled = on
         UserDefaults.standard.set(on, forKey: Self.key)
         locked = false
+    }
+
+    /// Enable AND immediately prompt Face ID / passcode so the user sees it works.
+    func enableWithPrompt() {
+        enabled = true
+        UserDefaults.standard.set(true, forKey: Self.key)
+        locked = true
+        authenticate()
     }
 
     /// Re-lock when leaving the foreground.

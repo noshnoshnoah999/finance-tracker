@@ -46,6 +46,13 @@ struct SettingsView: View {
                     set: { on in notifsOn = on; if on { Notifs.enable(store) } else { Notifs.disable() } }
                 )).labelsHidden().tint(T.greenD)
             }
+            if notifsOn {
+                Button { Notifs.sendTest() } label: {
+                    Text("Send test notification").font(.caption).fontWeight(.semibold).foregroundStyle(T.accent)
+                        .frame(maxWidth: .infinity).padding(.vertical, 9)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(T.border))
+                }.buttonStyle(.plain)
+            }
             Divider().overlay(T.border)
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -53,7 +60,7 @@ struct SettingsView: View {
                     Text("Require Face ID / passcode to open").font(.caption2).foregroundStyle(T.sub)
                 }
                 Spacer()
-                Toggle("", isOn: Binding(get: { lock.enabled }, set: { lock.setEnabled($0) })).labelsHidden().tint(T.greenD)
+                Toggle("", isOn: Binding(get: { lock.enabled }, set: { on in if on { lock.enableWithPrompt() } else { lock.setEnabled(false) } })).labelsHidden().tint(T.greenD)
             }
         }
     }
