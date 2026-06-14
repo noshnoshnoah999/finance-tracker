@@ -196,6 +196,56 @@ final class BudgetStore: ObservableObject {
         persist()
     }
 
+    // MARK: Goals (settings.goals array)
+    private func updateGoal(_ id: String, _ f: ([String: JSONValue]) -> [String: JSONValue]) {
+        let c = calc
+        let goals = (blob.settings["goals"]?.array ?? []).map { g -> JSONValue in
+            c.idStr(g["id"]) == id ? .object(f(g.object ?? [:])) : g
+        }
+        blob.settings["goals"] = .array(goals)
+        persist()
+    }
+    func addGoal(name: String, target: Double, monthly: Double) {
+        var goals = blob.settings["goals"]?.array ?? []
+        let id = "g" + String(UUID().uuidString.prefix(12))
+        goals.append(.object(["id": .string(id), "name": .string(name), "target": .number(target),
+                              "saved": .number(0), "monthly": .number(monthly), "items": .array([])]))
+        blob.settings["goals"] = .array(goals)
+        persist()
+    }
+    func removeGoal(_ id: String) {
+        let c = calc
+        var goals = blob.settings["goals"]?.array ?? []
+        goals.removeAll { c.idStr($0["id"]) == id }
+        blob.settings["goals"] = .array(goals)
+        persist()
+    }
+    func setGoalNumber(_ id: String, _ field: String, _ v: Double) {
+        updateGoal(id) { var o = $0; o[field] = .number(v); return o }
+    }
+    func addGoalItem(_ goalId: String, name: String, price: Double, url: String) {
+        updateGoal(goalId) { o in
+            var oo = o
+            var items = oo["items"]?.array ?? []
+            let iid = "i" + String(UUID().uuidString.prefix(12))
+            var item: [String: JSONValue] = ["id": .string(iid), "name": .string(name), "price": .number(price)]
+            if !url.isEmpty { item["url"] = .string(url) }
+            items.append(.object(item))
+            oo["items"] = .array(items)
+            return oo
+        }
+    }
+    func removeGoalItem(_ goalId: String, _ itemId: String) {
+        let c = calc
+        updateGoal(goalId) { o in
+            var oo = o
+            var items = oo["items"]?.array ?? []
+            items.removeAll { c.idStr($0["id"]) == itemId }
+            oo["items"] = .array(items)
+            return oo
+        }
+    }
+
     // MARK: Calendar day cycling (mirrors the web toggleDay)
     func toggleDay(_ mk: String, _ ds: String, _ y: Int, _ mo: Int, _ d: Int) {
         let c = calc

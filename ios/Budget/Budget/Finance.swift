@@ -286,6 +286,15 @@ struct Calc {
     var totalTxns: Int { MONTHS.reduce(0) { $0 + txns($1.key).count } }
 }
 
+/// Format a USD amount ($ + 2 decimals).
+func usd(_ n: Double) -> String {
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.minimumFractionDigits = 2
+    f.maximumFractionDigits = 2
+    return "$" + (f.string(from: NSNumber(value: n)) ?? "0.00")
+}
+
 /// Format a yen amount like the web app (¥ + thousands separators, rounded).
 func yen(_ n: Double) -> String {
     let f = NumberFormatter()

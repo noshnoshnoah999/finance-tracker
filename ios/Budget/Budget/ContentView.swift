@@ -13,8 +13,8 @@ struct ContentView: View {
             BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }
             PlaceholderView(title: "Passbook").tabItem { Label("Passbook", systemImage: "building.columns") }
             PlaceholderView(title: "Limit").tabItem { Label("Limit", systemImage: "gauge.with.dots.needle.bottom.50percent") }
-            PlaceholderView(title: "Savings").tabItem { Label("Savings", systemImage: "banknote") }
-            PlaceholderView(title: "Goals").tabItem { Label("Goals", systemImage: "target") }
+            SavingsView().tabItem { Label("Savings", systemImage: "banknote") }
+            GoalsView().tabItem { Label("Goals", systemImage: "target") }
             PlaceholderView(title: "Settings").tabItem { Label("Settings", systemImage: "gearshape") }
         }
     }
