@@ -188,6 +188,11 @@
       const [pF,setPF2]=useState("");
       const [pT,setPT]=useState("");
       const [pH,setPH]=useState({pMon:0,pTue:0,pSun:0});
+      // Limit-page shift simulator: a list of shifts you're thinking of working.
+      const [simShifts,setSimShifts]=useState([]);
+      const [simAdvice,setSimAdvice]=useState(null);
+      const [simLoading,setSimLoading]=useState(false);
+      const [simErr,setSimErr]=useState("");
       const [th,setTh]=useState(CACHED&&CACHED.theme?CACHED.theme:"latte");
       const [nM,setNM]=useState({name:"",amount:""});
       const [eMI,setEMI]=useState(null);
@@ -628,6 +633,22 @@
           setPbMsg(added>0?`Imported ${added} bank transaction${added===1?"":"s"} across ${monthsTouched.size} month${monthsTouched.size===1?"":"s"}. (${combined.length} email${combined.length===1?"":"s"} scanned)`:`No new bank transactions to add (${combined.length} scanned, already imported).`);
         }catch(e){setPbErr("Bank email import failed: "+String(e&&e.message||e));}
         setPbProg("");setPbLoading(false);
+      };
+      // Limit page — ask Claude whether the planned shifts are wise this month.
+      const askLimitAdvisor=async(plannedH,plannedPay,shiftLines)=>{
+        setSimErr("");setSimAdvice(null);setSimLoading(true);
+        try{
+          const projectedYearEnd=Math.round(eT+plannedPay*nFM);
+          const r=await fetch(`${SUPABASE_URL}/functions/v1/limit-advisor`,{
+            method:"POST",
+            headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
+            body:JSON.stringify({annualLimit:se.annualLimit,earnedSoFar:eT,roomLeft:rL,monthsLeft:nFM,hourlyWage:se.hourlyWage,safePerMonthYen:eS,safePerMonthHours:Math.round(mHP),plannedHours:plannedH.toFixed(1),plannedPay,projectedYearEnd,shiftLines}),
+          });
+          const j=await r.json();
+          if(!r.ok||j.error)throw new Error(j.error||("HTTP "+r.status));
+          setSimAdvice(j.data);
+        }catch(e){setSimErr("Couldn't get advice: "+String(e&&e.message||e));}
+        setSimLoading(false);
       };
       // On-demand: re-analyse all stored transactions for fresh cross-month insights (no re-upload)
       const analyzeSpending=async()=>{
@@ -1254,6 +1275,7 @@
                     <div style={{background:c.cardAlt,borderRadius:14,padding:"12px 14px"}}>
                       <div style={{fontSize:11,color:c.sub,marginBottom:4}}>Safe/month ({nFM} left)</div>
                       <div style={{fontSize:20,fontWeight:800,color:rL<100000?c.roseD:c.greenD}}>{yn(eS)}</div>
+                      <div style={{fontSize:12,color:c.sub,marginTop:2,fontWeight:600}}>≈ {mHP.toFixed(0)} hrs</div>
                     </div>
                   </div>
                 </div>
@@ -1294,104 +1316,70 @@
                   </div>
                 );})()}
 
-                {/* ── What to work this month ── */}
+                {/* ── This month's target + shift simulator ── */}
                 {nMK&&(()=>{
-                  const nMKcd=da[nMK]?.customDays||{};
-                  const mondays=cDIMAvail(nMK,1,nMKcd),tuesdays=cDIMAvail(nMK,2,nMKcd),sundays=cDIMAvail(nMK,0,nMKcd);
-                  const fullH=mondays*monH+tuesdays*tueH+sundays*sunH;
-                  const fullWage=Math.round(fullH*se.hourlyWage);
-                  const overIfFull=fullWage>eS;
-                  let budget=eS,rMon=0,rTue=0,rSun=0;
-                  for(let i=0;i<sundays;i++){if(budget>=sunH*se.hourlyWage){rSun++;budget-=sunH*se.hourlyWage;}else break;}
-                  for(let i=0;i<mondays;i++){if(budget>=monH*se.hourlyWage){rMon++;budget-=monH*se.hourlyWage;}else break;}
-                  for(let i=0;i<tuesdays;i++){if(budget>=tueH*se.hourlyWage){rTue++;budget-=tueH*se.hourlyWage;}else break;}
-                  const rH=rMon*monH+rTue*tueH+rSun*sunH;
-                  const rWage=Math.round(rH*se.hourlyWage);
-                  const days=[
-                    {day:"Monday",avail:mondays,rec:rMon,h:monH},
-                    {day:"Tuesday",avail:tuesdays,rec:rTue,h:tueH},
-                    {day:"Sunday",avail:sundays,rec:rSun,h:sunH},
-                  ];
+                  const shiftH=s=>{const a=(s.start||"0:0").split(":").map(Number),b=(s.end||"0:0").split(":").map(Number);return Math.max(0,(b[0]+b[1]/60)-(a[0]+a[1]/60)-((s.breakMin||0)/60));};
+                  const plannedH=simShifts.reduce((t,s)=>t+shiftH(s),0);
+                  const plannedPay=Math.round(plannedH*se.hourlyWage);
+                  const diff=eS-plannedPay;
+                  const projYear=Math.round(eT+plannedPay*nFM);
+                  const overYear=projYear>se.annualLimit;
+                  const verdict=plannedPay===0?"none":(plannedPay<=eS?"yes":(overYear?"over":"caution"));
+                  const vColor=verdict==="yes"?c.greenD:verdict==="caution"?c.peachD:verdict==="over"?c.roseD:c.muted;
+                  const shiftLines=simShifts.map(s=>`- ${s.day} ${s.start}-${s.end}${s.breakMin?` (${s.breakMin}m break)`:""} = ${shiftH(s).toFixed(1)}h`).join("\n");
                   return(
-                    <div style={{...crd,border:`2px solid ${c.blueD}`}}>
-                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
-                        <div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/>
-                        <span style={{fontSize:15,fontWeight:700}}>What to work in {nML}</span>
-                      </div>
-                      <div style={{fontSize:12,color:c.sub,marginBottom:18}}>
-                        Recommended shifts to stay under your limit{(nMK==="2026-05"||nMK==="2026-06")?" · paid leave excluded":""}
-                      </div>
-
-                      {/* Day-by-day breakdown */}
-                      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
-                        {days.map(({day,avail,rec,h})=>{
-                          const earned=Math.round(rec*h*se.hourlyWage);
-                          const skip=rec===0;
-                          const workAll=rec===avail;
-                          return(
-                            <div key={day} style={{background:skip?c.cardAlt:c.cardAlt,borderRadius:14,padding:"14px 16px",opacity:skip?0.5:1}}>
-                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                                <div>
-                                  <span style={{fontSize:15,fontWeight:700,color:c.text}}>{day}</span>
-                                  <span style={{fontSize:12,color:c.sub,marginLeft:8}}>{h}h per shift</span>
-                                </div>
-                                <span style={{fontSize:14,fontWeight:800,color:skip?c.muted:workAll?c.greenD:c.peachD}}>
-                                  {skip?"Skip all":workAll?`All ${rec}`:`${rec} of ${avail}`}
-                                </span>
-                              </div>
-                              {/* Shift dots */}
-                              <div style={{display:"flex",gap:6,marginBottom:10}}>
-                                {Array.from({length:avail}).map((_,i)=>(
-                                  <div key={i} style={{flex:1,height:8,borderRadius:4,background:i<rec?c.blueD:c.border}}/>
-                                ))}
-                              </div>
-                              <div style={{display:"flex",justifyContent:"space-between",fontSize:12}}>
-                                <span style={{color:c.sub}}>{rec} shift{rec!==1?"s":""} · {(rec*h).toFixed(1)}h total</span>
-                                <span style={{fontWeight:700,color:skip?c.muted:c.text}}>{skip?"¥0":yn(earned)}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Summary */}
-                      <div style={{padding:16,borderRadius:14,background:overIfFull?c.peachBg:c.greenBg,border:`2px solid ${overIfFull?c.peachD:c.greenD}`,marginBottom:16}}>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12,textAlign:"center"}}>
-                          <div><div style={{fontSize:11,color:c.sub,marginBottom:3}}>Shifts</div><div style={{fontSize:18,fontWeight:800,color:c.text}}>{rMon+rTue+rSun}</div></div>
-                          <div><div style={{fontSize:11,color:c.sub,marginBottom:3}}>Hours</div><div style={{fontSize:18,fontWeight:800,color:c.text}}>{rH.toFixed(1)}h</div></div>
-                          <div><div style={{fontSize:11,color:c.sub,marginBottom:3}}>Earn</div><div style={{fontSize:18,fontWeight:800,color:overIfFull?c.peachD:c.greenD}}>{yn(rWage)}</div></div>
+                    <React.Fragment>
+                      {/* Monthly target — plain language */}
+                      <div style={{...crd,border:`2px solid ${c.blueD}`}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Your monthly target</span></div>
+                        <div style={{fontSize:13,color:c.sub,marginBottom:14}}>To spread the rest of your ¥{se.annualLimit.toLocaleString()} limit evenly across the {nFM} months left, each month aim for about:</div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                          <div style={{background:c.cardAlt,borderRadius:14,padding:"16px 14px",textAlign:"center"}}><div style={{fontSize:11,color:c.sub,marginBottom:4}}>Earn about</div><div style={{fontSize:26,fontWeight:800,color:c.blueD}}>{yn(eS)}</div></div>
+                          <div style={{background:c.cardAlt,borderRadius:14,padding:"16px 14px",textAlign:"center"}}><div style={{fontSize:11,color:c.sub,marginBottom:4}}>Work about</div><div style={{fontSize:26,fontWeight:800,color:c.blueD}}>{mHP.toFixed(0)}h</div></div>
                         </div>
-                        <div style={{padding:10,borderRadius:10,background:overIfFull?c.peachD:c.greenD,color:c.white,fontSize:13,fontWeight:700,textAlign:"center"}}>
-                          {overIfFull?`All shifts would exceed by ${yn(fullWage-eS)}`:`Safe — ${yn(eS-rWage)} under your monthly limit`}
+                        <div style={{marginTop:12,padding:12,borderRadius:12,background:rL<0?c.roseBg:c.greenBg,fontSize:13,color:rL<0?c.roseD:c.greenD,fontWeight:600,textAlign:"center"}}>
+                          {rL<0?`You're ${yn(Math.abs(rL))} over the limit — ease off`:`Work more some months, less others — just keep the year under ${yn(se.annualLimit)}.`}
                         </div>
                       </div>
 
-                      {/* What-if calculator */}
-                      <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>What if I work different shifts?</div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
-                        {[{label:"Mon",max:mondays,key:"pMon",h:monH},{label:"Tue",max:tuesdays,key:"pTue",h:tueH},{label:"Sun",max:sundays,key:"pSun",h:sunH}].map(({label,max,key,h})=>(
-                          <div key={key} style={{background:c.cardAlt,borderRadius:12,padding:12}}>
-                            <div style={{fontSize:11,color:c.sub,marginBottom:6,textAlign:"center"}}>{label} <span style={{opacity:0.6}}>(max {max})</span></div>
-                            <NI value={pH[key]||0} onChange={v=>setPH(p=>({...p,[key]:Math.min(v,max)}))} placeholder="0"/>
-                            <div style={{fontSize:10,color:c.sub,marginTop:4,textAlign:"center"}}>{h}h/shift</div>
+                      {/* Shift simulator */}
+                      <div style={crd}>
+                        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Can I work these shifts?</span></div>
+                        <div style={{fontSize:12,color:c.sub,marginBottom:14}}>Add the shifts you're thinking of working this month — I'll tell you if you can.</div>
+                        {simShifts.length===0&&<div style={{fontSize:13,color:c.muted,marginBottom:10}}>No shifts yet — add one below.</div>}
+                        {simShifts.map(s=>(
+                          <div key={s.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"nowrap"}}>
+                            <select value={s.day} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,day:e.target.value}:x))} style={{...inp,flex:"0 0 64px",padding:"8px 4px"}}>{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>(<option key={d} value={d}>{d}</option>))}</select>
+                            <input type="time" value={s.start} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,start:e.target.value}:x))} style={{...inp,flex:1,minWidth:0,padding:"8px 4px"}}/>
+                            <input type="time" value={s.end} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,end:e.target.value}:x))} style={{...inp,flex:1,minWidth:0,padding:"8px 4px"}}/>
+                            <span style={{fontSize:12,color:c.sub,width:38,textAlign:"right",flexShrink:0}}>{shiftH(s).toFixed(1)}h</span>
+                            <button onClick={()=>setSimShifts(p=>p.filter(x=>x.id!==s.id))} style={{border:"none",background:"transparent",color:c.roseD,fontSize:16,cursor:"pointer",padding:"0 2px",flexShrink:0}}>×</button>
                           </div>
                         ))}
-                      </div>
-                      {pHasInput&&(
-                        <div>
+                        <button onClick={()=>setSimShifts(p=>[...p,{id:Date.now(),day:"Mon",start:"09:00",end:"16:00",breakMin:60}])} style={{width:"100%",padding:10,borderRadius:12,border:`1.5px dashed ${c.border}`,background:c.cardAlt,color:c.sub,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:ft,marginBottom:6}}>+ Add a shift</button>
+                        <div style={{fontSize:11,color:c.muted,marginBottom:14}}>Each shift's break is taken off automatically (defaults to 60 min).</div>
+
+                        {simShifts.length>0&&(<React.Fragment>
                           <div style={{padding:14,background:c.cardAlt,borderRadius:14,fontSize:13,marginBottom:10}}>
-                            <div style={rw}><span style={{color:c.sub}}>Shifts planned</span><span style={{fontWeight:600}}>{pTotalDays} days · {pTotalH.toFixed(1)}h</span></div>
-                            <div style={rw}><span style={{color:c.sub}}>You'd earn</span><span style={{fontWeight:700,fontSize:16,color:c.text}}>{yn(pW)}</span></div>
-                            <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{color:c.sub}}>Annual total after</span><span style={{fontWeight:600}}>{yn(pNT)}</span></div>
-                            <div style={rw}><span style={{color:c.sub}}>Limit remaining</span><span style={{fontWeight:700,color:pOL?c.roseD:pR<100000?c.peachD:c.greenD}}>{yn(pR)}</span></div>
-                            {nFM>1&&!pOL&&<div style={rw}><span style={{color:c.sub}}>Safe/month after this</span><span style={{fontWeight:600}}>{yn(pFA)} ({pFH.toFixed(0)}h)</span></div>}
+                            <div style={rw}><span style={{color:c.sub}}>This month</span><span style={{fontWeight:700,fontSize:16}}>{plannedH.toFixed(1)}h · {yn(plannedPay)}</span></div>
+                            <div style={rw}><span style={{color:c.sub}}>Your monthly target</span><span style={{fontWeight:600}}>{mHP.toFixed(0)}h · {yn(eS)}</span></div>
+                            <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{color:c.sub}}>If every month were like this</span><span style={{fontWeight:600,color:overYear?c.roseD:c.text}}>≈ {yn(projYear)}/yr</span></div>
                           </div>
-                          <div style={{padding:14,borderRadius:14,background:pOL?c.roseD:pR<100000?c.peachD:c.greenD,color:c.white,fontSize:14,fontWeight:700,textAlign:"center"}}>
-                            {pOL?`Over by ${yn(Math.abs(pR))} — work fewer shifts`:pR<100000?`Almost at the limit — only ${yn(pR)} left`:`Safe — ${yn(pR)} still available`}
+                          <div style={{padding:14,borderRadius:14,background:vColor,color:c.white,fontSize:14,fontWeight:700,textAlign:"center",marginBottom:12}}>
+                            {verdict==="yes"?`✅ Yes — go for it. ${yn(Math.abs(diff))} under your monthly pace.`:verdict==="caution"?`⚠️ Doable, but ${yn(plannedPay-eS)} above your steady pace — balance it with a lighter month.`:`❌ Too much — at this rate you'd reach ${yn(projYear)} (over by ${yn(projYear-se.annualLimit)}).`}
                           </div>
-                        </div>
-                      )}
-                    </div>
+                          <button onClick={()=>askLimitAdvisor(plannedH,plannedPay,shiftLines)} disabled={simLoading} style={{width:"100%",padding:12,borderRadius:12,border:"none",background:c.blueD,color:c.white,fontWeight:700,fontSize:13,fontFamily:ft,cursor:simLoading?"default":"pointer",opacity:simLoading?0.6:1}}>{simLoading?"Claude is thinking…":"🤖 Ask Claude for advice"}</button>
+                          {simErr&&<div style={{marginTop:10,padding:12,borderRadius:12,background:c.roseBg,color:c.roseD,fontSize:12,fontWeight:600}}>{simErr}</div>}
+                          {simAdvice&&(
+                            <div style={{marginTop:10,padding:14,borderRadius:14,background:c.greenBg,border:`1px solid ${c.border}`}}>
+                              <div style={{fontSize:14,fontWeight:700,color:c.text,marginBottom:6}}>{simAdvice.headline}</div>
+                              <div style={{fontSize:13,color:c.sub,marginBottom:(simAdvice.suggestions||[]).length?10:0}}>{simAdvice.reasoning}</div>
+                              {(simAdvice.suggestions||[]).map((s,i)=>(<div key={i} style={{fontSize:13,color:c.text,marginBottom:6,display:"flex",gap:6}}><span style={{color:c.peachD}}>•</span><span>{s}</span></div>))}
+                            </div>
+                          )}
+                        </React.Fragment>)}
+                      </div>
+                    </React.Fragment>
                   );
                 })()}
 
