@@ -388,6 +388,27 @@ final class BudgetStore: ObservableObject {
         if let e = resp["error"]?.string { throw NSError(domain: "fn", code: 1, userInfo: [NSLocalizedDescriptionKey: e]) }
         return resp["data"] ?? .object([:])
     }
+
+    // Limit page — Claude shift advisor (limit-advisor edge function).
+    struct LimitAdvice { var verdict: String; var headline: String; var reasoning: String; var suggestions: [String] }
+    func limitAdvice(_ ctx: [String: JSONValue]) async throws -> LimitAdvice {
+        guard let u = URL(string: "\(baseURL)/functions/v1/limit-advisor") else { throw URLError(.badURL) }
+        var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = 60
+        req.setValue(anon, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(anon)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(JSONValue.object(ctx))
+        let (data, _) = try await URLSession.shared.data(for: req)
+        let resp = try JSONDecoder().decode(JSONValue.self, from: data)
+        if let e = resp["error"]?.string { throw NSError(domain: "fn", code: 1, userInfo: [NSLocalizedDescriptionKey: e]) }
+        let d = resp["data"] ?? .object([:])
+        return LimitAdvice(
+            verdict: d["verdict"]?.string ?? "yes",
+            headline: d["headline"]?.string ?? "",
+            reasoning: d["reasoning"]?.string ?? "",
+            suggestions: (d["suggestions"]?.array ?? []).compactMap { $0.string }
+        )
+    }
     /// Import up to 5 passbook files: analyse each, bucket transactions into their months
     /// (de-duped), and stash the latest AI insights.
     func analyzePassbooks(_ files: [(data: Data, type: String)]) async {
