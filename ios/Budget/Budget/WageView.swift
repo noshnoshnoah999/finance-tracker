@@ -49,7 +49,6 @@ struct WageView: View {
     // MARK: - One month
     @ViewBuilder private func monthCard(_ c: Calc, _ mo: MonthMeta) -> some View {
         let d = c.month(mo.key)
-        let hasHours = d.d("hours") > 0
         let wage = c.wage(mo.key)
         let tr = c.transport(mo.key)
         let total = c.taxable(mo.key) + tr
@@ -91,11 +90,13 @@ struct WageView: View {
                     Text("= \(fmtHours(d.d("hours")))h × \(yen(c.hourlyWage)) = \(yen((d.d("hours") * c.hourlyWage).rounded()))")
                         .font(.caption).foregroundStyle(T.sub)
 
-                    if !hasHours {
-                        fieldLabel("Manual wage")
-                        TextField("0", value: dbl(mo.key, "wageOverride"), format: .number)
-                            .modifier(FieldStyle()).keyboardType(.numberPad)
-                    }
+                    fieldLabel("Actual pay — override")
+                    TextField("0", value: dbl(mo.key, "wageOverride"), format: .number)
+                        .modifier(FieldStyle()).keyboardType(.numberPad)
+                    Text(d.d("wageOverride") > 0
+                         ? "Using your manual figure — replaces the hours calc; transport is added on top."
+                         : "Optional — enter the real base pay from your payslip to override the hours calc.")
+                        .font(.caption2).foregroundStyle(T.sub)
 
                     fieldLabel("Days worked")
                     TextField("0", value: dbl(mo.key, "days"), format: .number)
@@ -104,7 +105,7 @@ struct WageView: View {
                     // Breakdown
                     VStack(spacing: 8) {
                         breakdownRow("Wage", yen(wage), bold: false)
-                        if c.paidLeaveYen(mo.key) > 0 {
+                        if d.d("wageOverride") <= 0 && c.paidLeaveYen(mo.key) > 0 {
                             breakdownRow("Paid leave", yen(c.paidLeaveYen(mo.key)), color: T.blueD)
                         }
                         breakdownRow("Transport (\(Int(d.d("days")))d)", yen(tr), bold: false)

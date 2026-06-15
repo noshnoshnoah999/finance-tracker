@@ -123,7 +123,9 @@ struct Calc {
 
     func wage(_ mk: String) -> Double {
         let d = month(mk)
-        return d.d("hours") > 0 ? (d.d("hours") * hourlyWage).rounded() : d.d("wageOverride")
+        // Manual override wins whenever set (>0), even with hours logged.
+        if d.d("wageOverride") > 0 { return d.d("wageOverride") }
+        return d.d("hours") > 0 ? (d.d("hours") * hourlyWage).rounded() : 0
     }
     func transport(_ mk: String) -> Double { month(mk).d("days") * transportRate(mk) }
 
@@ -133,6 +135,9 @@ struct Calc {
     }
     /// Taxable income for a month = this month's wage + last month's paid leave (paid in arrears).
     func taxable(_ mk: String) -> Double {
+        // A manual override is the full taxable pay (payslip base pay already
+        // includes paid leave) — don't add paid-leave wage on top.
+        if month(mk).d("wageOverride") > 0 { return wage(mk) }
         var pl = 0.0
         if month(mk).d("hours") > 0, let p = prevMK(mk) { pl = plHours(p) }
         return wage(mk) + (pl * hourlyWage).rounded()

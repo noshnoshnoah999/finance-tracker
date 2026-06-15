@@ -357,7 +357,9 @@
 
       const rt=se.commuteOneWay*2;
       const trf=k=>k<="2026-03"?se.trBefore:se.trAfter;
-      const gW=d=>d.hours>0?Math.round(d.hours*se.hourlyWage):(d.wageOverride||0);
+      // Manual pay override wins whenever it's set (>0), even with hours logged —
+      // so you can drop in the actual payslip figure. Falls back to hours × rate.
+      const gW=d=>(d.wageOverride>0)?d.wageOverride:(d.hours>0?Math.round(d.hours*se.hourlyWage):0);
       const gTr=(d,k)=>d.days*trf(k);
       const gPrevMK=mk=>{const i=MONTHS.findIndex(x=>x.key===mk);return i>0?MONTHS[i-1].key:null;};
       const gShifts=mk=>{const ov=da[mk]?.shiftOverrides||{};const r={};Object.keys(se.shifts||{}).forEach(d=>{r[d]=ov[d]?{...se.shifts[d],...ov[d]}:se.shifts[d];});return r;};
@@ -911,7 +913,9 @@
               const prevMK=mI>0?MONTHS[mI-1].key:null;
               const plH=hH&&prevMK?gPLHours(prevMK,da[prevMK]?.customDays,gShifts(prevMK),se.workDays):0;
               const plWage=Math.round(plH*se.hourlyWage);
-              const tx=wage+plWage;
+              // A manual override is the FULL taxable pay (the payslip base pay already
+              // includes paid leave) — so don't add paid-leave wage on top of it.
+              const tx=(d.wageOverride>0)?wage:(wage+plWage);
               const cT=MONTHS.slice(0,mI+1).reduce((s,x)=>s+gTx(da[x.key],x.key),0);
               const oT=cT<=se.annualLimit/12*(mI+1);
               return(
@@ -933,7 +937,7 @@
                         </div>
                         <div style={{fontSize:11,color:c.sub,marginTop:6}}>= {d.hours>0?d.hours.toFixed(4)+"h":"0h"} × {yn(se.hourlyWage)} = {yn(Math.round(d.hours*se.hourlyWage))}</div>
                       </div>
-                      {!hH&&<div style={{marginTop:12}}><label style={lbl}>Manual Wage</label><NI prefix="¥" value={d.wageOverride} onChange={v=>sM(mo.key,"wageOverride",v)}/></div>}
+                      <div style={{marginTop:12}}><label style={lbl}>Actual pay — override</label><NI prefix="¥" value={d.wageOverride} onChange={v=>sM(mo.key,"wageOverride",v)}/><div style={{fontSize:11,color:c.sub,marginTop:6}}>{d.wageOverride>0?`Using your manual figure (replaces the hours calc). Transport ${yn(tr)} added on top → ${yn(tx+tr)}.`:"Optional — enter the real base pay from your payslip to override the hours calc."}{d.wageOverride>0&&<button onClick={()=>sM(mo.key,"wageOverride",0)} style={{marginLeft:8,border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer",fontFamily:mn,textDecoration:"underline"}}>reset</button>}</div></div>
                       <div style={{marginTop:12}}><label style={lbl}>Days Worked</label><NI value={d.days} onChange={v=>sM(mo.key,"days",v)}/></div>
                       <div style={{marginTop:14,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
                         <div style={rw}><span style={{color:c.sub}}>Wage {hH?`(${d.hours}h × ${yn(se.hourlyWage)})`:"(manual)"}</span><span style={{fontWeight:600}}>{yn(wage)}</span></div>
