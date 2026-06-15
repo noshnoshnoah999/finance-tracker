@@ -7,16 +7,55 @@ struct ContentView: View {
     @EnvironmentObject var store: BudgetStore
 
     var body: some View {
+        // Keep to 5 tabs so iOS doesn't auto-create its own white "More" overflow
+        // list — Limit/Savings/Goals/Settings live in a themed More screen instead.
         TabView {
             HomeView().tabItem { Label("Home", systemImage: "house.fill") }
             WageView().tabItem { Label("Wage", systemImage: "yensign.circle") }
             BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }
             PassbookView().tabItem { Label("Passbook", systemImage: "building.columns") }
-            LimitView().tabItem { Label("Limit", systemImage: "gauge.with.dots.needle.bottom.50percent") }
-            SavingsView().tabItem { Label("Savings", systemImage: "banknote") }
-            GoalsView().tabItem { Label("Goals", systemImage: "target") }
-            SettingsView().tabItem { Label("Settings", systemImage: "gearshape") }
+            MoreView().tabItem { Label("More", systemImage: "ellipsis") }
         }
+    }
+}
+
+// MARK: - More (custom, themed — replaces iOS's white system overflow tab)
+
+struct MoreView: View {
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                T.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 12) {
+                        moreLink("Limit", "gauge.with.dots.needle.bottom.50percent") { LimitView() }
+                        moreLink("Savings", "banknote") { SavingsView() }
+                        moreLink("Goals", "target") { GoalsView() }
+                        moreLink("Settings", "gearshape") { SettingsView() }
+                    }
+                    .padding(20)
+                }
+            }
+            .navigationTitle("More")
+        }
+    }
+
+    @ViewBuilder private func moreLink<D: View>(_ title: String, _ icon: String, @ViewBuilder _ dest: @escaping () -> D) -> some View {
+        NavigationLink {
+            dest()
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: icon).font(.system(size: 18)).foregroundStyle(T.peachD).frame(width: 28)
+                Text(title).font(.headline).foregroundStyle(T.text)
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(T.muted)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity)
+            .background(T.card)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -338,6 +338,8 @@ struct BudgetTabView: View {
                 Circle().stroke(on ? T.greenD : T.border, lineWidth: 2).frame(width: 24, height: 24)
                 if on { Circle().fill(T.greenD).frame(width: 24, height: 24); Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(.white) }
             }
+            .frame(width: 34, height: 34)          // larger, reliable tap target
+            .contentShape(Rectangle())
         }.buttonStyle(.plain)
     }
     private func checkBox(_ on: Bool, _ tap: @escaping () -> Void) -> some View {
@@ -346,6 +348,8 @@ struct BudgetTabView: View {
                 RoundedRectangle(cornerRadius: 8).stroke(on ? T.greenD : T.border, lineWidth: 2).frame(width: 24, height: 24)
                 if on { RoundedRectangle(cornerRadius: 8).fill(T.greenD).frame(width: 24, height: 24); Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundStyle(.white) }
             }
+            .frame(width: 34, height: 34)
+            .contentShape(Rectangle())
         }.buttonStyle(.plain)
     }
 }

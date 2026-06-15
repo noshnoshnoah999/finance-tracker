@@ -186,6 +186,18 @@ struct Calc {
         return (monthMeta(mk)?.is5wk ?? false) ? se.d("food5wk", DS.food5wk) : se.d("food4wk", DS.food4wk)
     }
 
+    // MARK: Send to Mum — sum of the month's *checked* mum items (food + mumItems),
+    // matching the web `bdMTDisplay`.
+    func sendToMum(_ mk: String) -> Double {
+        let checked = Set((month(mk)["mumChecked"]?.array ?? []).map { idStr($0) })
+        var total = 0.0
+        if checked.contains("food") { total += food(mk) }
+        for it in se.arr("mumItems") where checked.contains(idStr(it["id"])) {
+            total += it.d("amount")
+        }
+        return total
+    }
+
     // MARK: Subscriptions
     private func mIdx(_ mk: String) -> Int { MONTHS.firstIndex { $0.key == mk } ?? -1 }
     func subScheduled(_ it: JSONValue, _ mk: String) -> Bool {

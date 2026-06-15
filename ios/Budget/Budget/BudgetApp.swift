@@ -42,13 +42,14 @@ struct BudgetApp: App {
                     if lock.locked { lock.authenticate() }
                     await store.refresh()
                     Notifs.schedule(store)
+                    MumReminder.sync(store)
                     poll()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     switch phase {
                     case .active:
                         if lock.locked { lock.authenticate() }
-                        Task { await store.refresh(); Notifs.schedule(store) }
+                        Task { await store.refresh(); Notifs.schedule(store); MumReminder.sync(store) }
                     case .background:
                         lock.lockOnBackground()
                     default: break

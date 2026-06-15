@@ -17,12 +17,12 @@ report()  {
 # ---------- Preflight / connectivity check ----------
 echo "[$(date '+%H:%M')] Checking everything's ready…"
 P=""
+# Real signing-capability check: is there an Apple Development cert in the
+# keychain? (The old `defaults read … DVTDeveloperAccountManagerAppleIDLists`
+# check was a false-negative on modern Xcode even with the account added, so
+# it's been removed — find-identity is the reliable signal.)
 if ! security find-identity -p codesigning -v 2>/dev/null | grep -q "Apple Development"; then
   P="${P}• Xcode isn't signed in — open Xcode ▸ Settings ▸ Accounts and add your Apple ID.
-"
-fi
-if [ "$(defaults read com.apple.dt.Xcode DVTDeveloperAccountManagerAppleIDLists 2>/dev/null | grep -c 'identifier =')" -eq 0 ]; then
-  P="${P}• No Apple ID in Xcode — open Xcode ▸ Settings ▸ Accounts, click +, add your Apple ID.
 "
 fi
 if ! xcrun devicectl list devices 2>/dev/null | grep "$DEV" | grep -qiE "connected|available"; then
@@ -59,10 +59,17 @@ restore_profiles() { mkdir -p "$PRIMARY_PROF"; cp "$PROF_BK"/*.mobileprovision "
 
 # ---------- iPhone ----------
 cd "$PROJ" || { report "Budget reinstall failed" "Project folder not found."; exit 1; }
-if ! ( set -o pipefail; xcodebuild -project Budget.xcodeproj -scheme Budget -destination 'generic/platform=iOS' -allowProvisioningUpdates build 2>&1 | tail -6 ); then
+build_iphone() { ( set -o pipefail; xcodebuild -project Budget.xcodeproj -scheme Budget -destination 'generic/platform=iOS' -allowProvisioningUpdates build 2>&1 | tail -6 ); }
+if ! build_iphone; then
+  # Setting profiles aside (to refresh the 7-day clock) sometimes makes the first
+  # build fail while Xcode regenerates them. Restore the old ones and retry once —
+  # that reliably recovers without needing a manual Xcode trip.
+  echo "First iPhone build failed — restoring profiles and retrying once…"
   restore_profiles
-  report "Budget reinstall failed" "iPhone build/signing failed. Open Xcode ▸ Settings ▸ Accounts and make sure your Apple ID is added, then click again."
-  echo "iPhone build FAILED — not installing (would be a stale app)."; exit 1
+  if ! build_iphone; then
+    report "Budget reinstall failed" "iPhone build/signing failed. Open Xcode ▸ Settings ▸ Accounts and make sure your Apple ID is added, then click again."
+    echo "iPhone build FAILED — not installing (would be a stale app)."; exit 1
+  fi
 fi
 rm -rf "$PROF_BK"
 APP=$(find "$HOME/Library/Developer/Xcode/DerivedData/Budget-"*/Build/Products/Debug-iphoneos -maxdepth 1 -name Budget.app 2>/dev/null | head -1)
