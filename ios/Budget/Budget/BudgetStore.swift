@@ -454,6 +454,43 @@ final class BudgetStore: ObservableObject {
         }
         pbLoading = false
     }
+
+    /// Pull Sony Bank WALLET transaction emails (Gmail label) via the import-bank-emails
+    /// edge function and merge them into months (same dedup as the passbook importer).
+    func importBankEmails() async {
+        pbErr = ""; pbMsg = ""; pbLoading = true
+        do {
+            guard let u = URL(string: "\(baseURL)/functions/v1/import-bank-emails") else { throw URLError(.badURL) }
+            var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = 60
+            req.setValue(anon, forHTTPHeaderField: "apikey")
+            req.setValue("Bearer \(anon)", forHTTPHeaderField: "Authorization")
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try JSONEncoder().encode(JSONValue.object(["sinceDays": .number(120)]))
+            let (data, _) = try await URLSession.shared.data(for: req)
+            let resp = try JSONDecoder().decode(JSONValue.self, from: data)
+            if let e = resp["error"]?.string { throw NSError(domain: "fn", code: 1, userInfo: [NSLocalizedDescriptionKey: e]) }
+            let combined = resp["transactions"]?.array ?? []
+            var added = 0; var months = Set<String>(); var byM: [String: [JSONValue]] = [:]
+            for t in combined {
+                let mk = String((t["date"]?.string ?? "").prefix(7))
+                guard monthMeta(mk) != nil else { continue }
+                byM[mk, default: []].append(t)
+            }
+            for (mk, txs) in byM {
+                guard var m = blob.data[mk]?.object else { continue }
+                var existing = m["txns"]?.array ?? []
+                var seen = Set(existing.map { txKey($0) })
+                for t in txs where !seen.contains(txKey(t)) { seen.insert(txKey(t)); existing.append(t); added += 1; months.insert(mk) }
+                m["txns"] = .array(existing)
+                blob.data[mk] = .object(m)
+            }
+            if added > 0 { persist() }
+            pbMsg = added > 0
+                ? "Imported \(added) bank transaction\(added == 1 ? "" : "s") across \(months.count) month\(months.count == 1 ? "" : "s"). (\(combined.count) scanned)"
+                : "No new bank transactions (\(combined.count) scanned, already imported)."
+        } catch { pbErr = "Bank email import failed: \(error.localizedDescription)" }
+        pbLoading = false
+    }
     /// On-demand cross-month insights over all stored transactions (edge-function Mode B).
     func analyzeSpending() async {
         var all: [JSONValue] = []

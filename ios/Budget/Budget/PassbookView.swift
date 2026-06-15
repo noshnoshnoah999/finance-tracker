@@ -277,6 +277,11 @@ struct PassbookView: View {
                     }.buttonStyle(.plain)
                 }
             }
+            Button { Task { await store.importBankEmails() } } label: {
+                Label("Import Sony Bank emails", systemImage: "envelope").fontWeight(.semibold).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 13).background(T.greenD).clipShape(RoundedRectangle(cornerRadius: 12))
+            }.buttonStyle(.plain).disabled(store.pbLoading)
+            Text("Pulls Sony Bank WALLET transaction emails from Gmail automatically.").font(.caption2).foregroundStyle(T.muted)
             if !store.pbErr.isEmpty { errBox(store.pbErr) }
             if !store.pbMsg.isEmpty && store.pbErr.isEmpty {
                 Text(store.pbMsg).font(.caption).fontWeight(.semibold).foregroundStyle(T.greenD)
