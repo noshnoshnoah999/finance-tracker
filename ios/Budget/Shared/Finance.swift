@@ -347,7 +347,7 @@ func txCat(_ k: String) -> (emoji: String, label: String) { TX_CATS[k] ?? ("•"
 
 /// De-dup key for an imported transaction (mirrors the web txKey).
 func txKey(_ t: JSONValue) -> String {
-    "\(t.s("date"))|\(t.s("description").trimmingCharacters(in: .whitespaces))|\(t.d("amount"))|\(t.s("direction"))"
+    "\(t.s("date"))|\(t.s("description").trimmingCharacters(in: .whitespaces))|\(t.d("amount"))|\(t.s("direction"))|\(t.s("ref"))"
 }
 
 /// Current month "YYYY-MM" clamped to a valid 2026 month (the app is 2026-only).

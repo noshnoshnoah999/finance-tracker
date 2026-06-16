@@ -59,12 +59,14 @@ function parseSony(body: string) {
   const m = body.match(/ご利用加盟店[：:]\s*(.+)/);
   const merchant = m ? toHalf(m[1]) : "Sony Bank WALLET";
   const isSuica = /SUICA|スイカ/i.test(merchant);
+  const ap = body.match(/承認番号[：:]\s*(\d+)/);          // unique per transaction
   return {
     date,
     description: isSuica ? "Mobile Suica (Apple) top-up" : merchant,
     amount: Math.abs(raw),
     direction: raw < 0 ? "in" : "out",
     category: isSuica ? "transport" : "shopping",
+    ref: ap ? ap[1] : "",                                  // approval no. → keeps identical charges distinct
     source: "sony-email",
   };
 }
