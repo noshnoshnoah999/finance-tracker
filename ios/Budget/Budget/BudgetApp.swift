@@ -39,7 +39,12 @@ struct BudgetApp: App {
                 }
                 .task {
                     UNUserNotificationCenter.current().delegate = NotifDelegate.shared
+                    // On Mac, never auto-prompt Touch ID (Stage Manager / focus changes make
+                    // that fire while you're in another app) — the lock screen's Unlock button
+                    // prompts only when you actually return. iOS keeps the auto-prompt.
+                    #if !targetEnvironment(macCatalyst)
                     if lock.locked { lock.authenticate() }
+                    #endif
                     await store.refresh()
                     Notifs.schedule(store)
                     MumReminder.sync(store)
