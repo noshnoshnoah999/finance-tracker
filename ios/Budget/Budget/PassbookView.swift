@@ -116,8 +116,8 @@ struct PassbookView: View {
         let real = c.hasRealTxns(pbm)
         let inT = c.monthlyPay(pbm)
         let outT = c.passbookOut(pbm)
-        let fixedB = real ? c.fixedBills(pbm) : 0   // real months: card txns miss fixed bills
-        let net = inT - outT - fixedB
+        let expenses = real ? c.spending(pbm) : 0   // real months: also subtract ALL budgeted bills + one-offs
+        let net = inT - outT - expenses
         let label = monthMeta(pbm)?.label ?? ""
 
         // Summary
@@ -134,16 +134,16 @@ struct PassbookView: View {
                 bigStat("Money in", yen(inT), T.greenD, T.greenBg)
                 bigStat("Money out", yen(outT), T.roseD, T.roseBg)
             }
-            if fixedB > 0 {
+            if expenses > 0 {
                 HStack(spacing: 6) {
-                    Text("Fixed bills").foregroundStyle(T.sub)
-                    Text("(rent, subs, savings…)").font(.caption2).foregroundStyle(T.muted)
+                    Text("Bills & expenses").foregroundStyle(T.sub)
+                    Text("(fixed, food, savings, one-offs)").font(.caption2).foregroundStyle(T.muted)
                     Spacer()
-                    Text("−\(yen(fixedB))").fontWeight(.bold).foregroundStyle(T.text)
+                    Text("−\(yen(expenses))").fontWeight(.bold).foregroundStyle(T.text)
                 }.font(.footnote)
             }
             HStack {
-                Text((net >= 0 ? "Left over" : "Overspent") + (fixedB > 0 ? " after bills" : "")).fontWeight(.semibold).foregroundStyle(.white)
+                Text((net >= 0 ? "Left over" : "Overspent") + (expenses > 0 ? " after everything" : "")).fontWeight(.semibold).foregroundStyle(.white)
                 Spacer()
                 Text(yen(abs(net))).font(.title3).fontWeight(.bold).foregroundStyle(.white)
             }

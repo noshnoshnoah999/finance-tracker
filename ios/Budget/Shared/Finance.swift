@@ -251,16 +251,6 @@ struct Calc {
         return s
     }
 
-    /// Recurring bills that don't appear as card transactions (fixed items + skin + savings).
-    /// For "real" months the imported card spending misses these, so they're subtracted on top.
-    func fixedBills(_ mk: String) -> Double {
-        let d = month(mk)
-        let skipped = d["skippedFixed"]?.object ?? [:]
-        var s = 0.0
-        for f in fixed where skipped[idStr(f["id"])]?.bool != true { s += fixedAmount(f, mk) }
-        s += skin(mk) + genSav(mk)
-        return s
-    }
     func income(_ mk: String) -> Double { monthlyPay(mk) + dadFree(mk) }
     func freeToSpend(_ mk: String) -> Double { income(mk) - spending(mk) }
 
