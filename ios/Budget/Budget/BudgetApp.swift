@@ -48,7 +48,13 @@ struct BudgetApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     switch phase {
                     case .active:
+                        // On Mac (Stage Manager) scenePhase flips to .active for windows that
+                        // are merely visible but not focused, which spuriously re-triggered
+                        // Touch ID while the user was in another app. There, don't auto-prompt —
+                        // the lock screen's Unlock button asks only when they actually return.
+                        #if !targetEnvironment(macCatalyst)
                         if lock.locked { lock.authenticate() }
+                        #endif
                         Task { await store.refresh(); Notifs.schedule(store); MumReminder.sync(store) }
                     case .background:
                         lock.lockOnBackground()
