@@ -1257,64 +1257,118 @@
             {tab==="limit"&&(
               <div>
 
-                {/* ── Overview card ── */}
-                <div style={{...crd,padding:22}}>
-                  <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}>Annual limit used</div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:12}}>
-                    <div style={{fontSize:34,fontWeight:800,letterSpacing:-1}}>{yn(eTd)}</div>
-                    <div style={{fontSize:13,color:c.sub}}>of {yn(se.annualLimit)}</div>
-                  </div>
-                  <div style={{background:c.cardAlt,borderRadius:8,height:12,marginBottom:14,overflow:"hidden"}}>
-                    <div style={{height:"100%",borderRadius:8,width:`${Math.min(100,(eT/se.annualLimit)*100)}%`,background:rL<100000?`linear-gradient(90deg,${c.peach},${c.roseD})`:`linear-gradient(90deg,${c.green},${c.blueD})`,transition:"width 0.4s"}}/>
-                  </div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                    <div style={{background:c.cardAlt,borderRadius:14,padding:"12px 14px"}}>
-                      <div style={{fontSize:11,color:c.sub,marginBottom:4}}>Remaining</div>
-                      <div style={{fontSize:20,fontWeight:800,color:rL<100000?c.roseD:c.greenD}}>{yn(rL)}</div>
-                    </div>
-                    <div style={{background:c.cardAlt,borderRadius:14,padding:"12px 14px"}}>
-                      <div style={{fontSize:11,color:c.sub,marginBottom:4}}>Safe/month ({nFM} left)</div>
-                      <div style={{fontSize:20,fontWeight:800,color:rL<100000?c.roseD:c.greenD}}>{yn(eS)}</div>
-                      <div style={{fontSize:12,color:c.sub,marginTop:2,fontWeight:600}}>≈ {mHP.toFixed(0)} hrs</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Status banner ── */}
-                <div style={{...crd,background:rL<0?c.roseD:rL<150000?c.peachD:c.greenD,padding:18,marginBottom:14}}>
-                  <div style={{fontSize:15,fontWeight:700,color:c.white,marginBottom:4}}>{rL<0?"Over your limit":rL<150000?"Getting close — be careful":"You're on track"}</div>
-                  <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>
-                    {rL<0?`Exceeded by ${yn(Math.abs(rL))}`:rL<150000?`Only ${yn(rL)} left across ${nFM} months`:`About ${mHP.toFixed(0)} hours/month at ¥${se.hourlyWage}/hr`}
-                  </div>
-                </div>
-
-                {/* ── Monthly breakdown bar chart ── */}
-                {(()=>{const maxW=Math.max(...MONTHS.map(mo=>gTx(da[mo.key],mo.key)),1);return(
-                  <div style={crd}>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-                      <div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/>
-                      <span style={{fontSize:15,fontWeight:700}}>Monthly Earnings</span>
-                    </div>
-                    {MONTHS.map(mo=>{
-                      const w=gTx(da[mo.key],mo.key);
-                      const isFut=mo.key>(MONTHS[cMN-1]?.key||"");
-                      return(
-                        <div key={mo.key} style={{marginBottom:10,opacity:isFut?0.35:1}}>
-                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-                            <span style={{fontSize:12,color:c.sub,width:36,flexShrink:0}}>{mo.short}</span>
-                            <div style={{flex:1,margin:"0 10px",height:8,borderRadius:4,background:c.cardAlt,overflow:"hidden"}}>
-                              {w>0&&<div style={{height:"100%",borderRadius:4,width:`${(w/maxW)*100}%`,background:c.blueD,transition:"width 0.3s"}}/>}
-                            </div>
-                            <span style={{fontSize:13,fontWeight:w>0?600:400,color:w>0?c.text:c.muted,width:80,textAlign:"right",flexShrink:0}}>{w>0?yn(w):"—"}</span>
+                {/* ── Bank-style hero + insights ── */}
+                {(()=>{
+                  const pctUsed=se.annualLimit>0?Math.min(1,eT/se.annualLimit):0;
+                  const pctTxt=se.annualLimit>0?Math.round((eT/se.annualLimit)*100):0;
+                  const elapsed=Math.max(1,cMN);
+                  const avgMonth=Math.round(eT/elapsed);
+                  const projYearEnd=Math.round(avgMonth*12);
+                  const projUnder=se.annualLimit-projYearEnd;
+                  const evenPaceNow=se.annualLimit*(elapsed/12);
+                  const paceDelta=Math.round(evenPaceNow-eT);            // + = under the even pace (room to spare)
+                  const ck=MONTHS[cMN-1]?.key,pk=MONTHS[cMN-2]?.key;
+                  const curMonthVal=ck?gTx(da[ck],ck):0;
+                  const curMonthName=MONTHS[cMN-1]?.label||"";
+                  const lastMonthVal=pk?gTx(da[pk],pk):0;
+                  const momDelta=lastMonthVal>0?Math.round((curMonthVal-lastMonthVal)/lastMonthVal*100):null;
+                  const RC=2*Math.PI*52;
+                  const ringColor=eT>=se.annualLimit?"#ff8a8a":(pctUsed>0.85?"#ffce7a":"#ffffff");
+                  const statusTxt=rL<0?"Over limit":rL<150000?"Getting close":"On track";
+                  const monthlyShare=se.annualLimit/12;
+                  return(
+                    <React.Fragment>
+                      {/* Hero card with progress ring */}
+                      <div style={{...crd,padding:22,background:`linear-gradient(135deg, ${c.blueD}, ${c.lavD})`,border:"none"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:20}}>
+                          <svg width="116" height="116" viewBox="0 0 120 120" style={{flexShrink:0}}>
+                            <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="12"/>
+                            <circle cx="60" cy="60" r="52" fill="none" stroke={ringColor} strokeWidth="12" strokeLinecap="round"
+                              strokeDasharray={RC} strokeDashoffset={RC*(1-pctUsed)} transform="rotate(-90 60 60)" style={{transition:"stroke-dashoffset 0.6s"}}/>
+                            <text x="60" y="57" textAnchor="middle" fontSize="28" fontWeight="800" fill="#fff">{pctTxt}%</text>
+                            <text x="60" y="77" textAnchor="middle" fontSize="11" fill="rgba(255,255,255,0.7)">of limit</text>
+                          </svg>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:3}}>Remaining to earn</div>
+                            <div style={{fontSize:32,fontWeight:800,color:"#fff",letterSpacing:-1,marginBottom:6,lineHeight:1}}>{yn(rL)}</div>
+                            <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginBottom:10}}>{yn(eTd)} used of {yn(se.annualLimit)}</div>
+                            <span style={{display:"inline-block",fontSize:12,fontWeight:700,color:"#fff",background:"rgba(255,255,255,0.18)",padding:"4px 12px",borderRadius:20}}>● {statusTxt}</span>
                           </div>
                         </div>
-                      );
-                    })}
-                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10,fontWeight:700,fontSize:14}}>
-                      <span>Total earned</span><span style={{color:c.blueD}}>{yn(eT)}</span>
-                    </div>
-                  </div>
-                );})()}
+                      </div>
+
+                      {/* Insights grid */}
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                        <div style={{...crd,marginBottom:0,padding:16}}>
+                          <div style={{fontSize:11,color:c.sub,marginBottom:4}}>Projected year-end</div>
+                          <div style={{fontSize:21,fontWeight:800,color:projYearEnd>se.annualLimit?c.roseD:c.greenD}}>{yn(projYearEnd)}</div>
+                          <div style={{fontSize:11,color:c.sub,marginTop:3,fontWeight:600}}>{projUnder>=0?`${yn(projUnder)} under limit`:`over by ${yn(-projUnder)}`}</div>
+                        </div>
+                        <div style={{...crd,marginBottom:0,padding:16}}>
+                          <div style={{fontSize:11,color:c.sub,marginBottom:4}}>Average / month</div>
+                          <div style={{fontSize:21,fontWeight:800,color:c.text}}>{yn(avgMonth)}</div>
+                          <div style={{fontSize:11,color:c.sub,marginTop:3,fontWeight:600}}>over {elapsed} month{elapsed!==1?"s":""}</div>
+                        </div>
+                        <div style={{...crd,marginBottom:0,padding:16}}>
+                          <div style={{fontSize:11,color:c.sub,marginBottom:4}}>{curMonthName} so far</div>
+                          <div style={{fontSize:21,fontWeight:800,color:c.text}}>{yn(curMonthVal)}</div>
+                          <div style={{fontSize:11,marginTop:3,fontWeight:600,color:momDelta==null?c.sub:momDelta>0?c.peachD:c.greenD}}>{momDelta==null?"vs last month —":`${momDelta>0?"↑":"↓"} ${Math.abs(momDelta)}% vs last month`}</div>
+                        </div>
+                        <div style={{...crd,marginBottom:0,padding:16}}>
+                          <div style={{fontSize:11,color:c.sub,marginBottom:4}}>Safe / month left</div>
+                          <div style={{fontSize:21,fontWeight:800,color:rL<100000?c.roseD:c.greenD}}>{yn(eS)}</div>
+                          <div style={{fontSize:11,color:c.sub,marginTop:3,fontWeight:600}}>≈ {mHP.toFixed(0)}h · {nFM} month{nFM!==1?"s":""} left</div>
+                        </div>
+                      </div>
+
+                      {/* Pace insight */}
+                      <div style={crd}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:10}}>
+                          <span style={{fontSize:13,fontWeight:700,color:c.text}}>Earning pace</span>
+                          <span style={{fontSize:12,fontWeight:700,color:paceDelta>=0?c.greenD:c.peachD}}>{paceDelta>=0?`${yn(paceDelta)} under pace`:`${yn(-paceDelta)} ahead`}</span>
+                        </div>
+                        <div style={{position:"relative",height:12,borderRadius:6,background:c.cardAlt,overflow:"hidden",marginBottom:6}}>
+                          <div style={{height:"100%",borderRadius:6,width:`${pctUsed*100}%`,background:paceDelta>=0?`linear-gradient(90deg,${c.green},${c.blueD})`:`linear-gradient(90deg,${c.peach},${c.roseD})`,transition:"width 0.5s"}}/>
+                          <div style={{position:"absolute",top:-2,bottom:-2,left:`${(elapsed/12)*100}%`,width:2,background:c.text,opacity:0.55}}/>
+                        </div>
+                        <div style={{fontSize:11,color:c.sub}}>{paceDelta>=0?`You're earning a bit under the even-pace line (mark) — room to work more if you want.`:`You're ahead of the even-pace line (mark) — ease off to stay safe.`}</div>
+                      </div>
+
+                      {/* Monthly earnings — color-coded vs even monthly share */}
+                      {(()=>{const maxW=Math.max(...MONTHS.map(mo=>gTx(da[mo.key],mo.key)),1);return(
+                        <div style={crd}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+                            <div style={{display:"flex",alignItems:"center",gap:10}}>
+                              <div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/>
+                              <span style={{fontSize:15,fontWeight:700}}>Monthly earnings</span>
+                            </div>
+                            <span style={{fontSize:11,color:c.sub}}>even share {yn(Math.round(monthlyShare))}</span>
+                          </div>
+                          {MONTHS.map((mo,i)=>{
+                            const w=gTx(da[mo.key],mo.key);
+                            const isFut=i>=cMN;
+                            const isCur=i===cMN-1;
+                            const heavy=w>monthlyShare;
+                            return(
+                              <div key={mo.key} style={{marginBottom:10,opacity:isFut?0.35:1}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                                  <span style={{fontSize:12,color:isCur?c.blueD:c.sub,fontWeight:isCur?800:400,width:36,flexShrink:0}}>{mo.short}</span>
+                                  <div style={{flex:1,margin:"0 10px",height:8,borderRadius:4,background:c.cardAlt,overflow:"hidden"}}>
+                                    {w>0&&<div style={{height:"100%",borderRadius:4,width:`${(w/maxW)*100}%`,background:heavy?c.peachD:c.blueD,transition:"width 0.3s"}}/>}
+                                  </div>
+                                  <span style={{fontSize:13,fontWeight:w>0?600:400,color:w>0?c.text:c.muted,width:80,textAlign:"right",flexShrink:0}}>{w>0?yn(w):"—"}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10,fontWeight:700,fontSize:14}}>
+                            <span>Total earned</span><span style={{color:c.blueD}}>{yn(eT)}</span>
+                          </div>
+                        </div>
+                      );})()}
+                    </React.Fragment>
+                  );
+                })()}
 
                 {/* ── This month's target + shift simulator ── */}
                 {nMK&&(()=>{
