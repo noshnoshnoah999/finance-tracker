@@ -508,6 +508,9 @@
       // Estimated spending from the budget when no passbook is imported for that month
       const pbBudgetOut=mk=>{const d=da[mk]||eM();let s=0;(se.fixed||[]).forEach(f=>{if(f.sub)s+=subTotal(mk);else if(f.variable)s+=((d.fixedAmounts||{})[f.id]||0);else s+=f.amount;});s+=d.suicaOverride!=null?d.suicaOverride:gCm(d,mk);s+=d.foodOverride!=null?d.foodOverride:fF(mk);if(se.showSkin!==false)s+=(d.skinTreatment||0);if(se.showGenSav!==false)s+=(d.generalSavings||0);(d.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;};
       const pbOut=mk=>pbHasReal(mk)?pbOutReal(mk):pbBudgetOut(mk);
+      // Recurring bills that DON'T show up as card transactions (fixed items + skin + savings),
+      // so for "real" months we can subtract them on top of the imported card spending.
+      const pbFixedBills=mk=>{const d=da[mk]||eM();let s=0;(se.fixed||[]).forEach(f=>{if(f.sub)s+=subTotal(mk);else if(f.variable)s+=((d.fixedAmounts||{})[f.id]||0);else s+=f.amount;});if(se.showSkin!==false)s+=(d.skinTreatment||0);if(se.showGenSav!==false)s+=(d.generalSavings||0);return s;};
       // Category breakdown straight from the imported transactions (no AI needed)
       const pbCats=mk=>{const m={};pbTx(mk).filter(t=>t.direction==="out").forEach(t=>{const k=t.category||"other";if(!m[k])m[k]={total:0,count:0};m[k].total+=(Number(t.amount)||0);m[k].count++;});return Object.keys(m).map(k=>({cat:k,...m[k]})).sort((a,b)=>b.total-a.total);};
       // Budgeted line items for an estimated month (mirrors the Budget tab)
@@ -1164,7 +1167,9 @@
                   const pmk=gPrevMK(pbm);
                   const plH=d.hours>0&&pmk?gPLHours(pmk,da[pmk]?.customDays,gShifts(pmk),se.workDays):0;
                   const plW=Math.round(plH*se.hourlyWage);
-                  const inTotal=pbPay(pbm),outTotal=pbOut(pbm),net=inTotal-outTotal;
+                  const inTotal=pbPay(pbm),outTotal=pbOut(pbm);
+                  const fixedBills=real?pbFixedBills(pbm):0;   // real months: card txns miss fixed bills, so add them
+                  const net=inTotal-outTotal-fixedBills;
                   const cats=pbCats(pbm);
                   const txs=pbTx(pbm).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
                   const lines=pbBudgetLines(pbm);
@@ -1181,8 +1186,14 @@
                         <div style={{background:c.greenBg,borderRadius:14,padding:14}}><div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:4}}>Money in</div><div style={{fontSize:22,fontWeight:800,color:c.greenD}}>{yn(pbInD)}</div></div>
                         <div style={{background:c.roseBg,borderRadius:14,padding:14}}><div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:4}}>Money out</div><div style={{fontSize:22,fontWeight:800,color:c.roseD}}>{yn(pbOutD)}</div></div>
                       </div>
+                      {fixedBills>0&&(
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 4px",fontSize:13}}>
+                          <span style={{color:c.sub}}>Fixed bills <span style={{fontSize:11,color:c.muted}}>(rent, subs, savings…)</span></span>
+                          <span style={{fontWeight:700,color:c.text}}>−{yn(fixedBills)}</span>
+                        </div>
+                      )}
                       <div style={{padding:"12px 14px",borderRadius:14,background:net>=0?c.greenD:c.roseD,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <span style={{fontSize:13,fontWeight:600,color:c.white}}>{net>=0?"Left over":"Overspent"}</span>
+                        <span style={{fontSize:13,fontWeight:600,color:c.white}}>{net>=0?"Left over":"Overspent"}{fixedBills>0?" after bills":""}</span>
                         <span style={{fontSize:20,fontWeight:800,color:c.white}}>{yn(Math.abs(net))}</span>
                       </div>
                     </div>
