@@ -58,28 +58,36 @@ struct PassbookView: View {
         return (out.jpegData(compressionQuality: 0.85) ?? data, "image/jpeg")
     }
 
-    // MARK: Year overview
+    // MARK: Year hero (bank-style gradient)
     @ViewBuilder private func yearOverview(_ c: Calc) -> some View {
         let inT = c.passbookYearIn, outT = c.passbookYearOut
-        VStack(alignment: .leading, spacing: 14) {
+        let net = inT - outT
+        let inPct = inT > 0 ? Int((outT / inT * 100).rounded()) : 0
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("2026 SO FAR").font(.caption2).fontWeight(.semibold).foregroundStyle(T.sub)
+                Text("2026 SO FAR").font(.caption2).fontWeight(.semibold).foregroundStyle(.white.opacity(0.7))
                 Spacer()
-                Text("\(c.totalTxns) transaction\(c.totalTxns == 1 ? "" : "s") imported").font(.caption2).foregroundStyle(T.muted)
+                Text("\(c.totalTxns) txn\(c.totalTxns == 1 ? "" : "s")").font(.caption2).foregroundStyle(.white.opacity(0.6))
             }
-            HStack {
-                miniStat("In", yen(inT), T.greenD)
-                miniStat("Out", yen(outT), T.roseD)
-                miniStat("Net", yen(inT - outT), inT - outT >= 0 ? T.greenD : T.roseD)
+            Text("Net kept this year").font(.caption2).foregroundStyle(.white.opacity(0.75))
+            Text(yen(net)).font(.system(size: 30, weight: .bold)).foregroundStyle(.white)
+            HStack(spacing: 10) {
+                heroTile("In", yen(inT))
+                heroTile("Out", yen(outT))
             }
+            if inT > 0 { Text("You spent \(inPct)% of what came in.").font(.caption2).foregroundStyle(.white.opacity(0.7)) }
         }
-        .card()
+        .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+        .background(LinearGradient(colors: [T.greenD, T.blueD], startPoint: .topLeading, endPoint: .bottomTrailing))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
-    private func miniStat(_ l: String, _ v: String, _ color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(l.uppercased()).font(.caption2).foregroundStyle(T.sub)
-            Text(v).font(.headline).fontWeight(.bold).foregroundStyle(color)
-        }.frame(maxWidth: .infinity, alignment: .leading)
+    private func heroTile(_ l: String, _ v: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(l.uppercased()).font(.caption2).foregroundStyle(.white.opacity(0.7))
+            Text(v).font(.headline).fontWeight(.bold).foregroundStyle(.white)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 10).padding(.horizontal, 12)
+        .background(Color.white.opacity(0.16)).clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: Month chips
@@ -134,6 +142,9 @@ struct PassbookView: View {
         }
         .card()
 
+        // Month insights
+        if real { monthInsights(c) }
+
         // Money In
         VStack(alignment: .leading, spacing: 8) {
             header("Money In", T.greenD)
@@ -158,37 +169,51 @@ struct PassbookView: View {
             }
             if real {
                 let cats = c.cats(pbm)
-                ForEach(cats) { x in
-                    let e = txCat(x.cat)
-                    VStack(spacing: 4) {
-                        HStack {
-                            Text("\(e.emoji) \(e.label)").font(.footnote)
-                            Text("×\(x.count)").font(.caption2).foregroundStyle(T.muted)
-                            Spacer()
-                            Text(yen(x.total)).font(.footnote).fontWeight(.bold)
-                        }
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(T.cardAlt)
-                                Capsule().fill(T.roseD).frame(width: (outT > 0 ? x.total / outT : 0) * geo.size.width)
+                let fracs = cats.map { outT > 0 ? $0.total / outT : 0 }
+                HStack(spacing: 16) {
+                    donut(fracs, outT)
+                    VStack(spacing: 7) {
+                        ForEach(Array(cats.enumerated()), id: \.offset) { i, x in
+                            let e = txCat(x.cat)
+                            HStack(spacing: 8) {
+                                RoundedRectangle(cornerRadius: 3).fill(catColor(i)).frame(width: 9, height: 9)
+                                Text("\(e.emoji) \(e.label)").font(.caption).lineLimit(1)
+                                Text("×\(x.count)").font(.system(size: 10)).foregroundStyle(T.muted)
+                                Spacer()
+                                Text(yen(x.total)).font(.caption).fontWeight(.bold)
                             }
-                        }.frame(height: 6)
+                        }
                     }
                 }
+                .padding(.bottom, 4)
                 Text("TRANSACTIONS").font(.caption2).fontWeight(.semibold).foregroundStyle(T.sub).padding(.top, 4)
-                ForEach(Array(c.txns(pbm).sorted { $0.s("date") < $1.s("date") }.enumerated()), id: \.offset) { _, t in
-                    let e = txCat(t.s("category"))
-                    HStack(spacing: 8) {
-                        Text(e.emoji)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(t.s("description")).font(.caption).fontWeight(.semibold).lineLimit(1)
-                            Text(t.s("date")).font(.system(size: 10)).foregroundStyle(T.muted)
+                let groups = Dictionary(grouping: c.txns(pbm)) { $0.s("date") }
+                ForEach(groups.keys.sorted(by: >), id: \.self) { date in
+                    let items = groups[date] ?? []
+                    let dayOut = items.filter { $0.s("direction") != "in" }.reduce(0.0) { $0 + $1.d("amount") }
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(date).font(.caption2).fontWeight(.bold).foregroundStyle(T.sub)
+                            Spacer()
+                            if dayOut > 0 { Text("−\(yen(dayOut))").font(.caption2).foregroundStyle(T.muted) }
                         }
-                        Spacer()
-                        Text("\(t.s("direction") == "in" ? "+" : "−")\(yen(t.d("amount")))")
-                            .font(.caption).fontWeight(.bold).foregroundStyle(t.s("direction") == "in" ? T.greenD : T.text)
+                        VStack(spacing: 0) {
+                            ForEach(Array(items.enumerated()), id: \.offset) { i, t in
+                                let e = txCat(t.s("category"))
+                                HStack(spacing: 9) {
+                                    Text(e.emoji)
+                                    Text(t.s("description")).font(.caption).fontWeight(.semibold).lineLimit(1)
+                                    Spacer()
+                                    Text("\(t.s("direction") == "in" ? "+" : "−")\(yen(t.d("amount")))")
+                                        .font(.caption).fontWeight(.bold).foregroundStyle(t.s("direction") == "in" ? T.greenD : T.text)
+                                }
+                                .padding(.vertical, 9).padding(.horizontal, 12)
+                                .overlay(alignment: .top) { if i > 0 { Divider().overlay(T.border) } }
+                            }
+                        }
+                        .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .padding(.vertical, 5).overlay(Divider().overlay(T.border), alignment: .bottom)
+                    .padding(.bottom, 6)
                 }
             } else {
                 let lines = c.budgetLines(pbm)
@@ -327,5 +352,60 @@ struct PassbookView: View {
     private func errBox(_ t: String) -> some View {
         Text(t).font(.caption).fontWeight(.semibold).foregroundStyle(T.roseD)
             .padding(10).frame(maxWidth: .infinity, alignment: .leading).background(T.roseBg).clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: Insights grid (bank-style)
+    @ViewBuilder private func monthInsights(_ c: Calc) -> some View {
+        let outTxs = c.txns(pbm).filter { $0.s("direction") != "in" }
+        let outT = c.passbookOut(pbm)
+        let biggest = outTxs.max { $0.d("amount") < $1.d("amount") }
+        let nDays = Set(outTxs.map { $0.s("date") }).count
+        let dailyAvg = nDays > 0 ? Int((outT / Double(nDays)).rounded()) : 0
+        let top = c.cats(pbm).first
+        let pm = prevMK(pbm)
+        let prevOut = pm != nil ? c.passbookOut(pm!) : 0
+        let momPct: Int? = prevOut > 0 ? Int(((outT - prevOut) / prevOut * 100).rounded()) : nil
+        let tc = top != nil ? txCat(top!.cat) : (emoji: "", label: "")
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            insightCell("Daily average", yen(Double(dailyAvg)), "over \(nDays) active day\(nDays == 1 ? "" : "s")", T.text)
+            insightCell("Biggest purchase", biggest != nil ? yen(biggest!.d("amount")) : "—", biggest?.s("description") ?? "", T.text)
+            insightCell("Top category", top != nil ? "\(tc.emoji) \(tc.label)" : "—", top != nil ? yen(top!.total) : "", T.text)
+            insightCell("vs last month", momPct == nil ? "—" : "\(momPct! > 0 ? "↑" : "↓") \(abs(momPct!))%", prevOut > 0 ? "spent \(yen(prevOut)) before" : "no prior month", momPct == nil ? T.text : (momPct! > 0 ? T.roseD : T.greenD))
+        }
+    }
+    private func insightCell(_ label: String, _ value: String, _ sub: String, _ col: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased()).font(.caption2).foregroundStyle(T.sub)
+            Text(value).font(.headline).fontWeight(.bold).foregroundStyle(col).lineLimit(1).minimumScaleFactor(0.7)
+            if !sub.isEmpty { Text(sub).font(.caption2).foregroundStyle(T.sub).lineLimit(1) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(14)
+        .background(T.card).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // Donut ring for the category breakdown
+    @ViewBuilder private func donut(_ fracs: [Double], _ total: Double) -> some View {
+        ZStack {
+            Circle().stroke(T.cardAlt, lineWidth: 14)
+            ForEach(Array(fracs.enumerated()), id: \.offset) { i, f in
+                let start = fracs.prefix(i).reduce(0, +)
+                Circle().trim(from: min(start, 1), to: min(start + f, 1))
+                    .stroke(catColor(i), style: StrokeStyle(lineWidth: 14, lineCap: .butt))
+                    .rotationEffect(.degrees(-90))
+            }
+            VStack(spacing: 0) {
+                Text("spent").font(.system(size: 9)).foregroundStyle(T.sub)
+                Text(yen(total)).font(.caption).fontWeight(.bold).foregroundStyle(T.text).minimumScaleFactor(0.6).lineLimit(1)
+            }
+        }
+        .frame(width: 104, height: 104)
+    }
+    private func catColor(_ i: Int) -> Color {
+        let pal: [Color] = [T.roseD, T.peachD, T.blueD, T.lavD, T.greenD, T.rose, T.peach, T.blue]
+        return pal[i % pal.count]
+    }
+    private func prevMK(_ mk: String) -> String? {
+        guard let i = MONTHS.firstIndex(where: { $0.key == mk }), i > 0 else { return nil }
+        return MONTHS[i - 1].key
     }
 }

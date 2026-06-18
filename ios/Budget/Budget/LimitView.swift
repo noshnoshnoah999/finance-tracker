@@ -36,38 +36,74 @@ struct LimitView: View {
         let verdict = shifts.isEmpty ? "none" : (plannedPay <= safe ? "yes" : (overYear ? "over" : "caution"))
         let vColor: Color = verdict == "yes" ? T.greenD : verdict == "caution" ? T.peachD : verdict == "over" ? T.roseD : T.muted
 
+        // Bank-style insights
+        let pctUsed = limit > 0 ? min(1, earned / limit) : 0
+        let pctTxt = limit > 0 ? Int((earned / limit * 100).rounded()) : 0
+        let elapsed = max(1, c.currentMonthNumber)
+        let avgMonth = (earned / Double(elapsed)).rounded()
+        let projYearEnd = (avgMonth * 12).rounded()
+        let projOver = projYearEnd > limit
+        let evenPace = limit * Double(elapsed) / 12
+        let paceDelta = (evenPace - earned).rounded()
+        let ci = c.currentMonthNumber - 1
+        let curVal = (ci >= 0 && ci < MONTHS.count) ? c.taxable(MONTHS[ci].key) : 0
+        let curName = (ci >= 0 && ci < MONTHS.count) ? MONTHS[ci].label : ""
+        let lastVal = (ci - 1 >= 0 && ci - 1 < MONTHS.count) ? c.taxable(MONTHS[ci - 1].key) : 0
+        let momPct: Int? = lastVal > 0 ? Int(((curVal - lastVal) / lastVal * 100).rounded()) : nil
+        let statusTxt = remaining < 0 ? "Over limit" : remaining < 150000 ? "Getting close" : "On track"
+        let ringColor: Color = earned >= limit ? Color(red: 1, green: 0.54, blue: 0.54) : (pctUsed > 0.85 ? Color(red: 1, green: 0.81, blue: 0.48) : .white)
+        let monthlyShare = limit / 12
+
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                // Overview
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("ANNUAL LIMIT USED").font(.caption2).fontWeight(.semibold).foregroundStyle(T.sub)
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(yen(earned)).font(.system(size: 34, weight: .bold)).foregroundStyle(T.text)
+                // Bank-style hero with progress ring
+                HStack(spacing: 18) {
+                    ZStack {
+                        Circle().stroke(Color.white.opacity(0.22), lineWidth: 12)
+                        Circle().trim(from: 0, to: pctUsed).stroke(ringColor, style: StrokeStyle(lineWidth: 12, lineCap: .round)).rotationEffect(.degrees(-90))
+                        VStack(spacing: 0) {
+                            Text("\(pctTxt)%").font(.system(size: 24, weight: .bold)).foregroundStyle(.white)
+                            Text("of limit").font(.system(size: 10)).foregroundStyle(.white.opacity(0.7))
+                        }
+                    }.frame(width: 104, height: 104)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("REMAINING TO EARN").font(.caption2).foregroundStyle(.white.opacity(0.7))
+                        Text(yen(remaining)).font(.system(size: 27, weight: .bold)).foregroundStyle(.white)
+                        Text("\(yen(earned)) used of \(yen(limit))").font(.caption2).foregroundStyle(.white.opacity(0.75))
+                        Text("● \(statusTxt)").font(.caption).fontWeight(.bold).foregroundStyle(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 4).background(Color.white.opacity(0.18)).clipShape(Capsule()).padding(.top, 2)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                .background(LinearGradient(colors: [T.blueD, T.lavD], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+
+                // Insights grid
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    limCell("Projected year-end", yen(projYearEnd), projOver ? T.roseD : T.greenD, projOver ? "over by \(yen(projYearEnd - limit))" : "\(yen(limit - projYearEnd)) under limit", T.sub)
+                    limCell("Average / month", yen(avgMonth), T.text, "over \(elapsed) month\(elapsed == 1 ? "" : "s")", T.sub)
+                    limCell("\(curName) so far", yen(curVal), T.text, momPct == nil ? "vs last month —" : "\(momPct! > 0 ? "↑" : "↓") \(abs(momPct!))% vs last", momPct == nil ? T.sub : (momPct! > 0 ? T.peachD : T.greenD))
+                    limCell("Safe / month left", yen(safe), remaining < 100000 ? T.roseD : T.greenD, "≈ \(Int(hoursPerMonth))h · \(nFM) left", T.sub)
+                }
+
+                // Earning pace
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Earning pace").font(.subheadline).fontWeight(.bold)
                         Spacer()
-                        Text("of \(yen(limit))").font(.footnote).foregroundStyle(T.sub)
+                        Text(paceDelta >= 0 ? "\(yen(paceDelta)) under pace" : "\(yen(-paceDelta)) ahead").font(.caption).fontWeight(.bold).foregroundStyle(paceDelta >= 0 ? T.greenD : T.peachD)
                     }
-                    ProgressBar(fraction: pct, color: remaining < 100000 ? T.roseD : T.blueD).frame(height: 12)
-                    HStack(spacing: 10) {
-                        tile("Remaining", yen(remaining), remaining < 100000 ? T.roseD : T.greenD, sub: nil)
-                        tile("Safe/month (\(nFM) left)", yen(safe), remaining < 100000 ? T.roseD : T.greenD, sub: "≈ \(Int(hoursPerMonth)) hrs")
-                    }
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(T.cardAlt)
+                            Capsule().fill(LinearGradient(colors: paceDelta >= 0 ? [T.green, T.blueD] : [T.peach, T.roseD], startPoint: .leading, endPoint: .trailing)).frame(width: geo.size.width * pctUsed)
+                            Rectangle().fill(T.text.opacity(0.55)).frame(width: 2).offset(x: geo.size.width * (Double(elapsed) / 12))
+                        }
+                    }.frame(height: 12)
+                    Text(paceDelta >= 0 ? "You're under the even-pace line (mark) — room to work more if you want." : "You're ahead of the even-pace line (mark) — ease off to stay safe.").font(.caption2).foregroundStyle(T.sub)
                 }
                 .card()
-
-                // Status banner
-                let overdraft = remaining < 0
-                let close = remaining < 150000
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(overdraft ? "Over your limit" : close ? "Getting close — be careful" : "You're on track")
-                        .font(.headline).foregroundStyle(.white)
-                    Text(overdraft ? "Exceeded by \(yen(abs(remaining)))"
-                         : close ? "Only \(yen(remaining)) left across \(nFM) months"
-                         : "About \(Int(hoursPerMonth)) hours/month at \(yen(c.hourlyWage))/hr")
-                        .font(.footnote).foregroundStyle(.white.opacity(0.85))
-                }
-                .padding(18).frame(maxWidth: .infinity, alignment: .leading)
-                .background(overdraft ? T.roseD : close ? T.peachD : T.greenD)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
 
                 // Monthly target — plain language
                 VStack(alignment: .leading, spacing: 10) {
@@ -167,20 +203,26 @@ struct LimitView: View {
                 }
                 .card()
 
-                // Monthly earnings
+                // Monthly earnings — colour-coded vs even share
                 let amounts = MONTHS.map { c.taxable($0.key) }
                 let maxW = max(amounts.max() ?? 1, 1)
                 VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 10) { RoundedRectangle(cornerRadius: 2).fill(T.blueD).frame(width: 3, height: 18); Text("Monthly Earnings").font(.headline) }
+                    HStack {
+                        HStack(spacing: 10) { RoundedRectangle(cornerRadius: 2).fill(T.blueD).frame(width: 3, height: 18); Text("Monthly earnings").font(.headline) }
+                        Spacer()
+                        Text("even share \(yen(monthlyShare.rounded()))").font(.caption2).foregroundStyle(T.sub)
+                    }
                     ForEach(Array(MONTHS.enumerated()), id: \.offset) { i, mo in
                         let w = amounts[i]
                         let isFut = i >= c.currentMonthNumber
+                        let isCur = i == c.currentMonthNumber - 1
+                        let heavy = w > monthlyShare
                         HStack(spacing: 10) {
-                            Text(mo.short).font(.caption).foregroundStyle(T.sub).frame(width: 34, alignment: .leading)
+                            Text(mo.short).font(.caption).fontWeight(isCur ? .bold : .regular).foregroundStyle(isCur ? T.blueD : T.sub).frame(width: 34, alignment: .leading)
                             GeometryReader { geo in
                                 ZStack(alignment: .leading) {
                                     Capsule().fill(T.cardAlt)
-                                    if w > 0 { Capsule().fill(T.blueD).frame(width: w / maxW * geo.size.width) }
+                                    if w > 0 { Capsule().fill(heavy ? T.peachD : T.blueD).frame(width: w / maxW * geo.size.width) }
                                 }
                             }.frame(height: 8)
                             Text(w > 0 ? yen(w) : "—").font(.caption).fontWeight(w > 0 ? .semibold : .regular)
@@ -226,6 +268,16 @@ struct LimitView: View {
             do { let a = try await store.limitAdvice(ctx); await MainActor.run { advice = a; adviceLoading = false } }
             catch { await MainActor.run { adviceErr = "Couldn't get advice: \(error.localizedDescription)"; adviceLoading = false } }
         }
+    }
+
+    private func limCell(_ label: String, _ value: String, _ valueColor: Color, _ sub: String, _ subColor: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased()).font(.caption2).foregroundStyle(T.sub)
+            Text(value).font(.headline).fontWeight(.bold).foregroundStyle(valueColor).lineLimit(1).minimumScaleFactor(0.7)
+            Text(sub).font(.caption2).fontWeight(.semibold).foregroundStyle(subColor).lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading).padding(14)
+        .background(T.card).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func tile(_ label: String, _ value: String, _ color: Color, sub: String?) -> some View {
