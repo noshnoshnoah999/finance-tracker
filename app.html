@@ -1134,18 +1134,22 @@
 
             {tab==="passbook"&&(
               <div>
-                {/* ── Year overview ── */}
-                <div style={{...crd,padding:20}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                    <span style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.6,fontWeight:600}}>2026 so far</span>
-                    <span style={{fontSize:11,color:c.muted,fontWeight:600}}>{pbTotalTxns} transaction{pbTotalTxns===1?"":"s"} imported</span>
+                {/* ── Year hero ── */}
+                {(()=>{const net=pbYearIn-pbYearOut;const inPct=pbYearIn>0?Math.round((pbYearOut/pbYearIn)*100):0;return(
+                  <div style={{...crd,padding:22,background:`linear-gradient(135deg, ${c.greenD}, ${c.blueD})`,border:"none"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                      <span style={{fontSize:11,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.6,fontWeight:600}}>2026 so far</span>
+                      <span style={{fontSize:11,color:"rgba(255,255,255,0.6)",fontWeight:600}}>{pbTotalTxns} txn{pbTotalTxns===1?"":"s"}</span>
+                    </div>
+                    <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginBottom:2}}>Net kept this year</div>
+                    <div style={{fontSize:32,fontWeight:800,color:"#fff",letterSpacing:-1,marginBottom:14,lineHeight:1}}>{yn(net)}</div>
+                    <div style={{display:"flex",gap:10}}>
+                      <div style={{flex:1,background:"rgba(255,255,255,0.16)",borderRadius:12,padding:"10px 12px"}}><div style={{fontSize:10,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.4,marginBottom:3}}>In</div><div style={{fontSize:17,fontWeight:800,color:"#fff"}}>{yn(pbYearIn)}</div></div>
+                      <div style={{flex:1,background:"rgba(255,255,255,0.16)",borderRadius:12,padding:"10px 12px"}}><div style={{fontSize:10,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.4,marginBottom:3}}>Out</div><div style={{fontSize:17,fontWeight:800,color:"#fff"}}>{yn(pbYearOut)}</div></div>
+                    </div>
+                    {pbYearIn>0&&<div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:10}}>You spent {inPct}% of what came in.</div>}
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-                    <div><div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:4}}>In</div><div style={{fontSize:18,fontWeight:800,color:c.greenD}}>{yn(pbYearIn)}</div></div>
-                    <div><div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:4}}>Out</div><div style={{fontSize:18,fontWeight:800,color:c.roseD}}>{yn(pbYearOut)}</div></div>
-                    <div><div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:4}}>Net</div><div style={{fontSize:18,fontWeight:800,color:pbYearIn-pbYearOut>=0?c.greenD:c.roseD}}>{yn(pbYearIn-pbYearOut)}</div></div>
-                  </div>
-                </div>
+                );})()}
 
                 {/* ── Month selector ── */}
                 <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
@@ -1183,6 +1187,24 @@
                       </div>
                     </div>
 
+                    {/* Month insights */}
+                    {real&&(()=>{
+                      const outTxs=txs.filter(x=>x.direction!=="in");
+                      const biggest=outTxs.reduce((m,x)=>x.amount>((m&&m.amount)||0)?x:m,null);
+                      const nDays=new Set(outTxs.map(x=>x.date)).size;
+                      const dailyAvg=nDays>0?Math.round(outTotal/nDays):0;
+                      const top=cats[0];const tic=top?ic(top.cat):["",""];
+                      const prevMK=gPrevMK(pbm);const prevOut=prevMK?pbOut(prevMK):0;
+                      const momPct=prevOut>0?Math.round((outTotal-prevOut)/prevOut*100):null;
+                      const cell=(label,value,sub,col)=>(<div style={{...crd,marginBottom:0,padding:14}}><div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:4}}>{label}</div><div style={{fontSize:18,fontWeight:800,color:col||c.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{value}</div>{sub&&<div style={{fontSize:11,color:c.sub,marginTop:2,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sub}</div>}</div>);
+                      return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                        {cell("Daily average",yn(dailyAvg),`over ${nDays} active day${nDays===1?"":"s"}`)}
+                        {cell("Biggest purchase",biggest?yn(biggest.amount):"—",biggest?biggest.description:"")}
+                        {cell("Top category",top?`${tic[0]} ${tic[1]}`:"—",top?yn(top.total):"")}
+                        {cell("vs last month",momPct==null?"—":`${momPct>0?"↑":"↓"} ${Math.abs(momPct)}%`,prevOut>0?`spent ${yn(prevOut)} before`:"no prior month",momPct==null?c.text:momPct>0?c.roseD:c.greenD)}
+                      </div>);
+                    })()}
+
                     {/* Money in */}
                     <div style={crd}>
                       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Money In</span></div>
@@ -1201,10 +1223,31 @@
                         <span style={{fontSize:11,color:c.muted,fontWeight:600}}>{real?`${txs.length} txns`:"from budget"}</span>
                       </div>
                       {real?(<React.Fragment>
-                        {cats.length>0&&(<div style={{marginBottom:14}}>{cats.map((x,i)=>{const[em,lab]=ic(x.cat);const pct=outTotal>0?(x.total/outTotal)*100:0;return(<div key={i} style={{marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,fontSize:13}}><span style={{color:c.text,fontWeight:500}}>{em} {lab} <span style={{color:c.muted,fontSize:11}}>×{x.count}</span></span><span style={{fontWeight:700}}>{yn(x.total)}</span></div><div style={{height:6,borderRadius:3,background:c.cardAlt,overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,width:`${pct}%`,background:c.roseD}}/></div></div>);})}</div>)}
+                        {cats.length>0&&(()=>{
+                          const PAL=[c.roseD,c.peachD,c.blueD,c.lavD,c.greenD,c.rose,c.peach,c.blue];
+                          const RC=2*Math.PI*42;let acc=0;
+                          const segs=cats.map((x,i)=>{const frac=outTotal>0?x.total/outTotal:0;const s={...x,frac,off:acc,col:PAL[i%PAL.length]};acc+=frac;return s;});
+                          return(<div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16}}>
+                            <svg width="104" height="104" viewBox="0 0 110 110" style={{flexShrink:0}}>
+                              <circle cx="55" cy="55" r="42" fill="none" stroke={c.cardAlt} strokeWidth="14"/>
+                              {segs.map((s,i)=>(<circle key={i} cx="55" cy="55" r="42" fill="none" stroke={s.col} strokeWidth="14" strokeDasharray={`${s.frac*RC} ${RC}`} strokeDashoffset={-s.off*RC} transform="rotate(-90 55 55)"/>))}
+                              <text x="55" y="50" textAnchor="middle" fontSize="9" fill={c.sub}>spent</text>
+                              <text x="55" y="66" textAnchor="middle" fontSize="14" fontWeight="800" fill={c.text}>{yn(outTotal)}</text>
+                            </svg>
+                            <div style={{flex:1,minWidth:0}}>{segs.map((s,i)=>{const[em,lab]=ic(s.cat);return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:7,fontSize:12}}><span style={{width:9,height:9,borderRadius:3,background:s.col,flexShrink:0}}/><span style={{color:c.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{em} {lab} <span style={{color:c.muted,fontSize:10}}>×{s.count}</span></span><span style={{fontWeight:700,color:c.text}}>{yn(s.total)}</span></div>);})}</div>
+                          </div>);
+                        })()}
                         <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:8,fontWeight:600}}>Transactions</div>
-                        <div style={{maxHeight:300,overflowY:"auto",border:`1px solid ${c.border}`,borderRadius:12}}>
-                          {txs.map((x,i)=>{const[em]=ic(x.category);return(<div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",borderTop:i>0?`1px solid ${c.border}`:"none",fontSize:12}}><div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}><span style={{fontSize:14,flexShrink:0}}>{em}</span><div style={{minWidth:0}}><div style={{fontWeight:600,color:c.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.description}</div><div style={{color:c.muted,fontSize:10}}>{x.date}</div></div></div><span style={{fontWeight:700,flexShrink:0,marginLeft:8,color:x.direction==="in"?c.greenD:c.text}}>{x.direction==="in"?"+":"−"}{yn(x.amount)}</span></div>);})}
+                        <div style={{maxHeight:360,overflowY:"auto"}}>
+                          {Object.entries(txs.reduce((g,x)=>{(g[x.date]=g[x.date]||[]).push(x);return g;},{})).sort((a,b)=>b[0].localeCompare(a[0])).map(([date,items])=>{
+                            const dayOut=items.filter(x=>x.direction!=="in").reduce((s,x)=>s+x.amount,0);
+                            return(<div key={date} style={{marginBottom:12}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}><span style={{fontSize:11,color:c.sub,fontWeight:700}}>{date}</span>{dayOut>0&&<span style={{fontSize:11,color:c.muted,fontWeight:600}}>−{yn(dayOut)}</span>}</div>
+                              <div style={{border:`1px solid ${c.border}`,borderRadius:12,overflow:"hidden"}}>
+                                {items.map((x,i)=>{const[em]=ic(x.category);return(<div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",borderTop:i>0?`1px solid ${c.border}`:"none",fontSize:12}}><div style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}><span style={{fontSize:15,flexShrink:0}}>{em}</span><div style={{fontWeight:600,color:c.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.description}</div></div><span style={{fontWeight:700,flexShrink:0,marginLeft:8,color:x.direction==="in"?c.greenD:c.text}}>{x.direction==="in"?"+":"−"}{yn(x.amount)}</span></div>);})}
+                              </div>
+                            </div>);
+                          })}
                         </div>
                       </React.Fragment>):(<React.Fragment>
                         {lines.length>0?(<div style={{fontSize:13}}>
