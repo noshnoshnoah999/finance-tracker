@@ -39,12 +39,7 @@ struct BudgetApp: App {
                 }
                 .task {
                     UNUserNotificationCenter.current().delegate = NotifDelegate.shared
-                    // On Mac, never auto-prompt Touch ID (Stage Manager / focus changes make
-                    // that fire while you're in another app) — the lock screen's Unlock button
-                    // prompts only when you actually return. iOS keeps the auto-prompt.
-                    #if !targetEnvironment(macCatalyst)
-                    if lock.locked { lock.authenticate() }
-                    #endif
+                    if lock.locked { lock.authenticate() }   // prompt on genuine launch
                     await store.refresh()
                     Notifs.schedule(store)
                     MumReminder.sync(store)
@@ -53,10 +48,9 @@ struct BudgetApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     switch phase {
                     case .active:
-                        // On Mac (Stage Manager) scenePhase flips to .active for windows that
-                        // are merely visible but not focused, which spuriously re-triggered
-                        // Touch ID while the user was in another app. There, don't auto-prompt —
-                        // the lock screen's Unlock button asks only when they actually return.
+                        // On Mac, scenePhase flips to .active for windows that are merely
+                        // visible (Stage Manager), not focused — so DON'T prompt here on Mac;
+                        // the NSApplication active notification below does it on real focus.
                         #if !targetEnvironment(macCatalyst)
                         if lock.locked { lock.authenticate() }
                         #endif
@@ -66,6 +60,17 @@ struct BudgetApp: App {
                     default: break
                     }
                 }
+                // Mac: drive lock/unlock off the real "app became frontmost" signal so Touch ID
+                // prompts when you actually switch TO the app — but never while it's just visible
+                // behind another app in Stage Manager.
+                #if targetEnvironment(macCatalyst)
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NSApplicationDidBecomeActiveNotification"))) { _ in
+                    if lock.locked { lock.authenticate() }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NSApplicationDidResignActiveNotification"))) { _ in
+                    lock.lockOnBackground()
+                }
+                #endif
         }
     }
 
