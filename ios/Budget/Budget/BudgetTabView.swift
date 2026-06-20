@@ -143,7 +143,7 @@ struct BudgetTabView: View {
             builtinRow(c, id: "suica", label: "SUICA (\(c.suicaDays(bm)) days)", amount: c.commute(bm))
             builtinRow(c, id: "food", label: "Food (\(monthMeta(bm)?.is5wk == true ? "5-wk" : "4-wk"))", amount: c.food(bm))
             if c.showSkin && c.skin(bm) > 0 { builtinRow(c, id: "skinTreatment", label: "Skin treatment", amount: c.skin(bm)) }
-            if c.showGenSav { builtinRow(c, id: "generalSavings", label: "General savings", amount: c.genSav(bm)) }
+            if c.showGenSav && c.genSavAmount > 0 { genSavRow(c) }
             Divider().overlay(T.border)
             row("Total fixed", yen(totalFixed(c)), bold: true, color: T.lavD)
             let left = c.leftToPay(bm)
@@ -226,6 +226,20 @@ struct BudgetTabView: View {
         .font(.footnote)
     }
 
+    @ViewBuilder private func genSavRow(_ c: Calc) -> some View {
+        let on = store.blob.data[bm]?["saveGen"]?.bool == true
+        let paid = store.blob.data[bm]?["paidFixed"]?["generalSavings"]?.bool ?? false
+        HStack(spacing: 10) {
+            if on { paidCircle(paid) { store.toggleBoolMap(bm, "paidFixed", "generalSavings") } }
+            Text("💰 General savings").foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted).strikethrough(paid)
+            if !on { Text("· not saving").font(.caption2).foregroundStyle(T.muted) }
+            Spacer()
+            Text(on ? yen(c.genSavAmount) : "—").fontWeight(.semibold).foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted)
+            Button(on ? "Don't save" : "Save this month") { store.setMonth(bm, "saveGen", .bool(!on)) }
+                .font(.caption2).foregroundStyle(on ? T.muted : T.greenD).buttonStyle(.plain)
+        }
+        .font(.footnote)
+    }
     @ViewBuilder private func builtinRow(_ c: Calc, id: String, label: String, amount: Double) -> some View {
         let paid = store.blob.data[bm]?["paidFixed"]?[id]?.bool ?? false
         HStack(spacing: 10) {

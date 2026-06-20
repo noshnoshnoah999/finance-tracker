@@ -239,7 +239,7 @@ struct Calc {
             .reduce(0) { $0 + ($1.d("gbp") * gbpToJpy).rounded() }
     }
     func skin(_ mk: String) -> Double { showSkin ? month(mk).d("skinTreatment") : 0 }
-    func genSav(_ mk: String) -> Double { showGenSav ? genSavAmount : 0 }
+    func genSav(_ mk: String) -> Double { (showGenSav && month(mk)["saveGen"]?.bool == true) ? genSavAmount : 0 }
 
     /// Total budgeted spending for a month, excluding skipped fixed lines (mirror cmSpending).
     func spending(_ mk: String) -> Double {

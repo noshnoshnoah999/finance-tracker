@@ -41,7 +41,7 @@ struct SavingsView: View {
 
     // MARK: Cash
     @ViewBuilder private func cashSection(_ c: Calc) -> some View {
-        let total = MONTHS.reduce(0.0) { $0 + c.month($1.key).d("savings") }
+        let total = MONTHS.reduce(0.0) { $0 + c.month($1.key).d("savings") + c.genSav($1.key) }
         let cMN = max(1, c.currentMonthNumber)
         let avg = total / Double(cMN)
         let goal = store.blob.settings["savingsGoal"]?.double ?? 0
@@ -77,14 +77,17 @@ struct SavingsView: View {
             sectionHeader("Monthly Savings", T.blueD)
             ForEach(MONTHS) { mo in
                 let s = c.month(mo.key).d("savings")
+                let gs = c.genSav(mo.key)
+                let t = s + gs
                 let isFut = mo.key > (MONTHS[safe: cMN - 1]?.key ?? "")
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text(mo.label).font(.footnote).fontWeight(.semibold).foregroundStyle(s > 0 ? T.text : T.muted)
+                        Text(mo.label).font(.footnote).fontWeight(.semibold).foregroundStyle(t > 0 ? T.text : T.muted)
                         Spacer()
-                        if s > 0 { Text(yen(s)).font(.footnote).fontWeight(.bold).foregroundStyle(T.blueD) }
+                        if t > 0 { Text(yen(t)).font(.footnote).fontWeight(.bold).foregroundStyle(T.blueD) }
                     }
                     yenField(mo.key, "savings", placeholder: isFut ? "Future…" : "Enter amount…")
+                    if gs > 0 { Text("+ \(yen(gs)) general savings (from budget)").font(.caption2).foregroundStyle(T.sub) }
                 }
                 .opacity(isFut ? 0.55 : 1)
             }
