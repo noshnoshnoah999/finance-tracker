@@ -100,7 +100,7 @@
       {id:"d3",note:"Lunch money",gbp:25},{id:"d4",note:"Student loan",gbp:150},
       {id:"d5",note:"Commuter pass",gbp:50},{id:"d6",note:"Japanese lessons",gbp:25},
     ];
-    const eM = () => ({hours:0,days:0,wageOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0,txns:[]});
+    const eM = () => ({hours:0,days:0,wageOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0,txns:[],extraIncome:[]});
     // Category display: emoji + label for imported passbook transactions
     const TX_CATS={income:["💰","Income"],food:["🍜","Food"],transport:["🚇","Transport"],subscriptions:["🔁","Subscriptions"],shopping:["🛍️","Shopping"],bills:["📄","Bills"],savings:["🏦","Savings"],investment:["📈","Investment"],fees:["⚠️","Fees"],transfer:["↔️","Transfer"],cash:["💴","Cash"],other:["•","Other"]};
     const txKey=t=>`${t.date}|${(t.description||"").trim()}|${t.amount}|${t.direction}|${t.ref||""}`;
@@ -185,6 +185,7 @@
       const [nE,setNE]=useState({name:"",amount:""});
       const [nD,setND]=useState({note:"",gbp:""});
       const [eD,setED]=useState(null);
+      const [nX,setNX]=useState({note:"",amount:""});
       const [pF,setPF2]=useState("");
       const [pT,setPT]=useState("");
       const [pH,setPH]=useState({pMon:0,pTue:0,pSun:0});
@@ -370,6 +371,8 @@
       const gShifts=mk=>{const ov=da[mk]?.shiftOverrides||{};const r={};Object.keys(se.shifts||{}).forEach(d=>{r[d]=ov[d]?{...se.shifts[d],...ov[d]}:se.shifts[d];});return r;};
       const gTx=(d,mk)=>{if(d.wageOverride>0)return gW(d);const pmk=gPrevMK(mk);const plH=pmk&&d.hours>0?gPLHours(pmk,da[pmk]?.customDays,gShifts(pmk),se.workDays):0;return gW(d)+Math.round(plH*se.hourlyWage);};
       const dTJ=d=>(d.dadItems||[]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
+      // Extra money (gifts, dad's pocket money, etc.) — non-pay income, NOT taxable.
+      const extraInc=mk=>{const d=da[mk];return((d&&d.extraIncome)||[]).reduce((s,x)=>s+(x.amount||0),0);};
       const fF=k=>MONTHS.find(x=>x.key===k)?.is5wk?se.food5wk:se.food4wk;
       const gSuicaDays=mk=>{const[y,mo]=mk.split("-").map(Number);const pd1=gPD(mk);const nextMK=mo===12?`${y+1}-01`:`${y}-${String(mo+1).padStart(2,"0")}`;const pd2=gPD(nextMK);const from=new Date(y,mo-1,pd1);const[y2,mo2]=nextMK.split("-").map(Number);const to=new Date(y2,mo2-1,pd2-1);const allCD={...(da[mk]?.customDays||{}),...(da[nextMK]?.customDays||{})};let n=0;const d2=new Date(from);while(d2<=to){const ds=`${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,"0")}-${String(d2.getDate()).padStart(2,"0")}`;if(getDayState(ds,d2,allCD,se.workDays)==="work")n++;d2.setDate(d2.getDate()+1);}return n;};
       const gCm=(_,mk)=>gSuicaDays(mk)*rt;
@@ -450,7 +453,8 @@
       const bdFoodAmt=bdFd;
       const allMumItems=[{id:"food",name:"Food Budget"+(bd.foodOverride!=null?" (custom)":MONTHS.find(x=>x.key===bm)?.is5wk?" (5-wk)":" (4-wk)"),amount:bdFoodAmt},...(se.mumItems||[])];
       const bdMTDisplay=allMumItems.filter(x=>bdMC.includes(x.id)).reduce((s,x)=>s+x.amount,0);
-      const bdFr=bdI+bdPLW+bdDJFree-bdFT-bdOY;
+      const bdExtra=extraInc(bm);
+      const bdFr=bdI+bdPLW+bdDJFree+bdExtra-bdFT-bdOY;
       const bdFrD=useCountUp(bdFr);
       // ── Dashboard helpers ──
       // Home always reflects the CURRENT month, independent of the Budget tab's selected month (bm)
@@ -465,7 +469,8 @@
       const cmDadFree=(cmd.dadItems||[]).filter(x=>(se.dadFreeSpend||{})[x.id]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
       const cmPayOnly=gTx(cmd,cmk)+gTr(cmd,cmk);
       const cmSpending=(()=>{let s=0;se.fixed.forEach(f=>{if(!cmSF[f.id])s+=cmFx(f);});s+=cmCm+cmFd+cmSkin+cmGenSav;(cmd.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;})();
-      const cmFree=cmPayOnly+cmDadFree-cmSpending;
+      const cmExtra=extraInc(cmk);
+      const cmFree=cmPayOnly+cmDadFree+cmExtra-cmSpending;
       const cmFreeD=useCountUp(cmFree);
       const bdLeftPay=(()=>{let u=0;se.fixed.forEach(f=>{if(!cmSF[f.id]&&!cmPF[f.id])u+=cmFx(f);});if(!cmPF["suica"])u+=cmCm;if(!cmPF["food"])u+=cmFd;if(!cmPF["skinTreatment"])u+=cmSkin;if(!cmPF["generalSavings"])u+=cmGenSav;return u;})();
       const homeBillIds=[...se.fixed.filter(f=>!cmSF[f.id]).map(f=>f.id),"suica","food",...(se.showSkin!==false&&cmSkin>0?["skinTreatment"]:[]),...(se.showGenSav!==false&&cmGenSav>0?["generalSavings"]:[])];
@@ -507,7 +512,7 @@
       const pbOutReal=mk=>pbTx(mk).filter(t=>t.direction==="out").reduce((s,t)=>s+(Number(t.amount)||0),0);
       const pbInReal=mk=>pbTx(mk).filter(t=>t.direction==="in").reduce((s,t)=>s+(Number(t.amount)||0),0);
       // Income = the month's actual pay the app already computes (wage + paid leave + transport)
-      const pbPay=mk=>{const d=da[mk]||eM();return gTx(d,mk)+gTr(d,mk);};
+      const pbPay=mk=>{const d=da[mk]||eM();return gTx(d,mk)+gTr(d,mk)+extraInc(mk);};
       // Estimated spending from the budget when no passbook is imported for that month
       const pbBudgetOut=mk=>{const d=da[mk]||eM();let s=0;(se.fixed||[]).forEach(f=>{if(f.sub)s+=subTotal(mk);else if(f.variable)s+=((d.fixedAmounts||{})[f.id]||0);else s+=f.amount;});s+=d.suicaOverride!=null?d.suicaOverride:gCm(d,mk);s+=d.foodOverride!=null?d.foodOverride:fF(mk);if(se.showSkin!==false)s+=(d.skinTreatment||0);s+=genSavM(mk);(d.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;};
       const pbOut=mk=>pbHasReal(mk)?pbOutReal(mk):pbBudgetOut(mk);
@@ -528,6 +533,8 @@
       const tMu=(k,id)=>setDa(p=>({...p,[k]:{...p[k],oneOffs:p[k].oneOffs.map(x=>x.id===id?{...x,mumPays:!x.mumPays}:x)}}));
       const aDI=k=>{if(!nD.gbp)return;setDa(p=>({...p,[k]:{...p[k],dadItems:[...(p[k].dadItems||[]),{id:Date.now(),note:nD.note||"Dad",gbp:Number(nD.gbp)||0}]}}));setND({note:"",gbp:""});};
       const rDI=(k,id)=>setDa(p=>({...p,[k]:{...p[k],dadItems:(p[k].dadItems||[]).filter(x=>x.id!==id)}}));
+      const aXI=k=>{if(!nX.amount)return;setDa(p=>({...p,[k]:{...p[k],extraIncome:[...((p[k]&&p[k].extraIncome)||[]),{id:Date.now(),note:nX.note||"Extra money",amount:Number(nX.amount)||0}]}}));setNX({note:"",amount:""});};
+      const rXI=(k,id)=>setDa(p=>({...p,[k]:{...p[k],extraIncome:((p[k]&&p[k].extraIncome)||[]).filter(x=>x.id!==id)}}));
       const uDI=(k,id,f,v)=>setDa(p=>({...p,[k]:{...p[k],dadItems:(p[k].dadItems||[]).map(x=>x.id===id?{...x,[f]:v}:x)}}));
       const tMC=(k,id)=>setDa(p=>{const cu=p[k]?.mumChecked||[];const nx=cu.includes(id)?cu.filter(x=>x!==id):[...cu,id];return{...p,[k]:{...p[k],mumChecked:nx}};});
       const aMI=()=>{if(!nM.name||!nM.amount)return;setSe(p=>({...p,mumItems:[...p.mumItems,{id:Date.now(),name:nM.name,amount:Number(nM.amount)||0}]}));setNM({name:"",amount:""});};
@@ -824,6 +831,7 @@
                   <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Income</span><span style={{fontWeight:600,color:c.text}}>{yn(cmPayOnly)}</span></div>
                     {cmDadFree>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>From Dad</span><span style={{fontWeight:600,color:c.text}}>+{yn(cmDadFree)}</span></div>}
+                    {cmExtra>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Extra money</span><span style={{fontWeight:600,color:c.text}}>+{yn(cmExtra)}</span></div>}
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Bills & spending</span><span style={{fontWeight:600,color:c.text}}>−{yn(cmSpending)}</span></div>
                   </div>
                   <div style={{paddingTop:12,borderTop:`1px solid ${c.border}`}}>
@@ -1060,7 +1068,8 @@
                     {bdPLH>0&&<div style={rw}><span style={{color:c.sub}}>Paid leave ({bdPLH.toFixed(1)}h)</span><span style={{fontWeight:500,color:c.blueD}}>{yn(bdPLW)}</span></div>}
                     <div style={rw}><span style={{color:c.sub}}>Transport Received</span><span style={{fontWeight:500}}>{yn(bdTr)}</span></div>
                     {bdDJFree>0&&<div style={rw}><span style={{color:c.sub}}>Dad (free spend)</span><span style={{fontWeight:500,color:c.greenD}}>{yn(bdDJFree)}</span></div>}
-                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total</span><span style={{fontWeight:700,fontSize:16,color:c.greenD}}>{yn(bdI+bdPLW+bdDJFree)}</span></div>
+                    {bdExtra>0&&<div style={rw}><span style={{color:c.sub}}>Extra money</span><span style={{fontWeight:500,color:c.greenD}}>{yn(bdExtra)}</span></div>}
+                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total</span><span style={{fontWeight:700,fontSize:16,color:c.greenD}}>{yn(bdI+bdPLW+bdDJFree+bdExtra)}</span></div>
                   </div>
                 </div>
 
@@ -1075,6 +1084,25 @@
                     <input placeholder="Note" value={nD.note} onChange={e=>setND(p=>({...p,note:e.target.value}))} style={{...inp,flex:2}}/>
                     <div style={{flex:1,position:"relative"}}><span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,color:c.sub}}>£</span><input placeholder="0" type="number" inputMode="numeric" value={nD.gbp} onChange={e=>setND(p=>({...p,gbp:e.target.value}))} style={{...inp,paddingLeft:26}}/></div>
                     <button onClick={()=>aDI(bm)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:12,padding:"10px 16px",cursor:"pointer",fontFamily:ft,fontWeight:700,fontSize:16}}>+</button>
+                  </div>
+                </div>
+
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Extra money</span></div>
+                    <span style={{fontSize:16}}>🎁</span>
+                  </div>
+                  <div style={{fontSize:12,color:c.sub,marginBottom:12}}>Money that didn't come from your pay — family gifts, Dad's pocket money, etc. Counts as income (incl. Passbook) but not toward your tax limit.</div>
+                  {(bd.extraIncome||[]).map(it=>(<div key={it.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,fontSize:13}}>
+                    <div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,color:c.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.note||"Extra money"}</div></div>
+                    <span style={{fontWeight:600,color:c.greenD,flexShrink:0}}>+{yn(it.amount)}</span>
+                    <button onClick={()=>rXI(bm,it.id)} style={{flexShrink:0,border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button>
+                  </div>))}
+                  {(bd.extraIncome||[]).length>0&&<div style={{...rw,fontSize:13,borderTop:`1px solid ${c.border}`,paddingTop:10,fontWeight:700}}><span>Total</span><span style={{color:c.greenD}}>{yn(bdExtra)}</span></div>}
+                  <div style={{display:"flex",gap:8,marginTop:12}}>
+                    <input placeholder="Note (e.g. Dad pocket money)" value={nX.note} onChange={e=>setNX(p=>({...p,note:e.target.value}))} style={{...inp,flex:2}}/>
+                    <div style={{flex:1,position:"relative"}}><span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,color:c.sub}}>¥</span><input placeholder="0" type="number" inputMode="numeric" value={nX.amount} onChange={e=>setNX(p=>({...p,amount:e.target.value}))} style={{...inp,paddingLeft:24}}/></div>
+                    <button onClick={()=>aXI(bm)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:12,padding:"10px 16px",cursor:"pointer",fontFamily:ft,fontWeight:700,fontSize:16}}>+</button>
                   </div>
                 </div>
 
@@ -1231,7 +1259,8 @@
                         <div style={rw}><span style={{color:c.sub}}>Wage {d.hours>0?`(${d.hours.toFixed(1)}h)`:"(manual)"}</span><span style={{fontWeight:600}}>{yn(wage)}</span></div>
                         {plW>0&&<div style={rw}><span style={{color:c.sub}}>Paid leave ({plH.toFixed(1)}h)</span><span style={{fontWeight:600,color:c.blueD}}>{yn(plW)}</span></div>}
                         <div style={rw}><span style={{color:c.sub}}>Transport</span><span style={{fontWeight:600}}>{yn(tr)}</span></div>
-                        <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:700}}>Monthly pay</span><span style={{fontWeight:800,fontSize:15,color:c.greenD}}>{yn(inTotal)}</span></div>
+                        {extraInc(pbm)>0&&<div style={rw}><span style={{color:c.sub}}>Extra money</span><span style={{fontWeight:600,color:c.greenD}}>{yn(extraInc(pbm))}</span></div>}
+                        <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:700}}>Money in</span><span style={{fontWeight:800,fontSize:15,color:c.greenD}}>{yn(inTotal)}</span></div>
                       </div>):(<div style={{fontSize:13,color:c.muted}}>No pay logged for {monthLabel} yet — add your hours in the Wage tab.</div>)}
                     </div>
 

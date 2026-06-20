@@ -11,6 +11,8 @@ struct BudgetTabView: View {
     @State private var bm: String = currentMonthKeyClamped()
     @State private var ooName = ""
     @State private var ooAmount = ""
+    @State private var nxNote = ""
+    @State private var nxAmount = ""
 
     var body: some View {
         let c = store.calc
@@ -19,6 +21,7 @@ struct BudgetTabView: View {
                 monthChips()
                 calendarCard(c)
                 incomeCard(c)
+                extraMoneyCard(c)
                 fixedCard(c)
                 subCard(c)
                 oneOffCard(c)
@@ -120,17 +123,59 @@ struct BudgetTabView: View {
     // MARK: Income
     @ViewBuilder private func incomeCard(_ c: Calc) -> some View {
         let wage = c.wage(bm), tr = c.transport(bm), pl = c.paidLeaveYen(bm), dad = c.dadFree(bm)
-        let total = c.monthlyPay(bm) + dad
+        let extra = c.extraIncome(bm)
+        let total = c.monthlyPay(bm) + dad + extra
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("Income", color: T.greenD)
             row("Wage", yen(wage))
             if pl > 0 { row("Paid leave", yen(pl), color: T.blueD) }
             row("Transport received", yen(tr))
             if dad > 0 { row("Dad (free spend)", yen(dad), color: T.greenD) }
+            if extra > 0 { row("Extra money", yen(extra), color: T.greenD) }
             Divider().overlay(T.border)
             row("Total", yen(total), bold: true, color: T.greenD)
         }
         .card()
+    }
+
+    // MARK: Extra money (gifts / Dad's pocket money — non-pay income)
+    @ViewBuilder private func extraMoneyCard(_ c: Calc) -> some View {
+        let items = c.month(bm).arr("extraIncome")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack { sectionHeader("Extra money", color: T.greenD); Spacer(); Text("🎁") }
+            Text("Money not from your pay — family gifts, Dad's pocket money. Counts as income (incl. Passbook), not toward your tax limit.")
+                .font(.caption2).foregroundStyle(T.sub)
+            ForEach(Array(items.enumerated()), id: \.offset) { _, it in
+                HStack {
+                    Text(it.s("note").isEmpty ? "Extra money" : it.s("note")).font(.footnote)
+                    Spacer()
+                    Text("+" + yen(it.d("amount"))).font(.footnote).fontWeight(.semibold).foregroundStyle(T.greenD)
+                    Button { removeExtra(it.d("id")) } label: { Image(systemName: "xmark").font(.caption2) }
+                        .buttonStyle(.plain).foregroundStyle(T.roseD)
+                }
+            }
+            if !items.isEmpty {
+                Divider().overlay(T.border)
+                row("Total", yen(c.extraIncome(bm)), bold: true, color: T.greenD)
+            }
+            HStack(spacing: 8) {
+                TextField("Note (e.g. Dad pocket money)", text: $nxNote).modifier(FieldStyle())
+                HStack(spacing: 4) { Text("¥").foregroundStyle(T.sub); TextField("0", text: $nxAmount).keyboardType(.numberPad) }.modifier(FieldStyle()).frame(width: 96)
+                Button { addExtra() } label: { Image(systemName: "plus").fontWeight(.bold).foregroundStyle(.white).padding(10).background(T.greenD).clipShape(RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain)
+            }
+        }
+        .card()
+    }
+    private func addExtra() {
+        guard let amt = Double(nxAmount), amt != 0 else { return }
+        var arr = store.blob.data[bm]?["extraIncome"]?.array ?? []
+        arr.append(.object(["id": .number(Date().timeIntervalSince1970 * 1000), "note": .string(nxNote.isEmpty ? "Extra money" : nxNote), "amount": .number(amt)]))
+        store.setMonth(bm, "extraIncome", .array(arr))
+        nxNote = ""; nxAmount = ""
+    }
+    private func removeExtra(_ id: Double) {
+        let arr = (store.blob.data[bm]?["extraIncome"]?.array ?? []).filter { $0.d("id") != id }
+        store.setMonth(bm, "extraIncome", .array(arr))
     }
 
     // MARK: Fixed expenses

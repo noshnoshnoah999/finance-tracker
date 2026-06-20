@@ -252,7 +252,10 @@ struct Calc {
         return s
     }
 
-    func income(_ mk: String) -> Double { monthlyPay(mk) + dadFree(mk) }
+    /// Extra money (gifts, Dad's pocket money, etc.) — non-pay income, NOT taxable.
+    func extraIncome(_ mk: String) -> Double { month(mk).arr("extraIncome").reduce(0) { $0 + $1.d("amount") } }
+
+    func income(_ mk: String) -> Double { monthlyPay(mk) + dadFree(mk) + extraIncome(mk) }
     func freeToSpend(_ mk: String) -> Double { income(mk) - spending(mk) }
 
     /// Bills (ids) shown on the Home progress, excluding skipped and zero skin/savings.
@@ -334,7 +337,7 @@ struct Calc {
     }
 
     private var elapsedKeys: [String] { MONTHS.enumerated().filter { $0.offset < currentMonthNumber }.map { $0.element.key } }
-    var passbookYearIn: Double { elapsedKeys.reduce(0) { $0 + monthlyPay($1) } }
+    var passbookYearIn: Double { elapsedKeys.reduce(0) { $0 + monthlyPay($1) + extraIncome($1) } }
     var passbookYearOut: Double { elapsedKeys.reduce(0) { $0 + passbookOut($1) } }
 }
 

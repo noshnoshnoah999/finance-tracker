@@ -156,8 +156,9 @@ struct HomeView: View {
         let cmk = clampMK(String(format: "%04d-%02d", cal.component(.year, from: now), cal.component(.month, from: now)))
         let pay = c.monthlyPay(cmk)
         let dad = c.dadFree(cmk)
+        let extra = c.extraIncome(cmk)
         let spend = c.spending(cmk)
-        let free = pay + dad - spend
+        let free = pay + dad + extra - spend
         let label = monthMeta(cmk)?.label ?? ""
         let billCount = c.homeBillIds(cmk).count
         let paid = c.paidCount(cmk)
@@ -173,6 +174,7 @@ struct HomeView: View {
             VStack(spacing: 6) {
                 lineRow("Income", yen(pay))
                 if dad > 0 { lineRow("From Dad", "+" + yen(dad)) }
+                if extra > 0 { lineRow("Extra money", "+" + yen(extra)) }
                 lineRow("Bills & spending", "−" + yen(spend))
             }
             Divider().overlay(T.border)

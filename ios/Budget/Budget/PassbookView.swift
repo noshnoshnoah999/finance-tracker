@@ -114,7 +114,7 @@ struct PassbookView: View {
     // MARK: Statement
     @ViewBuilder private func statement(_ c: Calc) -> some View {
         let real = c.hasRealTxns(pbm)
-        let inT = c.monthlyPay(pbm)
+        let inT = c.monthlyPay(pbm) + c.extraIncome(pbm)
         let outT = c.passbookOut(pbm)
         let expenses = real ? c.spending(pbm) : 0   // real months: also subtract ALL budgeted bills + one-offs
         let net = inT - outT - expenses
@@ -161,8 +161,9 @@ struct PassbookView: View {
                 line("Wage", yen(c.wage(pbm)))
                 if c.paidLeaveYen(pbm) > 0 { line("Paid leave", yen(c.paidLeaveYen(pbm)), T.blueD) }
                 line("Transport", yen(c.transport(pbm)))
+                if c.extraIncome(pbm) > 0 { line("Extra money", yen(c.extraIncome(pbm)), T.greenD) }
                 Divider().overlay(T.border)
-                line("Monthly pay", yen(inT), T.greenD, bold: true)
+                line("Money in", yen(inT), T.greenD, bold: true)
             } else {
                 Text("No pay logged for \(label) yet — add hours in the Wage tab.").font(.footnote).foregroundStyle(T.muted)
             }
