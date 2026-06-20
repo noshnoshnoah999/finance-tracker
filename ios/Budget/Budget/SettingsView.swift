@@ -109,6 +109,9 @@ struct SettingsView: View {
             Text("Built-in lines on the Fixed Expenses list. Turn off any you track elsewhere.").font(.caption2).foregroundStyle(T.sub)
             toggleRow("Skin Treatment", "showSkin")
             toggleRow("General Savings", "showGenSav")
+            if store.blob.settings["showGenSav"]?.bool != false {
+                field("General savings — monthly amount", "¥", set("genSavAmount"))
+            }
         }
     }
     @ViewBuilder private func schedule(_ c: Calc) -> some View {

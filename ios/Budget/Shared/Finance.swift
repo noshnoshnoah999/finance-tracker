@@ -24,6 +24,7 @@ struct Calc {
     var workDays: [Int] { se["workDays"]?.array?.compactMap { $0.int } ?? DS.workDays }
     var showSkin: Bool { se["showSkin"]?.bool != false }
     var showGenSav: Bool { se["showGenSav"]?.bool != false }
+    var genSavAmount: Double { se.d("genSavAmount") }
     var fixed: [JSONValue] { se.arr("fixed") }
     var subItems: [JSONValue] { se.arr("subItems") }
 
@@ -238,7 +239,7 @@ struct Calc {
             .reduce(0) { $0 + ($1.d("gbp") * gbpToJpy).rounded() }
     }
     func skin(_ mk: String) -> Double { showSkin ? month(mk).d("skinTreatment") : 0 }
-    func genSav(_ mk: String) -> Double { showGenSav ? month(mk).d("generalSavings") : 0 }
+    func genSav(_ mk: String) -> Double { showGenSav ? genSavAmount : 0 }
 
     /// Total budgeted spending for a month, excluding skipped fixed lines (mirror cmSpending).
     func spending(_ mk: String) -> Double {
