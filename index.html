@@ -100,7 +100,7 @@
       {id:"d3",note:"Lunch money",gbp:25},{id:"d4",note:"Student loan",gbp:150},
       {id:"d5",note:"Commuter pass",gbp:50},{id:"d6",note:"Japanese lessons",gbp:25},
     ];
-    const eM = () => ({hours:0,days:0,wageOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0,txns:[],extraIncome:[]});
+    const eM = () => ({hours:0,days:0,wageOverride:0,transportOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0,txns:[],extraIncome:[]});
     // Category display: emoji + label for imported passbook transactions
     const TX_CATS={income:["💰","Income"],food:["🍜","Food"],transport:["🚇","Transport"],subscriptions:["🔁","Subscriptions"],shopping:["🛍️","Shopping"],bills:["📄","Bills"],savings:["🏦","Savings"],investment:["📈","Investment"],fees:["⚠️","Fees"],transfer:["↔️","Transfer"],cash:["💴","Cash"],other:["•","Other"]};
     const txKey=t=>`${t.date}|${(t.description||"").trim()}|${t.amount}|${t.direction}|${t.ref||""}`;
@@ -365,11 +365,16 @@
       const trf=k=>k<="2026-03"?se.trBefore:se.trAfter;
       // Manual pay override wins whenever it's set (>0), even with hours logged —
       // so you can drop in the actual payslip figure. Falls back to hours × rate.
-      const gW=d=>(d.wageOverride>0)?d.wageOverride:(d.hours>0?Math.round(d.hours*se.hourlyWage):0);
-      const gTr=(d,k)=>d.days*trf(k);
+      // Override = the TOTAL received (incl. transport). gW is the base portion (override − transport),
+      // gTr is the transport portion you entered. So gW+gTr = override (transport NOT added on top).
+      const gW=d=>(d.wageOverride>0)?Math.max(0,d.wageOverride-(d.transportOverride||0)):(d.hours>0?Math.round(d.hours*se.hourlyWage):0);
+      const gTr=(d,k)=>(d.wageOverride>0)?(d.transportOverride||0):d.days*trf(k);
       const gPrevMK=mk=>{const i=MONTHS.findIndex(x=>x.key===mk);return i>0?MONTHS[i-1].key:null;};
       const gShifts=mk=>{const ov=da[mk]?.shiftOverrides||{};const r={};Object.keys(se.shifts||{}).forEach(d=>{r[d]=ov[d]?{...se.shifts[d],...ov[d]}:se.shifts[d];});return r;};
-      const gTx=(d,mk)=>{if(d.wageOverride>0)return gW(d);const pmk=gPrevMK(mk);const plH=pmk&&d.hours>0?gPLHours(pmk,da[pmk]?.customDays,gShifts(pmk),se.workDays):0;return gW(d)+Math.round(plH*se.hourlyWage);};
+      // Paid leave is paid in the NEXT month's payslip — so it shows regardless of whether
+      // this month's hours are logged yet. Override months already include it, so skip them.
+      const gPLW=mk=>{const d=da[mk]||eM();if(d.wageOverride>0)return 0;const pmk=gPrevMK(mk);if(!pmk)return 0;return Math.round(gPLHours(pmk,da[pmk]?.customDays,gShifts(pmk),se.workDays)*se.hourlyWage);};
+      const gTx=(d,mk)=>(d.wageOverride>0)?gW(d):gW(d)+gPLW(mk);
       const dTJ=d=>(d.dadItems||[]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
       // Extra money (gifts, dad's pocket money, etc.) — non-pay income, NOT taxable.
       const extraInc=mk=>{const d=da[mk];return((d&&d.extraIncome)||[]).reduce((s,x)=>s+(x.amount||0),0);};
@@ -437,7 +442,7 @@
 
       const bd=da[bm]||eM();
       const bdW=gW(bd),bdTr=gTr(bd,bm),bdCm=bd.suicaOverride!=null?bd.suicaOverride:gCm(bd,bm);const bdSI=gSuicaInfo(bm);
-      const bdPrevMK=gPrevMK(bm);const bdPLH=bd.hours>0&&bdPrevMK?gPLHours(bdPrevMK,da[bdPrevMK]?.customDays,gShifts(bdPrevMK),se.workDays):0;const bdPLW=Math.round(bdPLH*se.hourlyWage);
+      const bdPrevMK=gPrevMK(bm);const bdPLH=(bd.wageOverride>0)?0:(bdPrevMK?gPLHours(bdPrevMK,da[bdPrevMK]?.customDays,gShifts(bdPrevMK),se.workDays):0);const bdPLW=Math.round(bdPLH*se.hourlyWage);
       const bdDJ=dTJ(bd),bdDJFree=(bd.dadItems||[]).filter(x=>(se.dadFreeSpend||{})[x.id]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0),bdI=bdW+bdTr,bdFd=bd.foodOverride!=null?bd.foodOverride:fF(bm),bdSkin=(se.showSkin!==false)?(bd.skinTreatment||0):0,bdGenSav=genSavM(bm);
       const bdMC=bd.mumChecked||[],bdPF=bd.paidFixed||{},bdPOO=bd.paidOneOffs||{},bdSF=bd.skippedFixed||{},bdFA=bd.fixedAmounts||{};
       const mIdx=mk=>MONTHS.findIndex(x=>x.key===mk);
@@ -445,6 +450,12 @@
       const subIncluded=(it,mk)=>{const o=(da[mk]?.subInc||{})[it.id];return o===undefined?subScheduled(it,mk):o;};
       const subTotal=mk=>(se.subItems||[]).filter(it=>subIncluded(it,mk)&&(it.payer||"me")!=="dad").reduce((s,it)=>s+(it.price||0),0);
       const subTotalDad=mk=>(se.subItems||[]).filter(it=>subIncluded(it,mk)&&(it.payer||"me")==="dad").reduce((s,it)=>s+(it.price||0),0);
+      // Bills that DON'T appear as card transactions (fixed + skin + savings + one-offs).
+      const nonCardBills=mk=>{const d=da[mk]||eM();let s=0;(se.fixed||[]).forEach(f=>{if((d.skippedFixed||{})[f.id])return;s+=f.sub?subTotal(mk):f.variable?((d.fixedAmounts||{})[f.id]||0):f.amount;});if(se.showSkin!==false)s+=(d.skinTreatment||0);s+=genSavM(mk);(d.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;};
+      // Single source of truth for "money out this month" — used by BOTH Home and Passbook so they agree.
+      // Real (imported) months: non-card bills + actual card spending (card already covers food/transport).
+      // Estimated months: the full budget (non-card bills + budgeted food + suica).
+      const monthOut=mk=>{const tx=(da[mk]?.txns)||[];if(tx.length>0){return nonCardBills(mk)+tx.filter(t=>t.direction==="out").reduce((s,t)=>s+(Number(t.amount)||0),0);}const d=da[mk]||eM();return nonCardBills(mk)+(d.suicaOverride!=null?d.suicaOverride:gCm(d,mk))+(d.foodOverride!=null?d.foodOverride:fF(mk));};
       const fxAmt=f=>f.sub?subTotal(bm):(f.variable?(bdFA[f.id]||0):f.amount);
       const bdFC=se.fixed.filter(f=>!bdSF[f.id]).reduce((s,f)=>s+fxAmt(f),0);
       const bdFT=bdFC+bdCm+bdFd+bdSkin+bdGenSav;
@@ -470,7 +481,8 @@
       const cmPayOnly=gTx(cmd,cmk)+gTr(cmd,cmk);
       const cmSpending=(()=>{let s=0;se.fixed.forEach(f=>{if(!cmSF[f.id])s+=cmFx(f);});s+=cmCm+cmFd+cmSkin+cmGenSav;(cmd.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;})();
       const cmExtra=extraInc(cmk);
-      const cmFree=cmPayOnly+cmDadFree+cmExtra-cmSpending;
+      const cmOut=monthOut(cmk);
+      const cmFree=cmPayOnly+cmDadFree+cmExtra-cmOut;
       const cmFreeD=useCountUp(cmFree);
       const bdLeftPay=(()=>{let u=0;se.fixed.forEach(f=>{if(!cmSF[f.id]&&!cmPF[f.id])u+=cmFx(f);});if(!cmPF["suica"])u+=cmCm;if(!cmPF["food"])u+=cmFd;if(!cmPF["skinTreatment"])u+=cmSkin;if(!cmPF["generalSavings"])u+=cmGenSav;return u;})();
       const homeBillIds=[...se.fixed.filter(f=>!cmSF[f.id]).map(f=>f.id),"suica","food",...(se.showSkin!==false&&cmSkin>0?["skinTreatment"]:[]),...(se.showGenSav!==false&&cmGenSav>0?["generalSavings"]:[])];
@@ -832,7 +844,7 @@
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Income</span><span style={{fontWeight:600,color:c.text}}>{yn(cmPayOnly)}</span></div>
                     {cmDadFree>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>From Dad</span><span style={{fontWeight:600,color:c.text}}>+{yn(cmDadFree)}</span></div>}
                     {cmExtra>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Extra money</span><span style={{fontWeight:600,color:c.text}}>+{yn(cmExtra)}</span></div>}
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Bills & spending</span><span style={{fontWeight:600,color:c.text}}>−{yn(cmSpending)}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Bills & spending</span><span style={{fontWeight:600,color:c.text}}>−{yn(cmOut)}</span></div>
                   </div>
                   <div style={{paddingTop:12,borderTop:`1px solid ${c.border}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:c.sub,marginBottom:6}}><span>Bills paid</span><span style={{fontWeight:600,color:bdLeftPay>0?c.lavD:c.greenD}}>{homePaidCount} of {homeBillCount}{bdLeftPay>0?` · ${yn(bdLeftPay)} left`:" · all done ✓"}</span></div>
@@ -969,7 +981,8 @@
                         </div>
                         <div style={{fontSize:11,color:c.sub,marginTop:6}}>= {d.hours>0?d.hours.toFixed(4)+"h":"0h"} × {yn(se.hourlyWage)} = {yn(Math.round(d.hours*se.hourlyWage))}</div>
                       </div>
-                      <div style={{marginTop:12}}><label style={lbl}>Actual pay — override</label><NI prefix="¥" value={d.wageOverride} onChange={v=>sM(mo.key,"wageOverride",v)}/><div style={{fontSize:11,color:c.sub,marginTop:6}}>{d.wageOverride>0?`Using your manual figure (replaces the hours calc). Transport ${yn(tr)} added on top → ${yn(tx+tr)}.`:"Optional — enter the real base pay from your payslip to override the hours calc."}{d.wageOverride>0&&<button onClick={()=>sM(mo.key,"wageOverride",0)} style={{marginLeft:8,border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer",fontFamily:mn,textDecoration:"underline"}}>reset</button>}</div></div>
+                      <div style={{marginTop:12}}><label style={lbl}>Actual pay — override</label><NI prefix="¥" value={d.wageOverride} onChange={v=>sM(mo.key,"wageOverride",v)}/><div style={{fontSize:11,color:c.sub,marginTop:6}}>{d.wageOverride>0?`This is the TOTAL you received — transport is included, not added on top.`:"Optional — enter the real total from your payslip to override the hours calc."}{d.wageOverride>0&&<button onClick={()=>{sM(mo.key,"wageOverride",0);sM(mo.key,"transportOverride",0);}} style={{marginLeft:8,border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer",fontFamily:mn,textDecoration:"underline"}}>reset</button>}</div>
+                      {d.wageOverride>0&&<div style={{marginTop:10}}><label style={lbl}>…of which transport</label><NI prefix="¥" value={d.transportOverride||0} onChange={v=>sM(mo.key,"transportOverride",v)}/><div style={{fontSize:11,color:c.sub,marginTop:6}}>How much of the {yn(d.wageOverride)} was transport (for the breakdown — doesn't change the total). Base pay = {yn(Math.max(0,d.wageOverride-(d.transportOverride||0)))}.</div></div>}</div>
                       <div style={{marginTop:12}}><label style={lbl}>Days Worked</label><NI value={d.days} onChange={v=>sM(mo.key,"days",v)}/></div>
                       <div style={{marginTop:14,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
                         <div style={rw}><span style={{color:c.sub}}>Wage {hH?`(${d.hours}h × ${yn(se.hourlyWage)})`:"(manual)"}</span><span style={{fontWeight:600}}>{yn(wage)}</span></div>
@@ -1201,10 +1214,10 @@
                   const real=pbHasReal(pbm);
                   const wage=gW(d),tr=gTr(d,pbm);
                   const pmk=gPrevMK(pbm);
-                  const plH=d.hours>0&&pmk?gPLHours(pmk,da[pmk]?.customDays,gShifts(pmk),se.workDays):0;
+                  const plH=(d.wageOverride>0)?0:(pmk?gPLHours(pmk,da[pmk]?.customDays,gShifts(pmk),se.workDays):0);
                   const plW=Math.round(plH*se.hourlyWage);
                   const inTotal=pbPay(pbm),outTotal=pbOut(pbm);
-                  const expenses=real?pbBudgetOut(pbm):0;   // real months: also subtract ALL budgeted bills + one-offs
+                  const expenses=real?nonCardBills(pbm):0;   // real months: card already covers food/transport; add only non-card bills
                   const net=inTotal-outTotal-expenses;
                   const cats=pbCats(pbm);
                   const txs=pbTx(pbm).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
@@ -1224,7 +1237,7 @@
                       </div>
                       {expenses>0&&(
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 4px",fontSize:13}}>
-                          <span style={{color:c.sub}}>Bills &amp; expenses <span style={{fontSize:11,color:c.muted}}>(fixed, food, savings, one-offs)</span></span>
+                          <span style={{color:c.sub}}>Bills &amp; expenses <span style={{fontSize:11,color:c.muted}}>(fixed, savings, one-offs — food/transport are in your card spending)</span></span>
                           <span style={{fontWeight:700,color:c.text}}>−{yn(expenses)}</span>
                         </div>
                       )}
