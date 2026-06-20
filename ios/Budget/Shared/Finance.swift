@@ -124,11 +124,15 @@ struct Calc {
 
     func wage(_ mk: String) -> Double {
         let d = month(mk)
-        // Manual override wins whenever set (>0), even with hours logged.
-        if d.d("wageOverride") > 0 { return d.d("wageOverride") }
+        // Override = the TOTAL received (incl. transport); base = total − transport.
+        if d.d("wageOverride") > 0 { return max(0, d.d("wageOverride") - d.d("transportOverride")) }
         return d.d("hours") > 0 ? (d.d("hours") * hourlyWage).rounded() : 0
     }
-    func transport(_ mk: String) -> Double { month(mk).d("days") * transportRate(mk) }
+    func transport(_ mk: String) -> Double {
+        let d = month(mk)
+        if d.d("wageOverride") > 0 { return d.d("transportOverride") }   // the portion you entered, not added on top
+        return d.d("days") * transportRate(mk)
+    }
 
     func prevMK(_ mk: String) -> String? {
         guard let i = MONTHS.firstIndex(where: { $0.key == mk }), i > 0 else { return nil }
@@ -136,16 +140,17 @@ struct Calc {
     }
     /// Taxable income for a month = this month's wage + last month's paid leave (paid in arrears).
     func taxable(_ mk: String) -> Double {
-        // A manual override is the full taxable pay (payslip base pay already
-        // includes paid leave) — don't add paid-leave wage on top.
+        // A manual override is the full pay (already includes paid leave) — don't add it on top.
         if month(mk).d("wageOverride") > 0 { return wage(mk) }
+        // Paid leave is paid in the NEXT month, so show it regardless of this month's hours.
         var pl = 0.0
-        if month(mk).d("hours") > 0, let p = prevMK(mk) { pl = plHours(p) }
+        if let p = prevMK(mk) { pl = plHours(p) }
         return wage(mk) + (pl * hourlyWage).rounded()
     }
     /// Paid-leave yen credited into this month's paycheck (for display).
     func paidLeaveYen(_ mk: String) -> Double {
-        guard month(mk).d("hours") > 0, let p = prevMK(mk) else { return 0 }
+        if month(mk).d("wageOverride") > 0 { return 0 }
+        guard let p = prevMK(mk) else { return 0 }
         return (plHours(p) * hourlyWage).rounded()
     }
 
@@ -255,8 +260,29 @@ struct Calc {
     /// Extra money (gifts, Dad's pocket money, etc.) — non-pay income, NOT taxable.
     func extraIncome(_ mk: String) -> Double { month(mk).arr("extraIncome").reduce(0) { $0 + $1.d("amount") } }
 
+    /// Bills that don't appear as card transactions (fixed + skin + savings + one-offs).
+    func nonCardBills(_ mk: String) -> Double {
+        let d = month(mk)
+        let skipped = d["skippedFixed"]?.object ?? [:]
+        var s = 0.0
+        for f in fixed where skipped[idStr(f["id"])]?.bool != true { s += fixedAmount(f, mk) }
+        s += skin(mk) + genSav(mk)
+        for o in d.arr("oneOffs") where o["mumPays"]?.bool != true { s += o.d("amount") }
+        return s
+    }
+    /// Single source of truth for "money out" — used by Home and Passbook so they agree.
+    /// Real months: non-card bills + actual card spending. Estimated: full budget.
+    func monthOut(_ mk: String) -> Double {
+        let tx = month(mk).arr("txns")
+        if !tx.isEmpty {
+            let card = tx.filter { $0.s("direction") == "out" }.reduce(0) { $0 + $1.d("amount") }
+            return nonCardBills(mk) + card
+        }
+        return spending(mk)
+    }
+
     func income(_ mk: String) -> Double { monthlyPay(mk) + dadFree(mk) + extraIncome(mk) }
-    func freeToSpend(_ mk: String) -> Double { income(mk) - spending(mk) }
+    func freeToSpend(_ mk: String) -> Double { income(mk) - monthOut(mk) }
 
     /// Bills (ids) shown on the Home progress, excluding skipped and zero skin/savings.
     func homeBillIds(_ mk: String) -> [String] {

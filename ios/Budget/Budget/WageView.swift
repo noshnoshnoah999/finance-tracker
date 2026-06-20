@@ -94,9 +94,16 @@ struct WageView: View {
                     TextField("0", value: dbl(mo.key, "wageOverride"), format: .number)
                         .modifier(FieldStyle()).keyboardType(.numberPad)
                     Text(d.d("wageOverride") > 0
-                         ? "Using your manual figure — replaces the hours calc; transport is added on top."
-                         : "Optional — enter the real base pay from your payslip to override the hours calc.")
+                         ? "This is the TOTAL you received — transport is included, not added on top."
+                         : "Optional — enter the real total from your payslip to override the hours calc.")
                         .font(.caption2).foregroundStyle(T.sub)
+                    if d.d("wageOverride") > 0 {
+                        fieldLabel("…of which transport")
+                        TextField("0", value: dbl(mo.key, "transportOverride"), format: .number)
+                            .modifier(FieldStyle()).keyboardType(.numberPad)
+                        Text("How much of the \(yen(d.d("wageOverride"))) was transport (breakdown only — doesn't change the total). Base pay = \(yen(max(0, d.d("wageOverride") - d.d("transportOverride")))).")
+                            .font(.caption2).foregroundStyle(T.sub)
+                    }
 
                     fieldLabel("Days worked")
                     TextField("0", value: dbl(mo.key, "days"), format: .number)
@@ -108,7 +115,7 @@ struct WageView: View {
                         if d.d("wageOverride") <= 0 && c.paidLeaveYen(mo.key) > 0 {
                             breakdownRow("Paid leave", yen(c.paidLeaveYen(mo.key)), color: T.blueD)
                         }
-                        breakdownRow("Transport (\(Int(d.d("days")))d)", yen(tr), bold: false)
+                        breakdownRow(d.d("wageOverride") > 0 ? "Transport" : "Transport (\(Int(d.d("days")))d)", yen(tr), bold: false)
                         Divider().overlay(T.border)
                         breakdownRow("Total pay", yen(total), bold: true)
                     }

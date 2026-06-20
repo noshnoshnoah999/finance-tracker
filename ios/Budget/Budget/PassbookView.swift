@@ -116,7 +116,7 @@ struct PassbookView: View {
         let real = c.hasRealTxns(pbm)
         let inT = c.monthlyPay(pbm) + c.extraIncome(pbm)
         let outT = c.passbookOut(pbm)
-        let expenses = real ? c.spending(pbm) : 0   // real months: also subtract ALL budgeted bills + one-offs
+        let expenses = real ? c.nonCardBills(pbm) : 0   // card already covers food/transport; add only non-card bills
         let net = inT - outT - expenses
         let label = monthMeta(pbm)?.label ?? ""
 
@@ -137,7 +137,7 @@ struct PassbookView: View {
             if expenses > 0 {
                 HStack(spacing: 6) {
                     Text("Bills & expenses").foregroundStyle(T.sub)
-                    Text("(fixed, food, savings, one-offs)").font(.caption2).foregroundStyle(T.muted)
+                    Text("(fixed, savings, one-offs)").font(.caption2).foregroundStyle(T.muted)
                     Spacer()
                     Text("−\(yen(expenses))").fontWeight(.bold).foregroundStyle(T.text)
                 }.font(.footnote)

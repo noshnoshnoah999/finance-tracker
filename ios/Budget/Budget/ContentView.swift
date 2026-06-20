@@ -157,7 +157,7 @@ struct HomeView: View {
         let pay = c.monthlyPay(cmk)
         let dad = c.dadFree(cmk)
         let extra = c.extraIncome(cmk)
-        let spend = c.spending(cmk)
+        let spend = c.monthOut(cmk)
         let free = pay + dad + extra - spend
         let label = monthMeta(cmk)?.label ?? ""
         let billCount = c.homeBillIds(cmk).count
