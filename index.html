@@ -25,7 +25,7 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
-    body { margin: 0; background: #b38f57; }
+    body { margin: 0; background: #f6f7f9; }
     input, button { touch-action: manipulation; font-family: inherit; }
     ::-webkit-scrollbar { display: none; }
     @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 1000px; opacity: 1; } }
@@ -136,7 +136,9 @@
     const LATTE={bg:"linear-gradient(180deg,#c4a778 0%,#b38f57 50%,#9e7842 100%)",card:"rgba(243,231,210,0.52)",cardAlt:"rgba(228,210,180,0.6)",border:"rgba(255,248,232,0.38)",text:"#2a1c0e",sub:"#7d5f3a",muted:"#9c7e54",greenD:"#5a7330",green:"#7a9442",greenBg:"rgba(110,140,55,0.22)",blueD:"#b5763a",blue:"#cf9a5e",blueBg:"rgba(181,118,58,0.18)",lavD:"#9a6230",lavBg:"rgba(154,98,48,0.18)",peachD:"#a85d28",peach:"#c98748",peachBg:"rgba(168,93,40,0.18)",roseD:"#bb4a68",rose:"#d9779a",roseBg:"rgba(187,74,104,0.18)",white:"#ffffff",accent:"#643f1f"};
     // StudyTrack "Coffee" — warm dark browns + one bold orange accent (green=positive, red=negative).
     const COFFEE={bg:"#160e06",card:"#211508",cardAlt:"#2c1e0e",border:"rgba(249,115,22,0.14)",text:"#f5ede4",sub:"#c0916a",muted:"#8a5c38",greenD:"#00c896",green:"#2fd3a8",greenBg:"rgba(0,200,150,0.16)",blueD:"#f97316",blue:"#fb923c",blueBg:"rgba(249,115,22,0.18)",lavD:"#f97316",lavBg:"rgba(249,115,22,0.18)",peachD:"#e86a10",peach:"#fb923c",peachBg:"rgba(249,115,22,0.18)",roseD:"#ff4d6a",rose:"#ff6b82",roseBg:"rgba(255,77,106,0.16)",white:"#ffffff",accent:"#f97316"};
-    const _t={c:LATTE};
+    // Clean Light + Indigo — crisp white/soft-grey, calm indigo accent, emerald=positive, red=negative.
+    const INDIGO={bg:"#f6f7f9",card:"#ffffff",cardAlt:"#eef0f5",border:"#e4e7ef",text:"#16181f",sub:"#6b7180",muted:"#9aa0b0",greenD:"#10b981",green:"#34d399",greenBg:"rgba(16,185,129,0.12)",blueD:"#6366f1",blue:"#818cf8",blueBg:"rgba(99,102,241,0.12)",lavD:"#8b5cf6",lavBg:"rgba(139,92,246,0.12)",peachD:"#f59e0b",peach:"#fbbf24",peachBg:"rgba(245,158,11,0.12)",roseD:"#ef4444",rose:"#f87171",roseBg:"rgba(239,68,68,0.12)",white:"#ffffff",accent:"#6366f1"};
+    const _t={c:INDIGO};
 
     function PaidBtn({paid,onToggle}){const c=_t.c;return(<button onClick={onToggle} style={{width:24,height:24,borderRadius:12,border:`2px solid ${paid?c.greenD:c.border}`,background:paid?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:12,fontWeight:700,padding:0,flexShrink:0}}>{paid?"✓":""}</button>);}
 
@@ -199,7 +201,7 @@
       const [simAdvice,setSimAdvice]=useState(null);
       const [simLoading,setSimLoading]=useState(false);
       const [simErr,setSimErr]=useState("");
-      const [th,setTh]=useState(CACHED&&CACHED.theme?CACHED.theme:"latte");
+      const [th,setTh]=useState(CACHED&&CACHED.theme?CACHED.theme:"indigo");
       const [nM,setNM]=useState({name:"",amount:""});
       const [eMI,setEMI]=useState(null);
       const [sv,setSv]=useState(false);
@@ -230,7 +232,7 @@
       const subscribePush=async()=>{try{if(!('serviceWorker' in navigator)||!('PushManager' in window))return;const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(VAPID_PUBLIC)});const js=sub.toJSON();setSe(p=>(JSON.stringify(p.pushSub||null)===JSON.stringify(js)?p:{...p,pushSub:js}));}catch(_){}};
       useEffect(()=>{if(ld&&se.notifs&&'Notification' in window&&Notification.permission==='granted')subscribePush();},[ld,se.notifs]);
 
-      _t.c=th==="ember"?EMBER:th==="sage"?SAGE:th==="coffee"?COFFEE:LATTE;
+      _t.c=th==="ember"?EMBER:th==="sage"?SAGE:th==="coffee"?COFFEE:th==="latte"?LATTE:INDIGO;
       const c=_t.c;
       const crd={background:c.card,borderRadius:24,padding:20,marginBottom:12,border:`1px solid ${c.border}`,boxShadow:"0 1px 2px rgba(70,45,20,0.05)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)"};
       const inp={fontSize:14,border:`1px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.cardAlt,fontWeight:500,fontFamily:mn};
@@ -276,7 +278,7 @@
       // One-time theme migration to the new Latte design (user can still switch afterwards)
       useEffect(()=>{
         if(!ld) return;
-        if(!se.themeLatteV2){setTh("latte");setSe(p=>({...p,themeLatteV2:true,themeMigrated:true}));}
+        if(!se.themeIndigo){setTh("indigo");setSe(p=>({...p,themeIndigo:true,themeMigrated:true}));}
       },[ld]);
 
       // Save
@@ -1993,7 +1995,7 @@
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.accent,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Theme</span></div>
                   <div style={{display:"flex",gap:10}}>
-                    {[{id:"coffee",label:"Coffee",col:"#f97316",bg:"#211508"},{id:"latte",label:"Latte",col:"#643f1f",bg:"#b38f57"},{id:"sage",label:"Sage",col:"#2d6a3e",bg:"#f0f5ee"},{id:"ember",label:"Ember",col:"#b85e2a",bg:"#f5efe8"}].map(t2=>(<button key={t2.id} onClick={()=>setTh(t2.id)} style={{flex:1,padding:"14px 0",borderRadius:14,border:th===t2.id?`3px solid ${t2.col}`:`2px solid ${c.border}`,background:t2.bg,cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:th===t2.id?700:500,color:t2.col,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{width:24,height:24,borderRadius:12,background:t2.col}}/>{t2.label}</button>))}
+                    {[{id:"indigo",label:"Indigo",col:"#6366f1",bg:"#f6f7f9"},{id:"coffee",label:"Coffee",col:"#f97316",bg:"#211508"},{id:"latte",label:"Latte",col:"#643f1f",bg:"#b38f57"},{id:"sage",label:"Sage",col:"#2d6a3e",bg:"#f0f5ee"},{id:"ember",label:"Ember",col:"#b85e2a",bg:"#f5efe8"}].map(t2=>(<button key={t2.id} onClick={()=>setTh(t2.id)} style={{flex:1,padding:"14px 0",borderRadius:14,border:th===t2.id?`3px solid ${t2.col}`:`2px solid ${c.border}`,background:t2.bg,cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:th===t2.id?700:500,color:t2.col,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{width:24,height:24,borderRadius:12,background:t2.col}}/>{t2.label}</button>))}
                   </div>
                 </div>
                 <button onPointerDown={()=>{setSv(true);setTimeout(()=>setSv(false),2000);}} style={{width:"100%",padding:16,border:"none",background:sv?c.green:c.greenD,color:c.white,borderRadius:14,fontFamily:ft,fontSize:14,fontWeight:700,cursor:"pointer",marginTop:8}}>{sv?"Saved!":"Save Settings"}</button>

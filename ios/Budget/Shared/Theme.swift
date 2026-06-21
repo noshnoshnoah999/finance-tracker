@@ -16,41 +16,41 @@ extension Color {
     }
 }
 
-/// The Latte theme — the app's warm light-tan default (matches StudyTrack's look).
+/// Clean Light + Indigo — crisp white/soft-grey, calm indigo accent (emerald = positive, red = negative).
 enum T {
-    static let bgTop    = Color(hex: "c4a778")
-    static let bgMid    = Color(hex: "b38f57")
-    static let bgBottom = Color(hex: "9e7842")
+    static let bgTop    = Color(hex: "f8f9fb")
+    static let bgMid    = Color(hex: "f6f7f9")
+    static let bgBottom = Color(hex: "eef0f5")
 
-    static let card    = Color(hex: "f3e7d2", opacity: 0.52)
-    static let cardAlt = Color(hex: "e4d2b4", opacity: 0.60)
-    static let border  = Color(hex: "fff8e8", opacity: 0.38)
+    static let card    = Color(hex: "ffffff")
+    static let cardAlt = Color(hex: "eef0f5")
+    static let border  = Color(hex: "e4e7ef")
 
-    static let text  = Color(hex: "2a1c0e")
-    static let sub   = Color(hex: "7d5f3a")
-    static let muted = Color(hex: "9c7e54")
+    static let text  = Color(hex: "16181f")
+    static let sub   = Color(hex: "6b7180")
+    static let muted = Color(hex: "9aa0b0")
 
-    static let greenD  = Color(hex: "5a7330")
-    static let green   = Color(hex: "7a9442")
-    static let greenBg = Color(hex: "6e8c37", opacity: 0.22)
+    static let greenD  = Color(hex: "10b981")
+    static let green   = Color(hex: "34d399")
+    static let greenBg = Color(hex: "10b981", opacity: 0.12)
 
-    static let blueD  = Color(hex: "b5763a")
-    static let blue   = Color(hex: "cf9a5e")
-    static let blueBg = Color(hex: "b5763a", opacity: 0.18)
+    static let blueD  = Color(hex: "6366f1")
+    static let blue   = Color(hex: "818cf8")
+    static let blueBg = Color(hex: "6366f1", opacity: 0.12)
 
-    static let lavD  = Color(hex: "9a6230")
-    static let lavBg = Color(hex: "9a6230", opacity: 0.18)
+    static let lavD  = Color(hex: "8b5cf6")
+    static let lavBg = Color(hex: "8b5cf6", opacity: 0.12)
 
-    static let peachD  = Color(hex: "a85d28")
-    static let peach   = Color(hex: "c98748")
-    static let peachBg = Color(hex: "a85d28", opacity: 0.18)
+    static let peachD  = Color(hex: "f59e0b")
+    static let peach   = Color(hex: "fbbf24")
+    static let peachBg = Color(hex: "f59e0b", opacity: 0.12)
 
-    static let roseD  = Color(hex: "bb4a68")
-    static let rose   = Color(hex: "d9779a")
-    static let roseBg = Color(hex: "bb4a68", opacity: 0.18)
+    static let roseD  = Color(hex: "ef4444")
+    static let rose   = Color(hex: "f87171")
+    static let roseBg = Color(hex: "ef4444", opacity: 0.12)
 
     static let white  = Color.white
-    static let accent = Color(hex: "643f1f")
+    static let accent = Color(hex: "6366f1")
 
     static var background: LinearGradient {
         LinearGradient(colors: [bgTop, bgMid, bgBottom], startPoint: .top, endPoint: .bottom)
