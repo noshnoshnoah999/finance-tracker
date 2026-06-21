@@ -131,7 +131,7 @@ struct Calc {
     func transport(_ mk: String) -> Double {
         let d = month(mk)
         if d.d("wageOverride") > 0 { return d.d("transportOverride") }   // the portion you entered, not added on top
-        return d.d("days") * transportRate(mk)
+        return Double(workDaysInMonth(mk)) * transportRate(mk)   // derive from the calendar (source of truth)
     }
 
     func prevMK(_ mk: String) -> String? {

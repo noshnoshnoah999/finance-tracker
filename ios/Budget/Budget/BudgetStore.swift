@@ -292,6 +292,13 @@ final class BudgetStore: ObservableObject {
         else if state == "none" { next = "work" }
         if let n = next { cd[ds] = .string(n) } else { cd[ds] = nil }
         m["customDays"] = .object(cd)
+        // Keep the stored work-day count in sync with the calendar (drives transport).
+        var wd = 0
+        for dd in 1...c.daysIn(mk) {
+            let dsi = String(format: "%04d-%02d-%02d", y, mo, dd)
+            if c.dayState(dsi, y, mo, dd, .object(cd)) == "work" { wd += 1 }
+        }
+        m["days"] = .number(Double(wd))
         blob.data[mk] = m
         persist()
     }
