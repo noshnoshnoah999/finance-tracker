@@ -25,7 +25,7 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
-    body { margin: 0; background: #160e06; }
+    body { margin: 0; background: #b38f57; }
     input, button { touch-action: manipulation; font-family: inherit; }
     ::-webkit-scrollbar { display: none; }
     @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 1000px; opacity: 1; } }
@@ -133,10 +133,10 @@
     const SAGE={bg:"#f0f5ee",card:"#e4ebe1",cardAlt:"#d8e2d4",border:"#c8d4c3",text:"#1a1f18",sub:"#5a6656",muted:"#8a9685",greenD:"#2d6a3e",green:"#4a9960",greenBg:"#c8e6cf",blueD:"#3a6b8a",blue:"#6ba3c4",blueBg:"#c4dde8",lavD:"#6a5a8a",lavBg:"#d8d0e6",peachD:"#a87040",peach:"#d4a06a",peachBg:"#eedcc8",roseD:"#a84040",rose:"#d47070",roseBg:"#ecd0d0",white:"#ffffff",accent:"#2d6a3e"};
     const EMBER={bg:"#f5efe8",card:"#ebe0d4",cardAlt:"#e0d2c2",border:"#d4c4b0",text:"#2a1f14",sub:"#6b5540",muted:"#9a8672",greenD:"#6a7a2d",green:"#8a9a4a",greenBg:"#dae6b8",blueD:"#7a5a3a",blue:"#a48060",blueBg:"#e8d8c4",lavD:"#8a5a4a",lavBg:"#e6d0c8",peachD:"#b85e2a",peach:"#d4884a",peachBg:"#f0dcc4",roseD:"#a83030",rose:"#d06050",roseBg:"#ecc8c4",white:"#ffffff",accent:"#b85e2a"};
     const PUMP={bg:"#1a2a33",card:"#233d4d",cardAlt:"#2c4a5c",border:"#3a5a6a",text:"#f0e6dc",sub:"#c8d8e0",muted:"#7a9aa8",greenD:"#fe7f2d",green:"#fea05a",greenBg:"#3a3020",blueD:"#fe7f2d",blue:"#fea05a",blueBg:"#33281a",lavD:"#e09040",lavBg:"#2a2818",peachD:"#fe7f2d",peach:"#fea05a",peachBg:"#33281a",roseD:"#e05050",rose:"#f07070",roseBg:"#3a2020",white:"#f0e6dc",accent:"#fe7f2d"};
-    const LATTE={bg:"linear-gradient(180deg,#c4a778 0%,#b38f57 50%,#9e7842 100%)",card:"rgba(243,231,210,0.52)",cardAlt:"rgba(228,210,180,0.6)",border:"rgba(255,248,232,0.38)",text:"#2a1c0e",sub:"#7d5f3a",muted:"#9c7e54",greenD:"#5a7330",green:"#7a9442",greenBg:"rgba(110,140,55,0.22)",blueD:"#4f5fd0",blue:"#7d8ae8",blueBg:"rgba(91,110,224,0.18)",lavD:"#6f5fd6",lavBg:"rgba(111,95,214,0.18)",peachD:"#a85d28",peach:"#c98748",peachBg:"rgba(168,93,40,0.18)",roseD:"#bb4a68",rose:"#d9779a",roseBg:"rgba(187,74,104,0.18)",white:"#ffffff",accent:"#643f1f"};
+    const LATTE={bg:"linear-gradient(180deg,#c4a778 0%,#b38f57 50%,#9e7842 100%)",card:"rgba(243,231,210,0.52)",cardAlt:"rgba(228,210,180,0.6)",border:"rgba(255,248,232,0.38)",text:"#2a1c0e",sub:"#7d5f3a",muted:"#9c7e54",greenD:"#5a7330",green:"#7a9442",greenBg:"rgba(110,140,55,0.22)",blueD:"#b5763a",blue:"#cf9a5e",blueBg:"rgba(181,118,58,0.18)",lavD:"#9a6230",lavBg:"rgba(154,98,48,0.18)",peachD:"#a85d28",peach:"#c98748",peachBg:"rgba(168,93,40,0.18)",roseD:"#bb4a68",rose:"#d9779a",roseBg:"rgba(187,74,104,0.18)",white:"#ffffff",accent:"#643f1f"};
     // StudyTrack "Coffee" — warm dark browns + one bold orange accent (green=positive, red=negative).
     const COFFEE={bg:"#160e06",card:"#211508",cardAlt:"#2c1e0e",border:"rgba(249,115,22,0.14)",text:"#f5ede4",sub:"#c0916a",muted:"#8a5c38",greenD:"#00c896",green:"#2fd3a8",greenBg:"rgba(0,200,150,0.16)",blueD:"#f97316",blue:"#fb923c",blueBg:"rgba(249,115,22,0.18)",lavD:"#f97316",lavBg:"rgba(249,115,22,0.18)",peachD:"#e86a10",peach:"#fb923c",peachBg:"rgba(249,115,22,0.18)",roseD:"#ff4d6a",rose:"#ff6b82",roseBg:"rgba(255,77,106,0.16)",white:"#ffffff",accent:"#f97316"};
-    const _t={c:COFFEE};
+    const _t={c:LATTE};
 
     function PaidBtn({paid,onToggle}){const c=_t.c;return(<button onClick={onToggle} style={{width:24,height:24,borderRadius:12,border:`2px solid ${paid?c.greenD:c.border}`,background:paid?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:12,fontWeight:700,padding:0,flexShrink:0}}>{paid?"✓":""}</button>);}
 
@@ -199,7 +199,7 @@
       const [simAdvice,setSimAdvice]=useState(null);
       const [simLoading,setSimLoading]=useState(false);
       const [simErr,setSimErr]=useState("");
-      const [th,setTh]=useState(CACHED&&CACHED.theme?CACHED.theme:"coffee");
+      const [th,setTh]=useState(CACHED&&CACHED.theme?CACHED.theme:"latte");
       const [nM,setNM]=useState({name:"",amount:""});
       const [eMI,setEMI]=useState(null);
       const [sv,setSv]=useState(false);
@@ -230,7 +230,7 @@
       const subscribePush=async()=>{try{if(!('serviceWorker' in navigator)||!('PushManager' in window))return;const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(VAPID_PUBLIC)});const js=sub.toJSON();setSe(p=>(JSON.stringify(p.pushSub||null)===JSON.stringify(js)?p:{...p,pushSub:js}));}catch(_){}};
       useEffect(()=>{if(ld&&se.notifs&&'Notification' in window&&Notification.permission==='granted')subscribePush();},[ld,se.notifs]);
 
-      _t.c=th==="ember"?EMBER:th==="sage"?SAGE:th==="latte"?LATTE:COFFEE;
+      _t.c=th==="ember"?EMBER:th==="sage"?SAGE:th==="coffee"?COFFEE:LATTE;
       const c=_t.c;
       const crd={background:c.card,borderRadius:24,padding:20,marginBottom:12,border:`1px solid ${c.border}`,boxShadow:"0 1px 2px rgba(70,45,20,0.05)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)"};
       const inp={fontSize:14,border:`1px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.cardAlt,fontWeight:500,fontFamily:mn};
@@ -276,7 +276,7 @@
       // One-time theme migration to the new Latte design (user can still switch afterwards)
       useEffect(()=>{
         if(!ld) return;
-        if(!se.coffeeApplied){setTh("coffee");setSe(p=>({...p,coffeeApplied:true,themeMigrated:true}));}
+        if(!se.themeLatteV2){setTh("latte");setSe(p=>({...p,themeLatteV2:true,themeMigrated:true}));}
       },[ld]);
 
       // Save

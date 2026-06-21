@@ -33,7 +33,7 @@ struct BudgetApp: App {
                 .environmentObject(store)
                 .environmentObject(lock)
                 .tint(T.accent)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
                 .overlay {
                     if lock.locked { LockView { lock.authenticate() } }
                 }
