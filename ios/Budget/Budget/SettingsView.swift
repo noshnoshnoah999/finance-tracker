@@ -109,6 +109,7 @@ struct SettingsView: View {
             Text("Built-in lines on the Fixed Expenses list. Turn off any you track elsewhere.").font(.caption2).foregroundStyle(T.sub)
             toggleRow("Skin Treatment", "showSkin")
             toggleRow("General Savings", "showGenSav")
+            toggleRow("Silver Investment", "showSilver")
             if store.blob.settings["showGenSav"]?.bool != false {
                 field("General savings — monthly amount", "¥", set("genSavAmount"))
             }

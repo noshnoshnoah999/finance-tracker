@@ -13,6 +13,8 @@ struct BudgetTabView: View {
     @State private var ooAmount = ""
     @State private var nxNote = ""
     @State private var nxAmount = ""
+    @State private var ndNote = ""
+    @State private var ndGbp = ""
 
     var body: some View {
         let c = store.calc
@@ -21,6 +23,7 @@ struct BudgetTabView: View {
                 monthChips()
                 calendarCard(c)
                 incomeCard(c)
+                dadCard(c)
                 extraMoneyCard(c)
                 fixedCard(c)
                 subCard(c)
@@ -138,6 +141,40 @@ struct BudgetTabView: View {
         .card()
     }
 
+    // MARK: Dad's Contributions (per-month £ items; repeat each month, amounts editable)
+    @ViewBuilder private func dadCard(_ c: Calc) -> some View {
+        let items = c.month(bm).arr("dadItems")
+        let rate = c.gbpToJpy
+        let free = store.blob.settings["dadFreeSpend"]?.object ?? [:]
+        let total = items.reduce(0.0) { $0 + $1.d("gbp") } * rate
+        VStack(alignment: .leading, spacing: 8) {
+            HStack { sectionHeader("Dad's Contributions", color: T.greenD); Spacer(); Text("£1 = ¥\(Int(rate))").font(.caption2).foregroundStyle(T.sub) }
+            Text("What Dad sends each month. Tap \u{201C}Free\u{201D} for money that's yours to spend (counts as income).").font(.caption2).foregroundStyle(T.sub)
+            ForEach(Array(items.enumerated()), id: \.offset) { _, it in
+                let id = c.idStr(it["id"])
+                let isFree = free[id]?.bool ?? false
+                HStack(spacing: 8) {
+                    TextField("Note", text: Binding(get: { it.s("note") }, set: { store.updateDadItem(bm, id, note: $0) })).font(.footnote)
+                    HStack(spacing: 2) { Text("£").foregroundStyle(T.sub).font(.caption2)
+                        TextField("0", value: Binding(get: { it.d("gbp") }, set: { store.updateDadItem(bm, id, gbp: $0) }), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 44)
+                    }
+                    Text(yen((it.d("gbp") * rate).rounded())).font(.caption2).fontWeight(.semibold).frame(width: 64, alignment: .trailing)
+                    Button(isFree ? "Free" : "Free?") { store.toggleDadFree(id) }
+                        .font(.system(size: 10, weight: .semibold)).foregroundStyle(isFree ? .white : T.muted)
+                        .padding(.horizontal, 7).padding(.vertical, 3).background(isFree ? T.greenD : T.cardAlt).clipShape(Capsule()).buttonStyle(.plain)
+                    Button { store.removeDadItem(bm, id) } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.roseD)
+                }
+            }
+            if !items.isEmpty { Divider().overlay(T.border); row("Total", yen(total.rounded()), bold: true, color: T.greenD) }
+            HStack(spacing: 8) {
+                TextField("Note (e.g. Pocket money)", text: $ndNote).modifier(FieldStyle())
+                HStack(spacing: 4) { Text("£").foregroundStyle(T.sub); TextField("0", text: $ndGbp).keyboardType(.numberPad) }.modifier(FieldStyle()).frame(width: 80)
+                Button { if let g = Double(ndGbp), g != 0 { store.addDadItem(bm, note: ndNote, gbp: g); ndNote = ""; ndGbp = "" } } label: { Image(systemName: "plus").fontWeight(.bold).foregroundStyle(.white).padding(10).background(T.greenD).clipShape(RoundedRectangle(cornerRadius: 10)) }.buttonStyle(.plain)
+            }
+        }
+        .card()
+    }
+
     // MARK: Extra money (gifts / Dad's pocket money — non-pay income)
     @ViewBuilder private func extraMoneyCard(_ c: Calc) -> some View {
         let items = c.month(bm).arr("extraIncome")
@@ -188,7 +225,8 @@ struct BudgetTabView: View {
             builtinRow(c, id: "suica", label: "SUICA (\(c.suicaDays(bm)) days)", amount: c.commute(bm))
             builtinRow(c, id: "food", label: "Food (\(monthMeta(bm)?.is5wk == true ? "5-wk" : "4-wk"))", amount: c.food(bm))
             if c.showSkin && c.skin(bm) > 0 { builtinRow(c, id: "skinTreatment", label: "Skin treatment", amount: c.skin(bm)) }
-            if c.showGenSav && c.genSavAmount > 0 { genSavRow(c) }
+            if c.showGenSav { genSavRow(c) }
+            if c.showSilver { silverRow(c) }
             Divider().overlay(T.border)
             row("Total fixed", yen(totalFixed(c)), bold: true, color: T.lavD)
             let left = c.leftToPay(bm)
@@ -279,9 +317,30 @@ struct BudgetTabView: View {
             Text("💰 General savings").foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted).strikethrough(paid)
             if !on { Text("· not saving").font(.caption2).foregroundStyle(T.muted) }
             Spacer()
-            Text(on ? yen(c.genSavAmount) : "—").fontWeight(.semibold).foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted)
-            Button(on ? "Don't save" : "Save this month") { store.setMonth(bm, "saveGen", .bool(!on)) }
+            if on {
+                TextField("0", value: Binding<Double>(
+                    get: { let ov = store.blob.data[bm]?["genSavAmt"]?.double ?? 0; return ov > 0 ? ov : c.genSavAmount },
+                    set: { store.setMonth(bm, "genSavAmt", .number($0)) }
+                ), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 80).modifier(FieldStyle())
+            } else {
+                Text("—").fontWeight(.semibold).foregroundStyle(T.muted)
+            }
+            Button(on ? "Skip" : "Save this month") { store.setMonth(bm, "saveGen", .bool(!on)) }
                 .font(.caption2).foregroundStyle(on ? T.muted : T.greenD).buttonStyle(.plain)
+        }
+        .font(.footnote)
+    }
+    @ViewBuilder private func silverRow(_ c: Calc) -> some View {
+        let inv = store.blob.data[bm]?["silverInvest"]?.double ?? 0
+        let usd = c.usdToJpy > 0 ? inv / c.usdToJpy : 0
+        HStack(spacing: 10) {
+            Text("🪙 Silver investment").foregroundStyle(inv > 0 ? T.text : T.muted)
+            if inv > 0 { Text("≈ $\(String(format: "%.2f", usd))").font(.caption2).foregroundStyle(T.sub) }
+            Spacer()
+            TextField("0", value: Binding<Double>(
+                get: { store.blob.data[bm]?["silverInvest"]?.double ?? 0 },
+                set: { store.setMonth(bm, "silverInvest", .number($0)) }
+            ), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 80).modifier(FieldStyle())
         }
         .font(.footnote)
     }
@@ -301,7 +360,7 @@ struct BudgetTabView: View {
         let skipped = d["skippedFixed"]?.object ?? [:]
         var s = 0.0
         for f in c.fixed where skipped[c.idStr(f["id"])]?.bool != true { s += c.fixedAmount(f, bm) }
-        s += c.commute(bm) + c.food(bm) + c.skin(bm) + c.genSav(bm)
+        s += c.commute(bm) + c.food(bm) + c.skin(bm) + c.genSav(bm) + c.silverInvest(bm)
         return s
     }
 

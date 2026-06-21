@@ -244,7 +244,18 @@ struct Calc {
             .reduce(0) { $0 + ($1.d("gbp") * gbpToJpy).rounded() }
     }
     func skin(_ mk: String) -> Double { showSkin ? month(mk).d("skinTreatment") : 0 }
-    func genSav(_ mk: String) -> Double { (showGenSav && month(mk)["saveGen"]?.bool == true) ? genSavAmount : 0 }
+    func genSav(_ mk: String) -> Double {
+        guard showGenSav, month(mk)["saveGen"]?.bool == true else { return 0 }
+        let ov = month(mk).d("genSavAmt")
+        return ov > 0 ? ov : genSavAmount
+    }
+    // Silver investment (¥) for a month — a budget outflow; syncs to the Silver page as USD.
+    var showSilver: Bool { se["showSilver"]?.bool != false }
+    func silverInvest(_ mk: String) -> Double { showSilver ? month(mk).d("silverInvest") : 0 }
+    func silverUsd(_ mk: String) -> Double {
+        let inv = silverInvest(mk)
+        return inv > 0 ? (inv / (se.d("usdToJpy", DS.usdToJpy))).rounded() : month(mk).d("silverUsd")
+    }
 
     /// Total budgeted spending for a month, excluding skipped fixed lines (mirror cmSpending).
     func spending(_ mk: String) -> Double {
@@ -252,7 +263,7 @@ struct Calc {
         let skipped = d["skippedFixed"]?.object ?? [:]
         var s = 0.0
         for f in fixed where skipped[idStr(f["id"])]?.bool != true { s += fixedAmount(f, mk) }
-        s += commute(mk) + food(mk) + skin(mk) + genSav(mk)
+        s += commute(mk) + food(mk) + skin(mk) + genSav(mk) + silverInvest(mk)
         for o in d.arr("oneOffs") where o["mumPays"]?.bool != true { s += o.d("amount") }
         return s
     }
@@ -266,7 +277,7 @@ struct Calc {
         let skipped = d["skippedFixed"]?.object ?? [:]
         var s = 0.0
         for f in fixed where skipped[idStr(f["id"])]?.bool != true { s += fixedAmount(f, mk) }
-        s += skin(mk) + genSav(mk)
+        s += skin(mk) + genSav(mk) + silverInvest(mk)
         for o in d.arr("oneOffs") where o["mumPays"]?.bool != true { s += o.d("amount") }
         return s
     }

@@ -117,7 +117,7 @@ struct SavingsView: View {
     // MARK: Silver
     @ViewBuilder private func silverSection(_ c: Calc) -> some View {
         let oz = MONTHS.reduce(0.0) { $0 + c.month($1.key).d("silverOz") }
-        let usdIn = MONTHS.reduce(0.0) { $0 + c.month($1.key).d("silverUsd") }
+        let usdIn = MONTHS.reduce(0.0) { $0 + c.silverUsd($1.key) }
         let avgCost = oz > 0 ? usdIn / oz : 0
         let spot = store.blob.settings["silverSpot"]?.double ?? 0
         let rate = store.blob.settings["usdToJpy"]?.double ?? DS.usdToJpy
@@ -156,7 +156,8 @@ struct SavingsView: View {
 
             // Per-month entries
             ForEach(MONTHS) { mo in
-                let mOz = c.month(mo.key).d("silverOz"), mUsd = c.month(mo.key).d("silverUsd")
+                let mOz = c.month(mo.key).d("silverOz"), mUsd = c.silverUsd(mo.key)
+                let fromBudget = c.silverInvest(mo.key) > 0
                 let isFut = mo.key > (MONTHS[safe: cMN - 1]?.key ?? "")
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
@@ -166,7 +167,12 @@ struct SavingsView: View {
                     }
                     HStack(spacing: 8) {
                         labeledDoubleField(mo.key, "silverOz", placeholder: isFut ? "—" : "Ounces…")
-                        labeledDoubleField(mo.key, "silverUsd", placeholder: isFut ? "—" : "Spent…")
+                        if fromBudget {
+                            HStack(spacing: 4) { Text("$").foregroundStyle(T.sub).font(.caption); Text("\(Int(mUsd))"); Spacer(); Text("from budget").font(.caption2).foregroundStyle(T.muted) }
+                                .frame(maxWidth: .infinity).padding(.vertical, 8).padding(.horizontal, 10).background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 10))
+                        } else {
+                            labeledDoubleField(mo.key, "silverUsd", placeholder: isFut ? "—" : "Spent…")
+                        }
                     }
                 }
                 .opacity(isFut ? 0.55 : 1)

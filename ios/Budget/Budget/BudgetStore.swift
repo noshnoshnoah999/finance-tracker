@@ -211,6 +211,38 @@ final class BudgetStore: ObservableObject {
         blob.data[mk] = m
         persist()
     }
+    // MARK: Dad's contributions (per-month £ items; "free" flags are global)
+    func addDadItem(_ mk: String, note: String, gbp: Double) {
+        var m = blob.data[mk] ?? .object([:])
+        var arr = m["dadItems"]?.array ?? []
+        let id = "d" + String(UUID().uuidString.prefix(12))
+        arr.append(.object(["id": .string(id), "note": .string(note.isEmpty ? "Dad" : note), "gbp": .number(gbp)]))
+        m["dadItems"] = .array(arr); blob.data[mk] = m; persist()
+    }
+    func removeDadItem(_ mk: String, _ id: String) {
+        let c = calc
+        var m = blob.data[mk] ?? .object([:])
+        var arr = m["dadItems"]?.array ?? []
+        arr.removeAll { c.idStr($0["id"]) == id }
+        m["dadItems"] = .array(arr); blob.data[mk] = m; persist()
+    }
+    func updateDadItem(_ mk: String, _ id: String, note: String? = nil, gbp: Double? = nil) {
+        let c = calc
+        var m = blob.data[mk] ?? .object([:])
+        let arr = (m["dadItems"]?.array ?? []).map { o -> JSONValue in
+            guard c.idStr(o["id"]) == id else { return o }
+            var oo = o.object ?? [:]
+            if let note { oo["note"] = .string(note) }
+            if let gbp { oo["gbp"] = .number(gbp) }
+            return .object(oo)
+        }
+        m["dadItems"] = .array(arr); blob.data[mk] = m; persist()
+    }
+    func toggleDadFree(_ id: String) {
+        var fs = blob.settings["dadFreeSpend"]?.object ?? [:]
+        fs[id] = .bool(!(fs[id]?.bool ?? false))
+        blob.settings["dadFreeSpend"] = .object(fs); persist()
+    }
     func toggleOneOffMum(_ mk: String, _ id: String) {
         let c = calc
         var m = blob.data[mk] ?? .object([:])
