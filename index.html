@@ -459,7 +459,7 @@
       const subTotalDad=mk=>(se.subItems||[]).filter(it=>subIncluded(it,mk)&&(it.payer||"me")==="dad").reduce((s,it)=>s+(it.price||0),0);
       // Bills that DON'T appear as card transactions (fixed + skin + savings + one-offs).
       const nonCardBills=mk=>{const d=da[mk]||eM();let s=0;(se.fixed||[]).forEach(f=>{if((d.skippedFixed||{})[f.id])return;s+=f.sub?subTotal(mk):f.variable?((d.fixedAmounts||{})[f.id]||0):f.amount;});if(se.showSkin!==false)s+=(d.skinTreatment||0);s+=genSavM(mk)+silverM(mk);(d.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;};
-      // Single source of truth for "money out this month" — used by BOTH Home and Passbook so they agree.
+      // Single source of truth for "money out this month" — used by Home to show budget breakdown.
       // Real (imported) months: non-card bills + actual card spending (card already covers food/transport).
       // Estimated months: the full budget (non-card bills + budgeted food + suica).
       const monthOut=mk=>{const tx=(da[mk]?.txns)||[];if(tx.length>0){return nonCardBills(mk)+tx.filter(t=>t.direction==="out").reduce((s,t)=>s+(Number(t.amount)||0),0);}const d=da[mk]||eM();return nonCardBills(mk)+(d.suicaOverride!=null?d.suicaOverride:gCm(d,mk))+(d.foodOverride!=null?d.foodOverride:fF(mk));};
@@ -959,7 +959,7 @@
                     <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Extra money</span></div>
                     <span style={{fontSize:16}}>🎁</span>
                   </div>
-                  <div style={{fontSize:12,color:c.sub,marginBottom:12}}>Money that didn't come from your pay — family gifts, Dad's pocket money, etc. Counts as income (incl. Passbook) but not toward your tax limit.</div>
+                  <div style={{fontSize:12,color:c.sub,marginBottom:12}}>Money that didn't come from your pay — family gifts, Dad's pocket money, etc. Counts as income but not toward your tax limit.</div>
                   {(bd.extraIncome||[]).map(it=>(<div key={it.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,fontSize:13}}>
                     <div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,color:c.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.note||"Extra money"}</div></div>
                     <span style={{fontWeight:600,color:c.greenD,flexShrink:0}}>+{yn(it.amount)}</span>
