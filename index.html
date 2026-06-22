@@ -106,7 +106,6 @@
     const eM = () => ({hours:0,days:0,wageOverride:0,transportOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0,txns:[],extraIncome:[],genSavAmt:0,saveGen:false,silverInvest:0});
     // Category display: emoji + label for imported passbook transactions
     const TX_CATS={income:["💰","Income"],food:["🍜","Food"],transport:["🚇","Transport"],subscriptions:["🔁","Subscriptions"],shopping:["🛍️","Shopping"],bills:["📄","Bills"],savings:["🏦","Savings"],investment:["📈","Investment"],fees:["⚠️","Fees"],transfer:["↔️","Transfer"],cash:["💴","Cash"],other:["•","Other"]};
-    const txKey=t=>`${t.date}|${(t.description||"").trim()}|${t.amount}|${t.direction}|${t.ref||""}`;
     const PF = {"2026-01":{hours:0,days:4,wageOverride:28982},"2026-02":{hours:0,days:10,wageOverride:81143},"2026-03":{hours:0,days:14,wageOverride:107112},"2026-04":{hours:0,days:14,wageOverride:97207}};
     const gDef = () => { const d={}; MONTHS.forEach(mo=>{ const m=eM(); if(PF[mo.key]) Object.assign(m,PF[mo.key],{dadItems:DEF_DAD()}); else m.days=wDIM(mo.key,DS.workDays); d[mo.key]=m; }); return d; };
 
@@ -139,7 +138,7 @@
     // Clean Light + Indigo (kept as an option).
     const INDIGO={bg:"#f6f7f9",card:"#ffffff",cardAlt:"#eef0f5",border:"#e4e7ef",text:"#16181f",sub:"#6b7180",muted:"#9aa0b0",greenD:"#10b981",green:"#34d399",greenBg:"rgba(16,185,129,0.12)",blueD:"#6366f1",blue:"#818cf8",blueBg:"rgba(99,102,241,0.12)",lavD:"#8b5cf6",lavBg:"rgba(139,92,246,0.12)",peachD:"#f59e0b",peach:"#fbbf24",peachBg:"rgba(245,158,11,0.12)",roseD:"#ef4444",rose:"#f87171",roseBg:"rgba(239,68,68,0.12)",white:"#ffffff",accent:"#6366f1"};
     // Ocean Blue — soft blue gradient bg, crisp white cards, vivid blue accent, teal=positive, red=negative.
-    const OCEAN={bg:"linear-gradient(165deg,#eaf2fe 0%,#d6e4f8 55%,#c4d9f4 100%)",card:"#ffffff",cardAlt:"#eaf1fb",border:"#d4e1f1",text:"#0e2742",sub:"#54708f",muted:"#90a4c0",greenD:"#0d9488",green:"#14b8a6",greenBg:"rgba(13,148,136,0.13)",blueD:"#2563eb",blue:"#60a5fa",blueBg:"rgba(37,99,235,0.13)",lavD:"#3b82f6",lavBg:"rgba(59,130,246,0.13)",peachD:"#ef8f1c",peach:"#f9b53d",peachBg:"rgba(239,143,28,0.14)",roseD:"#e11d48",rose:"#fb7185",roseBg:"rgba(225,29,72,0.12)",white:"#ffffff",accent:"#2563eb"};
+    const OCEAN={bg:"linear-gradient(165deg,#d6e3f3 0%,#c3d5ec 55%,#b2c8e4 100%)",card:"#f7fafe",cardAlt:"#e6eef9",border:"#cdddf0",text:"#0e2742",sub:"#54708f",muted:"#8597b3",greenD:"#0d9488",green:"#14b8a6",greenBg:"rgba(13,148,136,0.13)",blueD:"#2563eb",blue:"#60a5fa",blueBg:"rgba(37,99,235,0.13)",lavD:"#3b82f6",lavBg:"rgba(59,130,246,0.13)",peachD:"#ef8f1c",peach:"#f9b53d",peachBg:"rgba(239,143,28,0.14)",roseD:"#e11d48",rose:"#fb7185",roseBg:"rgba(225,29,72,0.12)",white:"#ffffff",accent:"#2563eb"};
     const _t={c:OCEAN};
 
     function PaidBtn({paid,onToggle}){const c=_t.c;return(<button onClick={onToggle} style={{width:24,height:24,borderRadius:12,border:`2px solid ${paid?c.greenD:c.border}`,background:paid?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:12,fontWeight:700,padding:0,flexShrink:0}}>{paid?"✓":""}</button>);}
@@ -218,15 +217,6 @@
       const [nSub,setNSub]=useState({name:"",price:0,everyN:1});
       const [eSub,setESub]=useState(null);
       const [savView,setSavView]=useState("cash");
-      const [pbLoading,setPbLoading]=useState(false);
-      const [pbErr,setPbErr]=useState("");
-      const [pbRes,setPbRes]=useState(null);
-      const [pbName,setPbName]=useState("");
-      const [pbMsg,setPbMsg]=useState("");
-      const [pbProg,setPbProg]=useState("");
-      const [pbm,setPbm]=useState(()=>{const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;});
-      const [spendLoading,setSpendLoading]=useState(false);
-      const [spendErr,setSpendErr]=useState("");
       const timer=useRef(null);
       const selfChange=useRef(false);
       useEffect(()=>{const fn=()=>setWide(window.innerWidth>=768);window.addEventListener('resize',fn);return()=>window.removeEventListener('resize',fn);},[]);
@@ -536,27 +526,6 @@
       let pRD=0,pRC=0;
       if(pF&&pT){const allCD={};MONTHS.forEach(mo=>{Object.assign(allCD,da[mo.key]?.customDays||{});});const _d=new Date(pF),_en=new Date(pT);while(_d<=_en){const _ds=`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,"0")}-${String(_d.getDate()).padStart(2,"0")}`;if(getDayState(_ds,_d,allCD,se.workDays)==="work")pRD++;_d.setDate(_d.getDate()+1);}pRC=pRD*rt;}
 
-      // ── Passbook / statement helpers (per month) ──
-      const pbTx=mk=>(da[mk]?.txns||[]);
-      const pbHasReal=mk=>pbTx(mk).length>0;
-      const pbOutReal=mk=>pbTx(mk).filter(t=>t.direction==="out").reduce((s,t)=>s+(Number(t.amount)||0),0);
-      const pbInReal=mk=>pbTx(mk).filter(t=>t.direction==="in").reduce((s,t)=>s+(Number(t.amount)||0),0);
-      // Income = the month's actual pay the app already computes (wage + paid leave + transport)
-      const pbPay=mk=>{const d=da[mk]||eM();return gTx(d,mk)+gTr(d,mk)+extraInc(mk);};
-      // Estimated spending from the budget when no passbook is imported for that month
-      const pbBudgetOut=mk=>{const d=da[mk]||eM();let s=0;(se.fixed||[]).forEach(f=>{if(f.sub)s+=subTotal(mk);else if(f.variable)s+=((d.fixedAmounts||{})[f.id]||0);else s+=f.amount;});s+=d.suicaOverride!=null?d.suicaOverride:gCm(d,mk);s+=d.foodOverride!=null?d.foodOverride:fF(mk);if(se.showSkin!==false)s+=(d.skinTreatment||0);s+=genSavM(mk)+silverM(mk);(d.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;};
-      const pbOut=mk=>pbHasReal(mk)?pbOutReal(mk):pbBudgetOut(mk);
-      // Category breakdown straight from the imported transactions (no AI needed)
-      const pbCats=mk=>{const m={};pbTx(mk).filter(t=>t.direction==="out").forEach(t=>{const k=t.category||"other";if(!m[k])m[k]={total:0,count:0};m[k].total+=(Number(t.amount)||0);m[k].count++;});return Object.keys(m).map(k=>({cat:k,...m[k]})).sort((a,b)=>b.total-a.total);};
-      // Budgeted line items for an estimated month (mirrors the Budget tab)
-      const pbBudgetLines=mk=>{const d=da[mk]||eM();const out=[];(se.fixed||[]).forEach(f=>{const amt=f.sub?subTotal(mk):f.variable?((d.fixedAmounts||{})[f.id]||0):f.amount;if(amt>0)out.push({name:f.name,amount:amt,cat:f.sub?"subscriptions":"bills"});});const suica=d.suicaOverride!=null?d.suicaOverride:gCm(d,mk);if(suica>0)out.push({name:"SUICA / commute",amount:suica,cat:"transport"});const food=d.foodOverride!=null?d.foodOverride:fF(mk);if(food>0)out.push({name:"Food budget",amount:food,cat:"food"});if(se.showSkin!==false&&(d.skinTreatment||0)>0)out.push({name:"Skin treatment",amount:d.skinTreatment,cat:"shopping"});if(genSavM(mk)>0)out.push({name:"General savings",amount:genSavM(mk),cat:"savings"});(d.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>out.push({name:x.name,amount:x.amount,cat:"other"}));return out;};
-      const pbElapsed=MONTHS.filter((_,i)=>i<cMN);
-      const pbYearIn=pbElapsed.reduce((s,mo)=>s+pbPay(mo.key),0);
-      const pbYearOut=pbElapsed.reduce((s,mo)=>s+pbOut(mo.key),0);
-      const pbTotalTxns=MONTHS.reduce((s,mo)=>s+pbTx(mo.key).length,0);
-      const pbInD=useCountUp(pbPay(pbm));
-      const pbOutD=useCountUp(pbOut(pbm));
-      const spendIns=se.spendInsights||null;
 
       const aOO=k=>{if(!nE.name||!nE.amount)return;setDa(p=>({...p,[k]:{...p[k],oneOffs:[...p[k].oneOffs,{id:Date.now(),name:nE.name,amount:Number(nE.amount)||0,mumPays:false}]}}));setNE({name:"",amount:""});};
       const rOO=(k,id)=>setDa(p=>({...p,[k]:{...p[k],oneOffs:p[k].oneOffs.filter(x=>x.id!==id)}}));
@@ -570,72 +539,6 @@
       const aMI=()=>{if(!nM.name||!nM.amount)return;setSe(p=>({...p,mumItems:[...p.mumItems,{id:Date.now(),name:nM.name,amount:Number(nM.amount)||0}]}));setNM({name:"",amount:""});};
       const rMI=id=>setSe(p=>({...p,mumItems:p.mumItems.filter(x=>x.id!==id)}));
       const hR=()=>{setSe({...DS,fixed:DS.fixed.map(f=>({...f})),mumItems:DS.mumItems.map(x=>({...x}))});setDa(gDef());setConfirmReset(false);};
-      // ── Passbook AI: upload an image/PDF, analyse via the secure Supabase proxy ──
-      const budgetCtx=()=>[
-        "Fixed expenses: "+(se.fixed||[]).map(f=>`${f.name} ¥${f.amount||"?"}`).join(", "),
-        "Subscribe & Save: "+(se.subItems||[]).map(s=>`${s.name} ¥${s.price}`).join(", "),
-        "Mum repayments: "+(se.mumItems||[]).map(m=>`${m.name} ¥${m.amount}`).join(", "),
-        "Hourly wage ¥"+se.hourlyWage+", monthly silver investing in USD.",
-      ].join("\n");
-      // Analyse one file → parsed data (or throws). No UI side-effects.
-      // Shrink big images to ≤1536px on the long edge before upload — Claude rejects
-      // images over 8000px (full-page screenshots), and smaller is faster anyway. PDFs pass through.
-      const prepFile=(file)=>new Promise((resolve)=>{
-        const isPdf=(file.type==="application/pdf")||(file.name&&file.name.toLowerCase().endsWith(".pdf"));
-        if(isPdf){const r=new FileReader();r.onload=()=>resolve({b64:String(r.result).split(",")[1],mediaType:"application/pdf"});r.onerror=()=>resolve(null);r.readAsDataURL(file);return;}
-        const img=new Image();
-        img.onload=()=>{const max=1536;const scale=Math.min(1,max/Math.max(img.width,img.height));const cw=Math.max(1,Math.round(img.width*scale)),ch=Math.max(1,Math.round(img.height*scale));const c=document.createElement("canvas");c.width=cw;c.height=ch;c.getContext("2d").drawImage(img,0,0,cw,ch);URL.revokeObjectURL(img.src);resolve({b64:c.toDataURL("image/jpeg",0.85).split(",")[1],mediaType:"image/jpeg"});};
-        img.onerror=()=>{const r=new FileReader();r.onload=()=>resolve({b64:String(r.result).split(",")[1],mediaType:file.type||"image/jpeg"});r.onerror=()=>resolve(null);r.readAsDataURL(file);};
-        img.src=URL.createObjectURL(file);
-      });
-      const analyzeOne=async(file)=>{
-        const prepped=await prepFile(file);
-        if(!prepped)throw new Error("Couldn't read that file");
-        const b64=prepped.b64;
-        const mediaType=prepped.mediaType;
-        const ctrl=new AbortController();
-        const to=setTimeout(()=>ctrl.abort(),150000);
-        let r;
-        try{
-          r=await fetch(`${SUPABASE_URL}/functions/v1/analyze-passbook`,{
-            method:"POST",
-            headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
-            body:JSON.stringify({fileBase64:b64,mediaType,budgetContext:budgetCtx()}),
-            signal:ctrl.signal,
-          });
-        }finally{clearTimeout(to);}
-        const j=await r.json();
-        if(!r.ok||j.error)throw new Error(j.error||("HTTP "+r.status));
-        return j.data||{};
-      };
-      // Import up to 5 passbooks at once — analysed one after another, merged in one pass.
-      const analyzePassbooks=async(fileList)=>{
-        const files=Array.from(fileList||[]).slice(0,5);
-        if(!files.length)return;
-        setPbErr("");setPbRes(null);setPbMsg("");setPbLoading(true);
-        const combined=[];const errs=[];let lastData=null;
-        for(let i=0;i<files.length;i++){
-          const file=files[i];
-          setPbName(file.name||"passbook");
-          setPbProg(files.length>1?`Reading passbook ${i+1} of ${files.length}… ~15-40s each`:"Reading your passbook… ~15-40s");
-          try{
-            const data=await analyzeOne(file);
-            lastData=data;
-            if(Array.isArray(data.transactions))data.transactions.forEach(t=>combined.push(t));
-          }catch(e){errs.push((file.name||`file ${i+1}`)+": "+(e&&e.name==="AbortError"?"timed out":String(e&&e.message||e)));}
-        }
-        // Bucket every collected transaction into its month (2026 only), de-duping against
-        // what's stored AND within this batch (in case passbooks overlap).
-        let added=0;const monthsTouched=new Set();const additions={};
-        const byM={};
-        combined.forEach(t=>{const mk=String(t.date||"").slice(0,7);if(!/^\d{4}-\d{2}$/.test(mk))return;(byM[mk]=byM[mk]||[]).push(t);});
-        Object.keys(byM).forEach(mk=>{
-          if(!da[mk])return;
-          const seen=new Set((da[mk].txns||[]).map(txKey));const fresh=[];
-          byM[mk].forEach(t=>{const k=txKey(t);if(!seen.has(k)){seen.add(k);fresh.push(t);}});
-          if(fresh.length){added+=fresh.length;monthsTouched.add(mk);additions[mk]=fresh;}
-        });
-        if(added>0)setDa(p=>{const np={...p};Object.keys(additions).forEach(mk=>{np[mk]={...np[mk],txns:[...(np[mk].txns||[]),...additions[mk]]};});return np;});
         if(lastData)setSe(p=>({...p,spendInsights:{categories:lastData.categories||[],recurring:lastData.recurring||[],anomalies:lastData.anomalies||[],budget_matches:lastData.budget_matches||[],suggestions:lastData.suggestions||[],insights:lastData.insights||[],summary:lastData.summary||{},at:Date.now()}}));
         const ok=files.length-errs.length;
         if(ok===0)setPbErr(errs.length===1?errs[0]:`Couldn't read any of them:\n${errs.join("\n")}`);
@@ -646,32 +549,6 @@
           if(errs.length)msg+=` ${errs.length} couldn't be read.`;
           setPbMsg(msg);
         }
-        setPbProg("");setPbLoading(false);
-      };
-      // Import Sony Bank WALLET transaction emails (Gmail label) via the edge
-      // function, then merge into months with the same dedup as the passbook importer.
-      const importBankEmails=async()=>{
-        setPbErr("");setPbMsg("");setPbLoading(true);setPbProg("Reading your bank emails…");
-        try{
-          const r=await fetch(`${SUPABASE_URL}/functions/v1/import-bank-emails`,{
-            method:"POST",
-            headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
-            body:JSON.stringify({sinceDays:120}),
-          });
-          const j=await r.json();
-          if(!r.ok||j.error)throw new Error(j.error||("HTTP "+r.status));
-          const combined=Array.isArray(j.transactions)?j.transactions:[];
-          let added=0;const monthsTouched=new Set();const additions={};const byM={};
-          combined.forEach(t=>{const mk=String(t.date||"").slice(0,7);if(!/^\d{4}-\d{2}$/.test(mk))return;(byM[mk]=byM[mk]||[]).push(t);});
-          Object.keys(byM).forEach(mk=>{
-            if(!da[mk])return;
-            const seen=new Set((da[mk].txns||[]).map(txKey));const fresh=[];
-            byM[mk].forEach(t=>{const k=txKey(t);if(!seen.has(k)){seen.add(k);fresh.push(t);}});
-            if(fresh.length){added+=fresh.length;monthsTouched.add(mk);additions[mk]=fresh;}
-          });
-          if(added>0)setDa(p=>{const np={...p};Object.keys(additions).forEach(mk=>{np[mk]={...np[mk],txns:[...(np[mk].txns||[]),...additions[mk]]};});return np;});
-          setPbMsg(added>0?`Imported ${added} bank transaction${added===1?"":"s"} across ${monthsTouched.size} month${monthsTouched.size===1?"":"s"}. (${combined.length} email${combined.length===1?"":"s"} scanned)`:`No new bank transactions to add (${combined.length} scanned, already imported).`);
-        }catch(e){setPbErr("Bank email import failed: "+String(e&&e.message||e));}
         setPbProg("");setPbLoading(false);
       };
       // Limit page — ask Claude whether the planned shifts are wise this month.
@@ -689,32 +566,6 @@
           setSimAdvice(j.data);
         }catch(e){setSimErr("Couldn't get advice: "+String(e&&e.message||e));}
         setSimLoading(false);
-      };
-      // On-demand: re-analyse all stored transactions for fresh cross-month insights (no re-upload)
-      const analyzeSpending=async()=>{
-        const allTx=[];MONTHS.forEach(mo=>{(da[mo.key]?.txns||[]).forEach(t=>allTx.push(t));});
-        if(!allTx.length){setSpendErr("Upload a passbook first — then I can analyse your spending.");return;}
-        setSpendErr("");setSpendLoading(true);
-        try{
-          const ctrl=new AbortController();const to=setTimeout(()=>ctrl.abort(),120000);
-          let r;
-          try{
-            r=await fetch(`${SUPABASE_URL}/functions/v1/analyze-passbook`,{
-              method:"POST",
-              headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
-              body:JSON.stringify({transactions:allTx,budgetContext:budgetCtx()}),
-              signal:ctrl.signal,
-            });
-          }finally{clearTimeout(to);}
-          const j=await r.json();
-          if(!r.ok||j.error)throw new Error(j.error||("HTTP "+r.status));
-          const d=j.data||{};
-          setSe(p=>({...p,spendInsights:{categories:d.categories||[],recurring:d.recurring||[],anomalies:d.anomalies||[],budget_matches:d.budget_matches||[],suggestions:d.suggestions||[],insights:d.insights||[],summary:d.summary||{},at:Date.now()}}));
-        }catch(e){
-          const ab=e&&(e.name==="AbortError");
-          setSpendErr(ab?"Took too long — try again.":String(e&&e.message||e));
-        }
-        finally{setSpendLoading(false);}
       };
       const tPF=(k,id)=>sM(k,"paidFixed",{...(da[k].paidFixed||{}),[id]:!(da[k].paidFixed||{})[id]});
       const tPOO=(k,id)=>sM(k,"paidOneOffs",{...(da[k].paidOneOffs||{}),[id]:!(da[k].paidOneOffs||{})[id]});
@@ -790,7 +641,7 @@
         </div>
       );
 
-      const tabs=["home","wage","budget","passbook","limit","savings","goals","settings"];
+      const tabs=["home","wage","budget","limit","savings","goals","settings"];
       const syncCol=sync==="saved"?c.greenD:sync==="error"?c.roseD:c.muted;
       const syncLabel=sync==="saving"?"↑":sync==="saved"?"✓":sync==="error"?"!":null;
 
@@ -1201,180 +1052,6 @@
                     <span style={{fontWeight:700,fontSize:15,color:c.white}}>Free to Spend</span>
                     <span style={{fontSize:26,fontWeight:800,color:c.white}}>{yn(bdFr)}</span>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {tab==="passbook"&&(
-              <div>
-                {/* ── Year hero ── */}
-                {(()=>{const net=pbYearIn-pbYearOut;const inPct=pbYearIn>0?Math.round((pbYearOut/pbYearIn)*100):0;return(
-                  <div style={{...crd,padding:22,background:`linear-gradient(135deg, ${c.greenD}, ${c.blueD})`,border:"none"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                      <span style={{fontSize:11,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.6,fontWeight:600}}>2026 so far</span>
-                      <span style={{fontSize:11,color:"rgba(255,255,255,0.6)",fontWeight:600}}>{pbTotalTxns} txn{pbTotalTxns===1?"":"s"}</span>
-                    </div>
-                    <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginBottom:2}}>Net kept this year</div>
-                    <div style={{fontSize:32,fontWeight:800,color:"#fff",letterSpacing:-1,marginBottom:14,lineHeight:1}}>{yn(net)}</div>
-                    <div style={{display:"flex",gap:10}}>
-                      <div style={{flex:1,background:"rgba(255,255,255,0.16)",borderRadius:12,padding:"10px 12px"}}><div style={{fontSize:10,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.4,marginBottom:3}}>In</div><div style={{fontSize:17,fontWeight:800,color:"#fff"}}>{yn(pbYearIn)}</div></div>
-                      <div style={{flex:1,background:"rgba(255,255,255,0.16)",borderRadius:12,padding:"10px 12px"}}><div style={{fontSize:10,color:"rgba(255,255,255,0.7)",textTransform:"uppercase",letterSpacing:0.4,marginBottom:3}}>Out</div><div style={{fontSize:17,fontWeight:800,color:"#fff"}}>{yn(pbYearOut)}</div></div>
-                    </div>
-                    {pbYearIn>0&&<div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:10}}>You spent {inPct}% of what came in.</div>}
-                  </div>
-                );})()}
-
-                {/* ── Month selector ── */}
-                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
-                  {MONTHS.map(mo=>{const has=pbHasReal(mo.key);return(<button key={mo.key} onClick={()=>setPbm(mo.key)} style={{position:"relative",padding:"7px 14px",borderRadius:10,border:"none",background:pbm===mo.key?c.accent:c.card,color:pbm===mo.key?c.white:c.sub,fontSize:12,cursor:"pointer",fontWeight:pbm===mo.key?600:400,fontFamily:ft}}>{mo.short}{has&&<span style={{position:"absolute",top:4,right:5,width:5,height:5,borderRadius:3,background:pbm===mo.key?c.white:c.peachD}}/>}</button>);})}
-                </div>
-
-                {/* ── Selected-month statement ── */}
-                {(()=>{
-                  const d=da[pbm]||eM();
-                  const real=pbHasReal(pbm);
-                  const wage=gW(d),tr=gTr(d,pbm);
-                  const pmk=gPrevMK(pbm);
-                  const plH=(d.wageOverride>0)?0:(pmk?gPLHours(pmk,da[pmk]?.customDays,gShifts(pmk),se.workDays):0);
-                  const plW=Math.round(plH*se.hourlyWage);
-                  const inTotal=pbPay(pbm),outTotal=pbOut(pbm);
-                  const expenses=real?nonCardBills(pbm):0;   // real months: card already covers food/transport; add only non-card bills
-                  const net=inTotal-outTotal-expenses;
-                  const cats=pbCats(pbm);
-                  const txs=pbTx(pbm).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-                  const lines=pbBudgetLines(pbm);
-                  const monthLabel=MONTHS.find(x=>x.key===pbm)?.label||"";
-                  const ic=k=>(TX_CATS[k]||TX_CATS.other);
-                  return(<React.Fragment>
-                    {/* Summary */}
-                    <div style={{...crd,padding:20}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                        <span style={{fontSize:16,fontWeight:800,color:c.text}}>{monthLabel}</span>
-                        <span style={{fontSize:10,fontWeight:700,padding:"3px 9px",borderRadius:8,background:real?c.greenBg:c.cardAlt,color:real?c.greenD:c.muted,textTransform:"uppercase",letterSpacing:0.4}}>{real?"● Real":"Estimated"}</span>
-                      </div>
-                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                        <div style={{background:c.greenBg,borderRadius:14,padding:14}}><div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:4}}>Money in</div><div style={{fontSize:22,fontWeight:800,color:c.greenD}}>{yn(pbInD)}</div></div>
-                        <div style={{background:c.roseBg,borderRadius:14,padding:14}}><div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:4}}>Money out</div><div style={{fontSize:22,fontWeight:800,color:c.roseD}}>{yn(pbOutD)}</div></div>
-                      </div>
-                      {expenses>0&&(
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 4px",fontSize:13}}>
-                          <span style={{color:c.sub}}>Bills &amp; expenses <span style={{fontSize:11,color:c.muted}}>(fixed, savings, one-offs — food/transport are in your card spending)</span></span>
-                          <span style={{fontWeight:700,color:c.text}}>−{yn(expenses)}</span>
-                        </div>
-                      )}
-                      <div style={{padding:"12px 14px",borderRadius:14,background:net>=0?c.greenD:c.roseD,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <span style={{fontSize:13,fontWeight:600,color:c.white}}>{net>=0?"Left over":"Overspent"}{expenses>0?" after everything":""}</span>
-                        <span style={{fontSize:20,fontWeight:800,color:c.white}}>{yn(Math.abs(net))}</span>
-                      </div>
-                    </div>
-
-                    {/* Month insights */}
-                    {real&&(()=>{
-                      const outTxs=txs.filter(x=>x.direction!=="in");
-                      const biggest=outTxs.reduce((m,x)=>x.amount>((m&&m.amount)||0)?x:m,null);
-                      const nDays=new Set(outTxs.map(x=>x.date)).size;
-                      const dailyAvg=nDays>0?Math.round(outTotal/nDays):0;
-                      const top=cats[0];const tic=top?ic(top.cat):["",""];
-                      const prevMK=gPrevMK(pbm);const prevOut=prevMK?pbOut(prevMK):0;
-                      const momPct=prevOut>0?Math.round((outTotal-prevOut)/prevOut*100):null;
-                      const cell=(label,value,sub,col)=>(<div style={{...crd,marginBottom:0,padding:14}}><div style={{fontSize:10,color:c.sub,textTransform:"uppercase",letterSpacing:0.4,marginBottom:4}}>{label}</div><div style={{fontSize:18,fontWeight:800,color:col||c.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{value}</div>{sub&&<div style={{fontSize:11,color:c.sub,marginTop:2,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sub}</div>}</div>);
-                      return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-                        {cell("Daily average",yn(dailyAvg),`over ${nDays} active day${nDays===1?"":"s"}`)}
-                        {cell("Biggest purchase",biggest?yn(biggest.amount):"—",biggest?biggest.description:"")}
-                        {cell("Top category",top?`${tic[0]} ${tic[1]}`:"—",top?yn(top.total):"")}
-                        {cell("vs last month",momPct==null?"—":`${momPct>0?"↑":"↓"} ${Math.abs(momPct)}%`,prevOut>0?`spent ${yn(prevOut)} before`:"no prior month",momPct==null?c.text:momPct>0?c.roseD:c.greenD)}
-                      </div>);
-                    })()}
-
-                    {/* Money in */}
-                    <div style={crd}>
-                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Money In</span></div>
-                      {inTotal>0?(<div style={{fontSize:13}}>
-                        <div style={rw}><span style={{color:c.sub}}>Wage {d.hours>0?`(${d.hours.toFixed(1)}h)`:"(manual)"}</span><span style={{fontWeight:600}}>{yn(wage)}</span></div>
-                        {plW>0&&<div style={rw}><span style={{color:c.sub}}>Paid leave ({plH.toFixed(1)}h)</span><span style={{fontWeight:600,color:c.blueD}}>{yn(plW)}</span></div>}
-                        <div style={rw}><span style={{color:c.sub}}>Transport</span><span style={{fontWeight:600}}>{yn(tr)}</span></div>
-                        {extraInc(pbm)>0&&<div style={rw}><span style={{color:c.sub}}>Extra money</span><span style={{fontWeight:600,color:c.greenD}}>{yn(extraInc(pbm))}</span></div>}
-                        <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:700}}>Money in</span><span style={{fontWeight:800,fontSize:15,color:c.greenD}}>{yn(inTotal)}</span></div>
-                      </div>):(<div style={{fontSize:13,color:c.muted}}>No pay logged for {monthLabel} yet — add your hours in the Wage tab.</div>)}
-                    </div>
-
-                    {/* Money out */}
-                    <div style={crd}>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                        <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.roseD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Money Out</span></div>
-                        <span style={{fontSize:11,color:c.muted,fontWeight:600}}>{real?`${txs.length} txns`:"from budget"}</span>
-                      </div>
-                      {real?(<React.Fragment>
-                        {cats.length>0&&(()=>{
-                          const PAL=[c.roseD,c.peachD,c.blueD,c.lavD,c.greenD,c.rose,c.peach,c.blue];
-                          const RC=2*Math.PI*42;let acc=0;
-                          const segs=cats.map((x,i)=>{const frac=outTotal>0?x.total/outTotal:0;const s={...x,frac,off:acc,col:PAL[i%PAL.length]};acc+=frac;return s;});
-                          return(<div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16}}>
-                            <svg width="104" height="104" viewBox="0 0 110 110" style={{flexShrink:0}}>
-                              <circle cx="55" cy="55" r="42" fill="none" stroke={c.cardAlt} strokeWidth="14"/>
-                              {segs.map((s,i)=>(<circle key={i} cx="55" cy="55" r="42" fill="none" stroke={s.col} strokeWidth="14" strokeDasharray={`${s.frac*RC} ${RC}`} strokeDashoffset={-s.off*RC} transform="rotate(-90 55 55)"/>))}
-                              <text x="55" y="50" textAnchor="middle" fontSize="9" fill={c.sub}>spent</text>
-                              <text x="55" y="66" textAnchor="middle" fontSize="14" fontWeight="800" fill={c.text}>{yn(outTotal)}</text>
-                            </svg>
-                            <div style={{flex:1,minWidth:0}}>{segs.map((s,i)=>{const[em,lab]=ic(s.cat);return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:7,fontSize:12}}><span style={{width:9,height:9,borderRadius:3,background:s.col,flexShrink:0}}/><span style={{color:c.text,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{em} {lab} <span style={{color:c.muted,fontSize:10}}>×{s.count}</span></span><span style={{fontWeight:700,color:c.text}}>{yn(s.total)}</span></div>);})}</div>
-                          </div>);
-                        })()}
-                        <div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:8,fontWeight:600}}>Transactions</div>
-                        <div style={{maxHeight:360,overflowY:"auto"}}>
-                          {Object.entries(txs.reduce((g,x)=>{(g[x.date]=g[x.date]||[]).push(x);return g;},{})).sort((a,b)=>b[0].localeCompare(a[0])).map(([date,items])=>{
-                            const dayOut=items.filter(x=>x.direction!=="in").reduce((s,x)=>s+x.amount,0);
-                            return(<div key={date} style={{marginBottom:12}}>
-                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}><span style={{fontSize:11,color:c.sub,fontWeight:700}}>{date}</span>{dayOut>0&&<span style={{fontSize:11,color:c.muted,fontWeight:600}}>−{yn(dayOut)}</span>}</div>
-                              <div style={{border:`1px solid ${c.border}`,borderRadius:12,overflow:"hidden"}}>
-                                {items.map((x,i)=>{const[em]=ic(x.category);return(<div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 12px",borderTop:i>0?`1px solid ${c.border}`:"none",fontSize:12}}><div style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}><span style={{fontSize:15,flexShrink:0}}>{em}</span><div style={{fontWeight:600,color:c.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.description}</div></div><span style={{fontWeight:700,flexShrink:0,marginLeft:8,color:x.direction==="in"?c.greenD:c.text}}>{x.direction==="in"?"+":"−"}{yn(x.amount)}</span></div>);})}
-                              </div>
-                            </div>);
-                          })}
-                        </div>
-                      </React.Fragment>):(<React.Fragment>
-                        {lines.length>0?(<div style={{fontSize:13}}>
-                          {lines.map((x,i)=>{const[em,lab]=ic(x.cat);return(<div key={i} style={rw}><span style={{color:c.text}}>{em} {x.name}</span><span style={{fontWeight:600}}>{yn(x.amount)}</span></div>);})}
-                          <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:700}}>Estimated total</span><span style={{fontWeight:800,fontSize:15,color:c.roseD}}>{yn(outTotal)}</span></div>
-                        </div>):(<div style={{fontSize:13,color:c.muted}}>Nothing budgeted for {monthLabel}.</div>)}
-                        <div style={{marginTop:12,padding:12,borderRadius:12,background:c.cardAlt,fontSize:12,color:c.sub}}>This is your <b>budgeted</b> spending. Upload {monthLabel}'s passbook below to see what you actually spent.</div>
-                      </React.Fragment>)}
-                    </div>
-                  </React.Fragment>);
-                })()}
-
-                {/* ── AI spending insights ── */}
-                <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.lavD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Spending Insights</span></div>
-                    <span style={{fontSize:16}}>🧠</span>
-                  </div>
-                  <div style={{fontSize:12,color:c.sub,marginBottom:12}}>AI feedback & recommendations across everything you've imported.</div>
-                  <button onClick={analyzeSpending} disabled={spendLoading||pbTotalTxns===0} style={{width:"100%",padding:12,borderRadius:12,border:"none",cursor:spendLoading||pbTotalTxns===0?"default":"pointer",background:pbTotalTxns===0?c.cardAlt:c.lavD,color:pbTotalTxns===0?c.muted:c.white,fontWeight:700,fontSize:13,fontFamily:ft,opacity:spendLoading?0.6:1}}>{spendLoading?"Analysing your spending…":pbTotalTxns===0?"Import a passbook first":spendIns?"Re-analyse my spending":"Analyse my spending"}</button>
-                  {spendErr&&<div style={{marginTop:10,padding:12,borderRadius:12,background:c.roseBg,color:c.roseD,fontSize:12,fontWeight:600}}>{spendErr}</div>}
-                  {spendIns&&(()=>{const R=spendIns;const sec=t=>(<div style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.6,fontWeight:700,margin:"16px 0 8px"}}>{t}</div>);return(
-                    <div>
-                      {(R.insights||[]).length>0&&<div>{sec("What I noticed")}{R.insights.map((x,i)=>(<div key={i} style={{display:"flex",gap:8,fontSize:13,color:c.text,padding:"5px 0"}}><span style={{flexShrink:0}}>•</span><span>{x}</span></div>))}</div>}
-                      {(R.suggestions||[]).length>0&&<div>{sec("Recommendations")}{R.suggestions.map((x,i)=>(<div key={i} style={{display:"flex",gap:8,fontSize:13,color:c.text,padding:"5px 0"}}><span style={{color:c.greenD,flexShrink:0}}>→</span><span>{x}</span></div>))}</div>}
-                      {(R.recurring||[]).length>0&&<div>{sec("Recurring & subscriptions")}{R.recurring.map((x,i)=>(<div key={i} style={{padding:"6px 0",borderTop:i>0?`1px solid ${c.border}`:"none"}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:600,fontSize:13}}>{x.description}</span><span style={{fontWeight:700,color:c.peachD}}>{yn(x.amount)}</span></div>{x.note&&<div style={{fontSize:11,color:c.muted}}>{x.cadence} · {x.note}</div>}</div>))}</div>}
-                      {(R.anomalies||[]).length>0&&<div>{sec("Heads up")}{R.anomalies.map((x,i)=>(<div key={i} style={{padding:10,borderRadius:10,background:c.roseBg,marginBottom:6}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontWeight:600,fontSize:13,color:c.roseD}}>{x.description}</span><span style={{fontWeight:700,color:c.roseD}}>{yn(x.amount)}</span></div><div style={{fontSize:11,color:c.sub,marginTop:2}}>{x.reason}</div></div>))}</div>}
-                      {(R.budget_matches||[]).length>0&&<div>{sec("Against your budget")}{R.budget_matches.map((x,i)=>(<div key={i} style={{...rw,padding:"5px 0"}}><span style={{fontSize:13,color:c.text}}>{x.app_item||x.passbook}</span><span style={{fontSize:11,fontWeight:700,color:x.status==="matched"?c.greenD:x.status==="missing_from_app"?c.peachD:c.muted}}>{x.status==="matched"?"✓ matched":x.status==="missing_from_app"?"not tracked":"not seen"}</span></div>))}</div>}
-                    </div>
-                  );})()}
-                </div>
-
-                {/* ── Upload passbook ── */}
-                <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Import a passbook</span><span style={{marginLeft:"auto",fontSize:16}}>🏦</span></div>
-                  <div style={{fontSize:12,color:c.sub,marginBottom:12}}>Upload up to <b>5</b> photos or PDFs of your bank passbook (通帳) at once. Claude reads every transaction and files them into the right month automatically.</div>
-                  <label style={{display:"block",padding:14,borderRadius:14,border:`1.5px dashed ${c.border}`,background:c.cardAlt,textAlign:"center",cursor:pbLoading?"default":"pointer",color:c.sub,fontSize:13,fontWeight:600}}>
-                    {pbLoading?(pbProg||"Reading your passbook… ~15-40s"):(pbName?`Import more (last: ${pbName})`:"📷 Choose passbooks (up to 5)")}
-                    <input type="file" accept="image/*,application/pdf" multiple disabled={pbLoading} onChange={e=>{const fs=e.target.files;e.target.value="";analyzePassbooks(fs);}} style={{display:"none"}}/>
-                  </label>
-                  <div style={{fontSize:11,color:c.muted,marginTop:8,textAlign:"center"}}>Pick several at once — they're read one after another.</div>
-                  <button onClick={importBankEmails} disabled={pbLoading} style={{width:"100%",marginTop:10,padding:12,borderRadius:12,border:"none",cursor:pbLoading?"default":"pointer",background:c.greenD,color:c.white,fontWeight:700,fontSize:13,fontFamily:ft,opacity:pbLoading?0.6:1}}>✉️ Import Sony Bank emails</button>
-                  <div style={{fontSize:11,color:c.muted,marginTop:6,textAlign:"center"}}>Pulls Sony Bank WALLET transaction emails from Gmail automatically.</div>
-                  {pbErr&&<div style={{marginTop:10,padding:12,borderRadius:12,background:c.roseBg,color:c.roseD,fontSize:12,fontWeight:600}}>{pbErr}</div>}
-                  {pbMsg&&!pbErr&&<div style={{marginTop:10,padding:12,borderRadius:12,background:c.greenBg,color:c.greenD,fontSize:12,fontWeight:600}}>{pbMsg}</div>}
                 </div>
               </div>
             )}

@@ -180,7 +180,7 @@ struct BudgetTabView: View {
         let items = c.month(bm).arr("extraIncome")
         VStack(alignment: .leading, spacing: 8) {
             HStack { sectionHeader("Extra money", color: T.greenD); Spacer(); Text("🎁") }
-            Text("Money not from your pay — family gifts, Dad's pocket money. Counts as income (incl. Passbook), not toward your tax limit.")
+            Text("Money not from your pay — family gifts, Dad's pocket money. Counts as income but not toward your tax limit.")
                 .font(.caption2).foregroundStyle(T.sub)
             ForEach(Array(items.enumerated()), id: \.offset) { _, it in
                 HStack {

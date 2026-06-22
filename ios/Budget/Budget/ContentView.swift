@@ -13,7 +13,6 @@ struct ContentView: View {
             HomeView().tabItem { Label("Home", systemImage: "house.fill") }
             WageView().tabItem { Label("Wage", systemImage: "yensign.circle") }
             BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }
-            PassbookView().tabItem { Label("Passbook", systemImage: "building.columns") }
             MoreView().tabItem { Label("More", systemImage: "ellipsis") }
         }
     }
