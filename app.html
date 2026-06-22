@@ -25,7 +25,7 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
-    body { margin: 0; background: #d6e4f8; }
+    body { margin: 0; background: #8d8eef; }
     input, button { touch-action: manipulation; font-family: inherit; }
     ::-webkit-scrollbar { display: none; }
     @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 1000px; opacity: 1; } }
@@ -138,7 +138,7 @@
     // Clean Light + Indigo (kept as an option).
     const INDIGO={bg:"#f6f7f9",card:"#ffffff",cardAlt:"#eef0f5",border:"#e4e7ef",text:"#16181f",sub:"#6b7180",muted:"#9aa0b0",greenD:"#10b981",green:"#34d399",greenBg:"rgba(16,185,129,0.12)",blueD:"#6366f1",blue:"#818cf8",blueBg:"rgba(99,102,241,0.12)",lavD:"#8b5cf6",lavBg:"rgba(139,92,246,0.12)",peachD:"#f59e0b",peach:"#fbbf24",peachBg:"rgba(245,158,11,0.12)",roseD:"#ef4444",rose:"#f87171",roseBg:"rgba(239,68,68,0.12)",white:"#ffffff",accent:"#6366f1"};
     // Ocean Blue — soft blue gradient bg, crisp white cards, vivid blue accent, teal=positive, red=negative.
-    const OCEAN={bg:"linear-gradient(165deg,#d6e3f3 0%,#c3d5ec 55%,#b2c8e4 100%)",card:"#f7fafe",cardAlt:"#e6eef9",border:"#cdddf0",text:"#0e2742",sub:"#54708f",muted:"#8597b3",greenD:"#0d9488",green:"#14b8a6",greenBg:"rgba(13,148,136,0.13)",blueD:"#2563eb",blue:"#60a5fa",blueBg:"rgba(37,99,235,0.13)",lavD:"#3b82f6",lavBg:"rgba(59,130,246,0.13)",peachD:"#ef8f1c",peach:"#f9b53d",peachBg:"rgba(239,143,28,0.14)",roseD:"#e11d48",rose:"#fb7185",roseBg:"rgba(225,29,72,0.12)",white:"#ffffff",accent:"#2563eb"};
+    const OCEAN={bg:"linear-gradient(160deg,#7c9ff0 0%,#8d8eef 52%,#a98bef 100%)",card:"#f1f4fd",cardAlt:"#e3e9fb",border:"#d2dbf4",text:"#1a2342",sub:"#5a679a",muted:"#8e98c0",greenD:"#0d9488",green:"#14b8a6",greenBg:"rgba(13,148,136,0.13)",blueD:"#2563eb",blue:"#60a5fa",blueBg:"rgba(37,99,235,0.13)",lavD:"#6d5dea",lavBg:"rgba(109,93,234,0.14)",peachD:"#ef8f1c",peach:"#f9b53d",peachBg:"rgba(239,143,28,0.14)",roseD:"#e11d48",rose:"#fb7185",roseBg:"rgba(225,29,72,0.12)",white:"#ffffff",accent:"#5b6ee8"};
     const _t={c:OCEAN};
 
     function PaidBtn({paid,onToggle}){const c=_t.c;return(<button onClick={onToggle} style={{width:24,height:24,borderRadius:12,border:`2px solid ${paid?c.greenD:c.border}`,background:paid?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:12,fontWeight:700,padding:0,flexShrink:0}}>{paid?"✓":""}</button>);}

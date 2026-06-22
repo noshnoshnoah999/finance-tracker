@@ -16,19 +16,19 @@ extension Color {
     }
 }
 
-/// Ocean Blue — soft blue gradient bg, crisp white cards, vivid blue accent (teal = positive, red = negative).
+/// Ocean — rich blue→indigo→violet gradient bg, soft tinted cards, indigo accent (teal = positive, red = negative).
 enum T {
-    static let bgTop    = Color(hex: "eaf2fe")
-    static let bgMid    = Color(hex: "d6e4f8")
-    static let bgBottom = Color(hex: "c4d9f4")
+    static let bgTop    = Color(hex: "7c9ff0")
+    static let bgMid    = Color(hex: "8d8eef")
+    static let bgBottom = Color(hex: "a98bef")
 
-    static let card    = Color(hex: "ffffff")
-    static let cardAlt = Color(hex: "eaf1fb")
-    static let border  = Color(hex: "d4e1f1")
+    static let card    = Color(hex: "f1f4fd")
+    static let cardAlt = Color(hex: "e3e9fb")
+    static let border  = Color(hex: "d2dbf4")
 
-    static let text  = Color(hex: "0e2742")
-    static let sub   = Color(hex: "54708f")
-    static let muted = Color(hex: "90a4c0")
+    static let text  = Color(hex: "1a2342")
+    static let sub   = Color(hex: "5a679a")
+    static let muted = Color(hex: "8e98c0")
 
     static let greenD  = Color(hex: "0d9488")
     static let green   = Color(hex: "14b8a6")
@@ -38,8 +38,8 @@ enum T {
     static let blue   = Color(hex: "60a5fa")
     static let blueBg = Color(hex: "2563eb", opacity: 0.13)
 
-    static let lavD  = Color(hex: "3b82f6")
-    static let lavBg = Color(hex: "3b82f6", opacity: 0.13)
+    static let lavD  = Color(hex: "6d5dea")
+    static let lavBg = Color(hex: "6d5dea", opacity: 0.14)
 
     static let peachD  = Color(hex: "ef8f1c")
     static let peach   = Color(hex: "f9b53d")
@@ -50,7 +50,7 @@ enum T {
     static let roseBg = Color(hex: "e11d48", opacity: 0.12)
 
     static let white  = Color.white
-    static let accent = Color(hex: "2563eb")
+    static let accent = Color(hex: "5b6ee8")
 
     static var background: LinearGradient {
         LinearGradient(colors: [bgTop, bgMid, bgBottom], startPoint: .top, endPoint: .bottom)
