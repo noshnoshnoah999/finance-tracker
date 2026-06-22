@@ -13,6 +13,7 @@ struct ContentView: View {
             HomeView().tabItem { Label("Home", systemImage: "house.fill") }
             WageView().tabItem { Label("Wage", systemImage: "yensign.circle") }
             BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }
+            SavingsView().tabItem { Label("Savings", systemImage: "banknote") }
             MoreView().tabItem { Label("More", systemImage: "ellipsis") }
         }
     }
@@ -28,7 +29,6 @@ struct MoreView: View {
                 ScrollView {
                     VStack(spacing: 12) {
                         moreLink("Limit", "gauge.with.dots.needle.bottom.50percent") { LimitView() }
-                        moreLink("Savings", "banknote") { SavingsView() }
                         moreLink("Goals", "target") { GoalsView() }
                         moreLink("Settings", "gearshape") { SettingsView() }
                     }
