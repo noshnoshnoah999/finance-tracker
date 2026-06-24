@@ -34,8 +34,7 @@ final class BudgetStore: ObservableObject {
     var theme: String { blob.theme ?? "latte" }
 
     private var cacheURL: URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("budget_cache.json")
+        AppPaths.file("budget_cache.json")
     }
 
     init() { loadCache() }
@@ -554,8 +553,7 @@ final class BudgetStore: ObservableObject {
 
     // MARK: - Backups (rotating local snapshots, keep 60, throttle 10 min)
     private lazy var backupDir: URL = {
-        let d = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("backups", isDirectory: true)
+        let d = AppPaths.file("backups")
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
     }()
