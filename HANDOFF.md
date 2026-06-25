@@ -1,6 +1,6 @@
 # Budget App — Handoff
 
-_Last updated: 2026-06-24_
+_Last updated: 2026-06-26_
 
 A personal finance / budgeting app for tracking 2026 income against Japan's tax
 limit, monthly budgets, savings, and silver investments. Two front-ends share one
@@ -98,32 +98,38 @@ xcrun devicectl device install app --device <DEVICE_ID> \
 
 ---
 
-## Theme — current "Ocean" palette
+## Theme — current "Coffee" palette (single fixed theme)
 
-Rich blue→indigo→violet gradient with softly tinted (non-white) cards.
+Unified **earth palette** from the user's reference swatch (Cav Co.): Tobacco bg,
+Vanilla cards, Sand alt, Mahogany text/accent, Mountain muted. Money figures use a muted
+olive (+) / muted brick (−); other accents (blue/lav/peach) neutralised to palette browns
+so nothing clashes (2026-06-26).
+
+Source swatch: Vanilla `#F1EADA` · Tobacco `#B59E7D` · Mountain `#AAA396` ·
+Mahogany `#584738` · Sand `#CEC1A8`.
 
 | Token        | Value |
 |--------------|-------|
-| bg gradient  | `#7c9ff0` → `#8d8eef` → `#a98bef` (160°) |
-| body bg      | `#8d8eef` |
-| card         | `#f1f4fd` |
-| cardAlt      | `#e3e9fb` |
-| border       | `#d2dbf4` |
-| text / sub / muted | `#1a2342` / `#5a679a` / `#8e98c0` |
-| accent       | `#5b6ee8` (indigo) |
-| lavD / lavBg | `#6d5dea` / 0.14 |
-| green (positive) | `#0d9488` |
-| rose (negative)  | `#e11d48` |
-| peach        | `#ef8f1c` |
+| bg gradient  | `#c2ab8b` → `#b59e7d` → `#a68d6b` (180°, Tobacco) |
+| body bg      | `#b59e7d` |
+| card         | `#f1eada` (Vanilla) |
+| cardAlt      | `#cec1a8` (Sand) |
+| border       | `#d6c9b0` |
+| text / sub / muted | `#584738` (Mahogany) / `#6f5d49` / `#9a917f` (Mountain) |
+| accent       | `#584738` (Mahogany) |
+| green (positive) | `#6f7a48` (muted olive) |
+| rose (negative)  | `#9c5240` (muted brick) |
+| blue / lav / peach | `#7a6854` / `#8a7c64` / `#b08a55` (all palette browns) |
 
-- Web: `const OCEAN={...}` (~line 141) + `body { background: ... }` (~line 28).
-- Native: `Shared/Theme.swift` `enum T` (must be kept in sync by hand).
-- Older palettes (Sage/Ember/Latte/Coffee/Indigo) remain as selectable options in the
-  **web** theme picker (Settings). Native has only Ocean.
+- **Single theme now.** Web `_t.c` is hard-wired to `COFFEE` (~line 227); the Settings
+  theme picker was removed; `th` defaults to `"coffee"`. Old palette constants
+  (OCEAN/SAGE/EMBER/LATTE/INDIGO + dark-COFFEE replaced) still exist in the file but are
+  unreferenced — safe to delete later.
+- Web: `const COFFEE={...}` (~line 137) + `body { background:#cdbb96 }` (~line 28) +
+  `<meta theme-color="#cdbb96">`.
+- Native: `Shared/Theme.swift` `enum T` (kept in sync by hand).
 
-⚠️ **Theme history:** the user iterated through several rejected themes (dark Coffee →
-Latte → Indigo → Ocean) and twice asked to make it less white / more colorful. Keep
-backgrounds **saturated and easy on the eyes — never near-white**.
+⚠️ Keep backgrounds **warm and saturated — never near-white** (long-standing user pref).
 
 ---
 

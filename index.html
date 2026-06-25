@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Finance" />
-  <meta name="theme-color" content="#b38f57" />
+  <meta name="theme-color" content="#b59e7d" />
   <link rel="manifest" href="/finance-tracker/manifest.json" />
   <link rel="apple-touch-icon" href="/finance-tracker/apple-touch-icon-v6.png" />
   <link rel="apple-touch-icon-precomposed" href="/finance-tracker/apple-touch-icon-v6.png" />
@@ -25,7 +25,7 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
-    body { margin: 0; background: #8d8eef; }
+    body { margin: 0; background: #b59e7d; }
     input, button { touch-action: manipulation; font-family: inherit; }
     ::-webkit-scrollbar { display: none; }
     @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 1000px; opacity: 1; } }
@@ -134,12 +134,14 @@
     const PUMP={bg:"#1a2a33",card:"#233d4d",cardAlt:"#2c4a5c",border:"#3a5a6a",text:"#f0e6dc",sub:"#c8d8e0",muted:"#7a9aa8",greenD:"#fe7f2d",green:"#fea05a",greenBg:"#3a3020",blueD:"#fe7f2d",blue:"#fea05a",blueBg:"#33281a",lavD:"#e09040",lavBg:"#2a2818",peachD:"#fe7f2d",peach:"#fea05a",peachBg:"#33281a",roseD:"#e05050",rose:"#f07070",roseBg:"#3a2020",white:"#f0e6dc",accent:"#fe7f2d"};
     const LATTE={bg:"linear-gradient(180deg,#c4a778 0%,#b38f57 50%,#9e7842 100%)",card:"rgba(243,231,210,0.52)",cardAlt:"rgba(228,210,180,0.6)",border:"rgba(255,248,232,0.38)",text:"#2a1c0e",sub:"#7d5f3a",muted:"#9c7e54",greenD:"#5a7330",green:"#7a9442",greenBg:"rgba(110,140,55,0.22)",blueD:"#b5763a",blue:"#cf9a5e",blueBg:"rgba(181,118,58,0.18)",lavD:"#9a6230",lavBg:"rgba(154,98,48,0.18)",peachD:"#a85d28",peach:"#c98748",peachBg:"rgba(168,93,40,0.18)",roseD:"#bb4a68",rose:"#d9779a",roseBg:"rgba(187,74,104,0.18)",white:"#ffffff",accent:"#643f1f"};
     // StudyTrack "Coffee" — warm dark browns + one bold orange accent (green=positive, red=negative).
-    const COFFEE={bg:"#160e06",card:"#211508",cardAlt:"#2c1e0e",border:"rgba(249,115,22,0.14)",text:"#f5ede4",sub:"#c0916a",muted:"#8a5c38",greenD:"#00c896",green:"#2fd3a8",greenBg:"rgba(0,200,150,0.16)",blueD:"#f97316",blue:"#fb923c",blueBg:"rgba(249,115,22,0.18)",lavD:"#f97316",lavBg:"rgba(249,115,22,0.18)",peachD:"#e86a10",peach:"#fb923c",peachBg:"rgba(249,115,22,0.18)",roseD:"#ff4d6a",rose:"#ff6b82",roseBg:"rgba(255,77,106,0.16)",white:"#ffffff",accent:"#f97316"};
+    // COFFEE — unified earth palette: Tobacco bg, Vanilla cards, Sand alt, Mahogany text/accent,
+    // Mountain muted. Money: muted olive (+) / muted brick (-). Other accents neutralised to browns.
+    const COFFEE={bg:"linear-gradient(180deg,#c2ab8b 0%,#b59e7d 52%,#a68d6b 100%)",card:"#f1eada",cardAlt:"#cec1a8",border:"#d6c9b0",text:"#584738",sub:"#6f5d49",muted:"#9a917f",greenD:"#6f7a48",green:"#8a9560",greenBg:"rgba(111,122,72,0.16)",blueD:"#7a6854",blue:"#9a8a74",blueBg:"rgba(122,104,84,0.13)",lavD:"#8a7c64",lavBg:"rgba(138,124,100,0.16)",peachD:"#b08a55",peach:"#c5a878",peachBg:"rgba(176,138,85,0.16)",roseD:"#9c5240",rose:"#ba7762",roseBg:"rgba(156,82,64,0.15)",white:"#ffffff",accent:"#584738"};
     // Clean Light + Indigo (kept as an option).
     const INDIGO={bg:"#f6f7f9",card:"#ffffff",cardAlt:"#eef0f5",border:"#e4e7ef",text:"#16181f",sub:"#6b7180",muted:"#9aa0b0",greenD:"#10b981",green:"#34d399",greenBg:"rgba(16,185,129,0.12)",blueD:"#6366f1",blue:"#818cf8",blueBg:"rgba(99,102,241,0.12)",lavD:"#8b5cf6",lavBg:"rgba(139,92,246,0.12)",peachD:"#f59e0b",peach:"#fbbf24",peachBg:"rgba(245,158,11,0.12)",roseD:"#ef4444",rose:"#f87171",roseBg:"rgba(239,68,68,0.12)",white:"#ffffff",accent:"#6366f1"};
     // Ocean Blue — soft blue gradient bg, crisp white cards, vivid blue accent, teal=positive, red=negative.
     const OCEAN={bg:"linear-gradient(160deg,#7c9ff0 0%,#8d8eef 52%,#a98bef 100%)",card:"#f1f4fd",cardAlt:"#e3e9fb",border:"#d2dbf4",text:"#1a2342",sub:"#5a679a",muted:"#8e98c0",greenD:"#0d9488",green:"#14b8a6",greenBg:"rgba(13,148,136,0.13)",blueD:"#2563eb",blue:"#60a5fa",blueBg:"rgba(37,99,235,0.13)",lavD:"#6d5dea",lavBg:"rgba(109,93,234,0.14)",peachD:"#ef8f1c",peach:"#f9b53d",peachBg:"rgba(239,143,28,0.14)",roseD:"#e11d48",rose:"#fb7185",roseBg:"rgba(225,29,72,0.12)",white:"#ffffff",accent:"#5b6ee8"};
-    const _t={c:OCEAN};
+    const _t={c:COFFEE};
 
     function PaidBtn({paid,onToggle}){const c=_t.c;return(<button onClick={onToggle} style={{width:24,height:24,borderRadius:12,border:`2px solid ${paid?c.greenD:c.border}`,background:paid?c.greenD:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:c.white,fontSize:12,fontWeight:700,padding:0,flexShrink:0}}>{paid?"✓":""}</button>);}
 
@@ -202,7 +204,7 @@
       const [simAdvice,setSimAdvice]=useState(null);
       const [simLoading,setSimLoading]=useState(false);
       const [simErr,setSimErr]=useState("");
-      const [th,setTh]=useState(CACHED&&CACHED.theme?CACHED.theme:"ocean");
+      const [th,setTh]=useState("coffee");
       const [nM,setNM]=useState({name:"",amount:""});
       const [eMI,setEMI]=useState(null);
       const [sv,setSv]=useState(false);
@@ -224,7 +226,7 @@
       const subscribePush=async()=>{try{if(!('serviceWorker' in navigator)||!('PushManager' in window))return;const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToU8(VAPID_PUBLIC)});const js=sub.toJSON();setSe(p=>(JSON.stringify(p.pushSub||null)===JSON.stringify(js)?p:{...p,pushSub:js}));}catch(_){}};
       useEffect(()=>{if(ld&&se.notifs&&'Notification' in window&&Notification.permission==='granted')subscribePush();},[ld,se.notifs]);
 
-      _t.c=th==="ember"?EMBER:th==="sage"?SAGE:th==="coffee"?COFFEE:th==="latte"?LATTE:th==="indigo"?INDIGO:OCEAN;
+      _t.c=COFFEE; // single fixed theme
       const c=_t.c;
       const crd={background:c.card,borderRadius:24,padding:20,marginBottom:12,border:`1px solid ${c.border}`,boxShadow:"0 1px 2px rgba(70,45,20,0.05)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)"};
       const inp={fontSize:14,border:`1px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.cardAlt,fontWeight:500,fontFamily:mn};
@@ -1658,12 +1660,6 @@
                   ):(
                     <div style={{fontSize:13,color:c.muted}}>Not supported in this browser</div>
                   )}
-                </div>
-                <div style={crd}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.accent,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Theme</span></div>
-                  <div style={{display:"flex",gap:10}}>
-                    {[{id:"ocean",label:"Ocean",col:"#2563eb",bg:"#dbeafe"},{id:"indigo",label:"Indigo",col:"#6366f1",bg:"#f6f7f9"},{id:"coffee",label:"Coffee",col:"#f97316",bg:"#211508"},{id:"latte",label:"Latte",col:"#643f1f",bg:"#b38f57"},{id:"sage",label:"Sage",col:"#2d6a3e",bg:"#f0f5ee"},{id:"ember",label:"Ember",col:"#b85e2a",bg:"#f5efe8"}].map(t2=>(<button key={t2.id} onClick={()=>setTh(t2.id)} style={{flex:1,padding:"14px 0",borderRadius:14,border:th===t2.id?`3px solid ${t2.col}`:`2px solid ${c.border}`,background:t2.bg,cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:th===t2.id?700:500,color:t2.col,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}><div style={{width:24,height:24,borderRadius:12,background:t2.col}}/>{t2.label}</button>))}
-                  </div>
                 </div>
                 <button onPointerDown={()=>{setSv(true);setTimeout(()=>setSv(false),2000);}} style={{width:"100%",padding:16,border:"none",background:sv?c.green:c.greenD,color:c.white,borderRadius:14,fontFamily:ft,fontSize:14,fontWeight:700,cursor:"pointer",marginTop:8}}>{sv?"Saved!":"Save Settings"}</button>
                 {!confirmReset
