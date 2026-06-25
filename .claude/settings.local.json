@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(xcodebuild -scheme Budget -configuration Release -destination generic/platform=macos -derivedDataPath ~/tmp_budget build)"
-    ]
-  }
-}
