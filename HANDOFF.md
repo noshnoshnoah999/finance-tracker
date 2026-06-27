@@ -1,6 +1,59 @@
 # Budget App — Handoff
 
-_Last updated: 2026-06-26_
+_Last updated: 2026-06-28_
+
+---
+
+## Session 2026-06-28 — Payslip pay-record corrections
+
+**Done this session (committed, NOT yet pushed):**
+
+Corrected the four hardcoded past-month earnings in the `PF` block (`app.html`,
+synced to `index.html`) against Noah's actual payslips. In this app
+`wageOverride` = TOTAL received incl. transport; displayed base pay =
+`wageOverride − transportOverride`; that base feeds the ¥1,030,000 limit.
+
+| Month | wageOverride (total) | transportOverride | days | → base |
+|-------|---------------------|-------------------|------|--------|
+| 2026-01 | 31158 | 2176 | 4 | 28982 |
+| 2026-02 | 91543 | 10400 | 10 | 81143 |
+| 2026-03 | 121952 | 14560 | 14 | 107392 (incl. ¥35 OT) |
+| 2026-04 | 112607 | 15400 | 14 | 97207 |
+
+- **Commit:** `1654ed3` "Fix Jan–Apr 2026 pay records against actual payslips".
+- **NOT pushed** — Cowork sandbox has no GitHub credentials. Push from Claude Code
+  or run `git push origin main` on the Mac.
+
+**Open / to do (in priority order):**
+
+1. **Push commit `1654ed3` to GitHub.**
+2. **5-week-month contradiction — UNRESOLVED, blocks 2027.** Code (`MONTHS`, ~line 68)
+   flags Mar/Jun/Aug/Nov 2026 as `is5wk` (drives ¥20k vs ¥25k food money to Mum).
+   Noah said Jan/May/Jul/Oct. Verified the code's Mar/Jun/Aug/Nov = "pay period
+   15th→14th contains 5 Mondays" rule. Settle which is right (test: which 2026 month
+   did Noah actually send Mum ¥25,000?), THEN build 2027 months — `MONTHS` currently
+   ends Dec 2026. (If Monday rule holds, 2027 5-week = Mar/May/Aug/Nov.)
+3. **Calendar work-days override displayed days.** Stored `days` corrected above, but
+   app shows work-days from Budget-tab calendar via `gWorkDays`, so on-screen counts
+   (e.g. Jan showed 12 not 4) may still be wrong. Noah must fix the calendar days.
+4. **Stale transport rates for calculated (May-2026-onward) months.** `commuteOneWay`,
+   `trBefore`, `trAfter` (~line 82) reflect Noah's OLD address; he moved. Verified new
+   daily transport higher. Note: code's rate-change cutoff is `k<="2026-03"` (14 Mar),
+   not May. Also `commuteOneWay` is ONE-WAY (×2 in code, line ~370) and drives SUICA,
+   NOT the monthly transport (that's trBefore/trAfter).
+5. **¥1,030,000 limit assumption unverified** — app excludes transport from the limit
+   count (standard JP treatment) but Noah's exact threshold not confirmed.
+6. **Two unfinished side tasks:** (a) Google Doc on Nitori topper (product 7544982,
+   semi-double) with price + alternatives; (b) Google Doc of JR Keiyō Line trains
+   departing Shin-Urayasu 9:00–11:00 tomorrow, both directions.
+
+**KNOWN TOOL ISSUE:** Control Chrome MCP `execute_javascript` / `get_page_content`
+error "Chrome not running" even with tabs visible and permissions granted — confirmed
+broken regardless of permission resets. JS-rendered prices/timetables (Nitori, Yahoo
+transit) can't be auto-read this way. Have Noah read values off-screen; do NOT guess
+money or train-time figures.
+
+---
 
 A personal finance / budgeting app for tracking 2026 income against Japan's tax
 limit, monthly budgets, savings, and silver investments. Two front-ends share one
