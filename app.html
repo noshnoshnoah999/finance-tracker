@@ -106,7 +106,12 @@
     const eM = () => ({hours:0,days:0,wageOverride:0,transportOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0,txns:[],extraIncome:[],genSavAmt:0,saveGen:false,silverInvest:0});
     // Category display: emoji + label for transactions
     const TX_CATS={income:["💰","Income"],food:["🍜","Food"],transport:["🚇","Transport"],subscriptions:["🔁","Subscriptions"],shopping:["🛍️","Shopping"],bills:["📄","Bills"],savings:["🏦","Savings"],investment:["📈","Investment"],fees:["⚠️","Fees"],transfer:["↔️","Transfer"],cash:["💴","Cash"],other:["•","Other"]};
-    const PF = {"2026-01":{hours:0,days:4,wageOverride:28982},"2026-02":{hours:0,days:10,wageOverride:81143},"2026-03":{hours:0,days:14,wageOverride:107112},"2026-04":{hours:0,days:14,wageOverride:97207}};
+    // PF = manually-entered actuals for past months. wageOverride = TOTAL received (incl. transport); base pay = wageOverride − transportOverride.
+    // 2026-01: payslip-verified (Dec 2025 work) — total ¥31,158, transport ¥2,176 (→ base ¥28,982), 4 days.
+    // 2026-02: payslip-verified (Jan 2026 work) — total ¥91,543, transport ¥10,400 (→ base ¥81,143), 10 days.
+    // 2026-03: payslip-verified (Feb 2026 work) — total ¥121,952, transport ¥14,560 (→ base ¥107,392 incl. ¥35 overtime), 14 days.
+    // 2026-04: payslip-verified (Mar 2026 work) — total ¥112,607, transport ¥15,400 (→ base ¥97,207), 14 days.
+    const PF = {"2026-01":{hours:0,days:4,wageOverride:31158,transportOverride:2176},"2026-02":{hours:0,days:10,wageOverride:91543,transportOverride:10400},"2026-03":{hours:0,days:14,wageOverride:121952,transportOverride:14560},"2026-04":{hours:0,days:14,wageOverride:112607,transportOverride:15400}};
     const gDef = () => { const d={}; MONTHS.forEach(mo=>{ const m=eM(); if(PF[mo.key]) Object.assign(m,PF[mo.key],{dadItems:DEF_DAD()}); else m.days=wDIM(mo.key,DS.workDays); d[mo.key]=m; }); return d; };
 
     const cWD=(s,e,wd)=>{let n=0;const d=new Date(s),en=new Date(e);while(d<=en){if(wd.includes(d.getDay()))n++;d.setDate(d.getDate()+1);}return n;};
