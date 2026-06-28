@@ -359,7 +359,7 @@
         if(tot>=se.annualLimit/2) fireOnce('halfway','🏆 Halfway There!',`You've earned ¥${tot.toLocaleString()} — halfway through your ¥${se.annualLimit.toLocaleString()} annual limit`);
         const currDa2=da[mk]||{};const pF2=currDa2.paidFixed||{};
         const sF2=currDa2.skippedFixed||{};
-        const allBillsPaid=(se.fixed||[]).length>0&&(se.fixed||[]).every(f=>sF2[f.id]||pF2[f.id])&&pF2['suica']&&pF2['food']&&(!currDa2.skinTreatment||pF2['skinTreatment'])&&(!(se.showGenSav!==false&&currDa2.saveGen)||pF2['generalSavings']);
+        const allBillsPaid=(se.fixed||[]).length>0&&(se.fixed||[]).every(f=>sF2[f.id]||pF2[f.id])&&pF2['suica']&&pF2['food']&&(!currDa2.skinTreatment||pF2['skinTreatment'])&&(!(se.showGenSav!==false&&currDa2.saveGen)||pF2['generalSavings'])&&(!(se.showSilver!==false&&currDa2.saveSilver!==false&&(currDa2.silverInvest||0)>0)||pF2['silverInvest']);
         if(allBillsPaid) fireOnce('allpaid-'+mk,'✅ All Bills Paid!',`Every fixed expense is marked as paid for ${curMo?.label||'this month'} — nice work!`);
         const dayEarnings=se.hourlyWage*6;
         if(rem2>0&&rem2<dayEarnings*2) fire('lastday','📆 Almost at the Limit',`Only ¥${rem2.toLocaleString()} left — your next shift could exceed your annual limit!`);
@@ -413,7 +413,7 @@
       // genSavAmount but can be overridden per month (d.genSavAmt).
       const genSavM=mk=>{const d=da[mk];if(!(se.showGenSav!==false)||!d||!d.saveGen)return 0;return d.genSavAmt>0?d.genSavAmt:(se.genSavAmount||0);};
       // Silver investment: ¥ you convert to USD each month (a budget outflow; syncs to the Silver page).
-      const silverM=mk=>{const d=da[mk];return(se.showSilver!==false&&d&&d.silverInvest>0)?d.silverInvest:0;};
+      const silverM=mk=>{const d=da[mk];return(se.showSilver!==false&&d&&d.saveSilver!==false&&d.silverInvest>0)?d.silverInvest:0;};
       // USD invested in silver for a month: from the budget's ¥ silver investment (÷ rate), else the manual figure.
       const silverUsdM=mk=>{const d=da[mk]||{};const inv=silverM(mk);return inv>0?Math.round(inv/(se.usdToJpy||155)):(d.silverUsd||0);};
       const genSavTotal=MONTHS.reduce((s,mo)=>s+genSavM(mo.key),0);
@@ -499,8 +499,8 @@
       const cmOut=monthOut(cmk);
       const cmFree=cmPayOnly+cmDadFree+cmExtra-cmOut;
       const cmFreeD=useCountUp(cmFree);
-      const bdLeftPay=(()=>{let u=0;se.fixed.forEach(f=>{if(!cmSF[f.id]&&!cmPF[f.id])u+=cmFx(f);});if(!cmPF["suica"])u+=cmCm;if(!cmPF["food"])u+=cmFd;if(!cmPF["skinTreatment"])u+=cmSkin;if(!cmPF["generalSavings"])u+=cmGenSav;return u;})();
-      const homeBillIds=[...se.fixed.filter(f=>!cmSF[f.id]).map(f=>f.id),"suica","food",...(se.showSkin!==false&&cmSkin>0?["skinTreatment"]:[]),...(se.showGenSav!==false&&cmGenSav>0?["generalSavings"]:[])];
+      const bdLeftPay=(()=>{let u=0;se.fixed.forEach(f=>{if(!cmSF[f.id]&&!cmPF[f.id])u+=cmFx(f);});if(!cmPF["suica"])u+=cmCm;if(!cmPF["food"])u+=cmFd;if(!cmPF["skinTreatment"])u+=cmSkin;if(!cmPF["generalSavings"])u+=cmGenSav;const cmSilverAmt=silverM(cmk);if(cmSilverAmt>0&&!cmPF["silverInvest"])u+=cmSilverAmt;return u;})();
+      const homeBillIds=[...se.fixed.filter(f=>!cmSF[f.id]).map(f=>f.id),"suica","food",...(se.showSkin!==false&&cmSkin>0?["skinTreatment"]:[]),...(se.showGenSav!==false&&cmGenSav>0?["generalSavings"]:[]),...(se.showSilver!==false&&silverM(cmk)>0?["silverInvest"]:[])];
       const homeBillCount=homeBillIds.length;
       const homePaidCount=homeBillIds.filter(id=>cmPF[id]).length;
       const bmLabel=MONTHS.find(x=>x.key===cmk)?.label||"";
@@ -995,10 +995,12 @@
                         <button onClick={()=>sM(bm,"saveGen",!on)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:on?c.muted:c.greenD,fontFamily:mn,padding:"0 2px",flexShrink:0,fontWeight:on?400:700}}>{on?"Skip":"Save this month"}</button>
                       </div></div>
                     );})()}
-                    {se.showSilver!==false&&(()=>{const inv=bd.silverInvest||0;const usd=se.usdToJpy>0?inv/se.usdToJpy:0;return(
+                    {se.showSilver!==false&&(()=>{const on=bd.saveSilver!==false;const paid=bdPF["silverInvest"];const inv=bd.silverInvest||0;const usd=se.usdToJpy>0?inv/se.usdToJpy:0;return(
                       <div style={rw}><div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
-                        <span style={{flex:1,color:inv>0?c.text:c.muted,fontWeight:inv>0?500:400}}>🪙 Silver investment{inv>0&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>≈ ${usd.toFixed(2)}</span>}</span>
-                        <input type="number" inputMode="numeric" value={inv||""} placeholder="0" onChange={e=>sM(bm,"silverInvest",Number(e.target.value)||0)} style={{...inp,width:84,padding:"6px 10px",textAlign:"right",flexShrink:0}}/>
+                        {on&&<PaidBtn paid={paid} onToggle={()=>tPF(bm,"silverInvest")}/>}
+                        <span style={{flex:1,color:on?(paid?c.muted:c.text):c.muted,textDecoration:paid?"line-through":"none",fontWeight:on&&!paid?500:400}}>🪙 Silver investment{inv>0&&on&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>≈ ${usd.toFixed(2)}</span>}{!on&&<span style={{fontSize:10,color:c.muted,marginLeft:6}}>· not investing</span>}</span>
+                        {on?<input type="number" inputMode="numeric" value={inv||""} placeholder="0" onChange={e=>sM(bm,"silverInvest",Number(e.target.value)||0)} style={{...inp,width:84,padding:"6px 10px",textAlign:"right",flexShrink:0}}/>:<span style={{color:c.muted,flexShrink:0}}>—</span>}
+                        <button onClick={()=>sM(bm,"saveSilver",!on)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:on?c.muted:c.greenD,fontFamily:mn,padding:"0 2px",flexShrink:0,fontWeight:on?400:700}}>{on?"Skip":"Invest this month"}</button>
                       </div></div>
                     );})()}
                     <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total Fixed</span><span style={{fontWeight:700,fontSize:16,color:c.lavD}}>{yn(bdFT)}</span></div>
