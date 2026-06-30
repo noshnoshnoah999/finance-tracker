@@ -1,6 +1,86 @@
 # Budget App — Handoff
 
-_Last updated: 2026-06-28_
+_Last updated: 2026-07-01_
+
+---
+
+## Session 2026-07-01 — Silver Investment checkbox/skip + git collision incident
+
+**Done this session:**
+
+1. **Silver Investment row now matches General Savings UX** (checkbox to mark
+   paid, amount field, "Skip / Invest this month" toggle that zeroes the
+   amount for that month without deleting the stored figure). Landed via
+   commit `c35263b` ("Add checkbox and Skip button to Silver Investment row").
+   - Field name used: `saveSilver` (boolean, `undefined`/`true` = investing,
+     `false` = skipped — same back-compat pattern as `saveGen`).
+   - `silverM(mk)` now gates on `d.saveSilver!==false`.
+   - `bdLeftPay` (Budget tab "Left to pay") and `homeBillIds`/`homePaidCount`
+     (Home tab paid-count badge) now both include `silverInvest` when active —
+     previously Silver was counted in "Total Fixed" but silently dropped from
+     "Left to pay" and the Home paid-count, which was a real bug.
+   - `allBillsPaid` (drives the "✅ All Bills Paid!" notification) now also
+     requires silver to be paid before firing, when active.
+   - Applied identically to both `app.html` and `index.html`.
+
+2. **Duplicate-work incident, resolved.** A separate Claude Code terminal
+   session (branch `claude/things-need-fixing-qgyh2n`, commit `c35263b`,
+   2026-06-28) had independently built the same feature with a more complete
+   scope (also touched `index.html`, `allBillsPaid`, `homeBillIds` — areas
+   this Cowork session's first attempt missed). Cowork's own attempt (commit
+   `44820c3`, field name `investSilver`, narrower scope) was discarded via
+   `git reset --hard origin/main` in favor of the terminal session's version.
+   Remote branch `claude/things-need-fixing-qgyh2n` deleted after merge
+   (already in `main`).
+   - **Root cause:** Cowork sandbox and Noah's local terminal share the same
+     `.git` directory (Cowork mounts the selected folder directly — not a
+     separate clone). Concurrent git operations from both sides produced
+     stale `index.lock` / `HEAD.lock` files; the sandbox could not delete its
+     own lock files (`Operation not permitted`), so Noah had to clear them
+     from his terminal each time.
+   - **Standing rule saved to memory** (`git-shared-repo-collision.md`):
+     coordinate before git ops from either side; check `git log`/`git fetch`
+     at the start of a session in case a parallel Claude Code session already
+     touched the same area; all pushes/remote-branch deletes must run from
+     Noah's terminal — **the Cowork sandbox has no GitHub push credentials.**
+
+3. **Confirmed pushed:** commit `1654ed3` ("Fix Jan–Apr 2026 pay records
+   against actual payslips") from the 2026-06-28 session — listed as
+   "NOT pushed" in that session's notes, but verified now present on
+   `origin/main`. Item closed below.
+
+**Open / to do (carried forward, still unresolved):**
+
+1. ~~Push commit `1654ed3` to GitHub.~~ **Done — confirmed on `origin/main`.**
+2. **5-week-month contradiction — still UNRESOLVED, blocks 2027 build-out.**
+   Code (`MONTHS`, ~line 68) flags Mar/Jun/Aug/Nov 2026 as `is5wk` (drives
+   ¥20k vs ¥25k food money to Mum). Noah said Jan/May/Jul/Oct. Need to settle
+   which is right (test: which 2026 month did Noah actually send Mum
+   ¥25,000?) before building 2027 months — `MONTHS` currently ends Dec 2026.
+3. **Calendar work-days override displayed days** — stored `days` were
+   corrected per payslip, but the on-screen count comes from the Budget-tab
+   calendar via `gWorkDays`, so displayed numbers (e.g. Jan showed 12 not 4)
+   may still be wrong. Noah needs to fix the calendar entries directly.
+4. **Stale transport rates for calculated (May-2026-onward) months** —
+   `commuteOneWay`, `trBefore`, `trAfter` (~line 82) reflect Noah's old
+   address; he's moved and new daily transport cost is higher. Code's
+   rate-change cutoff is `k<="2026-03"` (14 Mar), not May — needs correcting.
+   Note: `commuteOneWay` is one-way (×2 in code, ~line 370) and drives SUICA
+   only, not the monthly transport figure (that's `trBefore`/`trAfter`).
+5. **¥1,030,000 limit assumption unverified** — app excludes transport from
+   the limit count (standard JP treatment) but Noah's exact threshold hasn't
+   been confirmed against his actual situation.
+6. **Two unfinished side tasks** (unrelated to the app itself): (a) Google
+   Doc on Nitori topper (product 7544982, semi-double) with price +
+   alternatives; (b) Google Doc of JR Keiyō Line trains departing
+   Shin-Urayasu 9:00–11:00, both directions.
+
+**KNOWN TOOL ISSUE (carried forward):** Control Chrome MCP
+`execute_javascript` / `get_page_content` errors "Chrome not running" even
+with tabs visible and permissions granted — confirmed broken regardless of
+permission resets. JS-rendered prices/timetables (Nitori, Yahoo transit)
+can't be auto-read this way. Have Noah read values off-screen; do NOT guess
+money or train-time figures.
 
 ---
 
