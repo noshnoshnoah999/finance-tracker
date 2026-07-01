@@ -106,7 +106,9 @@ struct WageView: View {
                     }
 
                     fieldLabel("Days worked")
-                    Text("\(c.workDaysInMonth(mo.key)) days")
+                    // Days Worked / Transport describe the PREVIOUS calendar month's work (same
+                    // arrears convention as paid leave, matching the "Hours worked in {prevMonth}" label above).
+                    Text("\(c.workDaysInMonth(c.prevMK(mo.key) ?? mo.key)) days")
                         .frame(maxWidth: .infinity, alignment: .leading).padding(12)
                         .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     Text("From your calendar (Budget tab). Drives transport & SUICA.").font(.caption2).foregroundStyle(T.sub)
@@ -117,7 +119,7 @@ struct WageView: View {
                         if d.d("wageOverride") <= 0 && c.paidLeaveYen(mo.key) > 0 {
                             breakdownRow("Paid leave", yen(c.paidLeaveYen(mo.key)), color: T.blueD)
                         }
-                        breakdownRow(d.d("wageOverride") > 0 ? "Transport" : "Transport (\(c.workDaysInMonth(mo.key))d)", yen(tr), bold: false)
+                        breakdownRow(d.d("wageOverride") > 0 ? "Transport" : "Transport (\(c.workDaysInMonth(c.prevMK(mo.key) ?? mo.key))d)", yen(tr), bold: false)
                         Divider().overlay(T.border)
                         breakdownRow("Total pay", yen(total), bold: true)
                     }

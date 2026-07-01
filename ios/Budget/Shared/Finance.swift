@@ -107,14 +107,16 @@ struct Calc {
         return r
     }
 
+    /// Flat hours credited for each Paid Leave day, regardless of that day's scheduled shift length.
+    static let plHoursPerDay: Double = 7
+
     // MARK: Paid leave hours in a month
     func plHours(_ mk: String) -> Double {
         let (y, m) = ym(mk)
         let cd = month(mk)["customDays"] ?? .object([:])
-        let sh = shifts(mk)
         var h = 0.0
         for d in 1...daysInMonth(y, m) where dayState(dstr(y, m, d), y, m, d, cd) == "pl" {
-            if let s = sh[String(jsDay(y, m, d))] { h += shiftHours(s) }
+            h += Calc.plHoursPerDay
         }
         return h
     }
@@ -131,7 +133,10 @@ struct Calc {
     func transport(_ mk: String) -> Double {
         let d = month(mk)
         if d.d("wageOverride") > 0 { return d.d("transportOverride") }   // the portion you entered, not added on top
-        return Double(workDaysInMonth(mk)) * transportRate(mk)   // derive from the calendar (source of truth)
+        // Transport is paid alongside wage for the PREVIOUS calendar month's work (same
+        // arrears convention as paidLeaveYen) — count work-days from prevMK(mk), not mk itself.
+        let refMK = prevMK(mk) ?? mk
+        return Double(workDaysInMonth(refMK)) * transportRate(mk)   // derive from the calendar (source of truth)
     }
 
     func prevMK(_ mk: String) -> String? {
