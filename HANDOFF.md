@@ -4,6 +4,70 @@ _Last updated: 2026-07-01_
 
 ---
 
+## Session 2026-07-01 (Cowork, later) — Days Worked / Transport / Paid Leave / native calendar grid fixes
+
+**Done this session:**
+
+1. **"Days Worked" / "Transport" month-mismatch bug — FIXED, commit `e98a4b8`.**
+   This is the fix for the "Calendar work-days override displayed days" item
+   below (Jan showed 12 not 4, etc.) — **confirmed independently this session**,
+   not just theorized. Root cause: the Wage-tab pay-period card for month `mk`
+   (e.g. "July 15th") stores/labels its hours as "Hours Worked in {prevMonth}"
+   (June), and Paid Leave already correctly read `gPLHours(prevMK)` — but
+   `gWorkDays`/`gTr` (Transport) and the "Days Worked" display box read `mk`
+   directly (July's own calendar) instead of `prevMK` (June's). Fixed in
+   `app.html` (`gTr`, "Days Worked" box, Schedule Overview "Days" column,
+   Transport breakdown label) and mirrored in `Finance.swift` (`transport()`) /
+   `WageView.swift` ("Days worked" text, Transport breakdown label). Verified
+   live against Noah's real Supabase data via Claude-in-Chrome: July 15th card
+   now shows Days Worked = 6 (was 12), matching the June calendar's actual
+   marked work days.
+2. **Paid leave now flat 7h/day — FIXED, same commit `e98a4b8`.** Was crediting
+   each PL day's actual scheduled shift length (`shiftHours`); now always
+   `PL_HOURS_PER_DAY = 7` (web: `gPLHours` in `app.html`; native:
+   `Calc.plHoursPerDay` in `Finance.swift`).
+3. **Native calendar grid bug — FIXED, commit `581ccce`.** July/Aug (and any
+   month where day 1 isn't Monday) showed day 1 missing and the next few days
+   shifted into the wrong weekday columns, self-correcting after ~day 5. Root
+   cause was native-only: `BudgetTabView.swift`'s `calendarCard` used
+   `ForEach(0..<lead, id: \.self)` for leading blank cells and
+   `ForEach(1...dim, id: \.self)` for day cells in the same `LazyVGrid` — both
+   plain positive `Int` ids, so whenever `lead > 0` they collided (e.g. Aug:
+   blanks 0-4, days 1-31 → ids 1-4 in both). Web's `renderCal` had always
+   avoided this (`key="e"+i` vs `key=d2`); the native port dropped that
+   disambiguation back on 2026-06-14 (commit `873b067`) and it was never caught
+   because nobody had visually checked native on a month where day 1 ≠ Monday
+   until now. Fixed by giving leading blanks negative ids (`(-lead)..<0`), which
+   can never collide with the positive day numbers. **Confirmed working by
+   Noah on-device** after rebuild + reinstall via `reinstall_budget.sh`.
+4. **Web app verified directly** (not just read) via Claude-in-Chrome against
+   Noah's real Supabase data — pulled actual pixel positions of calendar day
+   buttons vs. weekday headers for June/July/Aug, confirmed correct before
+   concluding the web app had no bug. Useful technique for next time something
+   "looks broken" but the code reads fine — don't just re-read the code,
+   actually render it against real data before telling Noah it's not a bug.
+5. **Open finding, not yet resolved:** hardcoded `PAID_LEAVE` array in
+   `app.html` includes `"2026-06-01"` as a default paid-leave day. This
+   silently added a 3rd June PL day (alongside the 7th/8th Noah actually took),
+   inflating paid leave to ¥29,400 instead of the expected ¥19,600 for 2 days.
+   Noah resolved it for June by tapping June 1st on the Budget-tab calendar to
+   override it away from "pl" (customDays overrides win over the hardcoded
+   list). **The hardcoded list itself was not edited** — worth checking whether
+   the other dates still in it (`2026-05-24`, `2026-05-25`, `2026-05-31`,
+   `2026-06-07`) are still correct, or removing the whole mechanism now that
+   the calendar's customDays is the real source of truth.
+
+**Git note:** same lock-file collision as the session below recurred on
+*every* commit made from this Cowork sandbox today (`e98a4b8`, `581ccce`) —
+even when no concurrent terminal session was obviously running one. Noah
+cleared it from his terminal (`rm -f .git/index.lock .git/HEAD.lock`) each
+time. Commit `e98a4b8` is confirmed pushed (present on `origin/main`); commit
+`581ccce` (native calendar fix) still needs pushing — per the updated push
+workflow, ask **Claude Code** to push it rather than Noah running
+`git push` by hand.
+
+---
+
 ## Session 2026-07-01 — Silver Investment checkbox/skip + git collision incident
 
 **Done this session:**
@@ -72,13 +136,10 @@ _Last updated: 2026-07-01_
    ¥20k vs ¥25k food money to Mum). Noah said Jan/May/Jul/Oct. Need to settle
    which is right (test: which 2026 month did Noah actually send Mum
    ¥25,000?) before building 2027 months — `MONTHS` currently ends Dec 2026.
-4. **Calendar work-days override displayed days** — stored `days` were
-   corrected per payslip, but the on-screen count comes from the Budget-tab
-   calendar via `gWorkDays`, so displayed numbers (e.g. Jan showed 12 not 4)
-   may still be wrong. **Possibly partially addressed by `e98a4b8`** (pushed
-   to `origin/main` today, 2026-07-01, by a separate session — changed
-   Days Worked/Transport to reference the previous calendar month). Not
-   independently verified this session; re-check before assuming it's fixed.
+4. ~~Calendar work-days override displayed days.~~ **FIXED and independently
+   verified** in the Cowork session above (`e98a4b8`) — confirmed live against
+   Noah's real data that Days Worked now shows the correct previous-month count
+   (e.g. July 15th card → 6, matching June's calendar).
 5. **Stale transport rates for calculated (May-2026-onward) months** —
    `commuteOneWay`, `trBefore`, `trAfter` (~line 82) reflect Noah's old
    address; he's moved and new daily transport cost is higher. Code's
