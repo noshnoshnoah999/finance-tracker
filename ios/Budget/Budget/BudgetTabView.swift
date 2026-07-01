@@ -15,6 +15,7 @@ struct BudgetTabView: View {
     @State private var nxAmount = ""
     @State private var ndNote = ""
     @State private var ndGbp = ""
+    @State private var editingFood = false
 
     var body: some View {
         let c = store.calc
@@ -35,6 +36,7 @@ struct BudgetTabView: View {
         }
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
+        .onChange(of: bm) { _, _ in editingFood = false }
     }
 
     // MARK: Month chips
@@ -226,7 +228,7 @@ struct BudgetTabView: View {
                 fixedRow(c, f)
             }
             builtinRow(c, id: "suica", label: "SUICA (\(c.suicaDays(bm)) days)", amount: c.commute(bm))
-            builtinRow(c, id: "food", label: "Food (\(monthMeta(bm)?.is5wk == true ? "5-wk" : "4-wk"))", amount: c.food(bm))
+            foodRow(c)
             if c.showSkin && c.skin(bm) > 0 { builtinRow(c, id: "skinTreatment", label: "Skin treatment", amount: c.skin(bm)) }
             if c.showGenSav { genSavRow(c) }
             if c.showSilver { silverRow(c) }
@@ -357,6 +359,42 @@ struct BudgetTabView: View {
         }
         .font(.footnote)
     }
+    @ViewBuilder private func foodRow(_ c: Calc) -> some View {
+        let paid = store.blob.data[bm]?["paidFixed"]?["food"]?.bool ?? false
+        let hasOverride = store.blob.data[bm]?["foodOverride"]?.double != nil
+        let amount = c.food(bm)
+        let label = "Food (" + (hasOverride ? "custom" : (monthMeta(bm)?.is5wk == true ? "5-wk" : "4-wk")) + ")"
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                if !editingFood { paidCircle(paid) { store.toggleBoolMap(bm, "paidFixed", "food") } }
+                Text(label).foregroundStyle(paid && !editingFood ? T.muted : T.text).strikethrough(paid && !editingFood)
+                    .onTapGesture { editingFood = true }
+                Spacer()
+                if editingFood {
+                    TextField("0", value: Binding<Double>(
+                        get: { amount },
+                        set: { store.setMonthNullable(bm, "foodOverride", $0) }
+                    ), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 90).modifier(FieldStyle())
+                } else {
+                    Text(yen(amount)).fontWeight(.semibold).foregroundStyle(paid ? T.muted : T.text)
+                        .onTapGesture { editingFood = true }
+                }
+            }
+            .font(.footnote)
+            if editingFood {
+                HStack(spacing: 12) {
+                    if hasOverride {
+                        Button("Reset") { store.setMonthNullable(bm, "foodOverride", nil) }
+                            .font(.caption2).foregroundStyle(T.muted).buttonStyle(.plain)
+                    }
+                    Spacer()
+                    Button("Done") { editingFood = false }
+                        .font(.caption2).fontWeight(.semibold).foregroundStyle(T.greenD).buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
     @ViewBuilder private func builtinRow(_ c: Calc, id: String, label: String, amount: Double) -> some View {
         let paid = store.blob.data[bm]?["paidFixed"]?[id]?.bool ?? false
         HStack(spacing: 10) {
