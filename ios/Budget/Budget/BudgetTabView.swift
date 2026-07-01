@@ -317,7 +317,7 @@ struct BudgetTabView: View {
         let paid = store.blob.data[bm]?["paidFixed"]?["generalSavings"]?.bool ?? false
         HStack(spacing: 10) {
             if on { paidCircle(paid) { store.toggleBoolMap(bm, "paidFixed", "generalSavings") } }
-            Text("💰 General savings").foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted).strikethrough(paid)
+            Text("General savings").foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted).strikethrough(paid)
             if !on { Text("· not saving").font(.caption2).foregroundStyle(T.muted) }
             Spacer()
             if on {
@@ -340,7 +340,7 @@ struct BudgetTabView: View {
         let usd = c.usdToJpy > 0 ? inv / c.usdToJpy : 0
         HStack(spacing: 10) {
             if on { paidCircle(paid) { store.toggleBoolMap(bm, "paidFixed", "silverInvest") } }
-            Text("🪙 Silver investment").foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted).strikethrough(paid)
+            Text("Silver investment").foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted).strikethrough(paid)
             if on && inv > 0 { Text("≈ $\(String(format: "%.2f", usd))").font(.caption2).foregroundStyle(T.sub) }
             if !on { Text("· not investing").font(.caption2).foregroundStyle(T.muted) }
             Spacer()

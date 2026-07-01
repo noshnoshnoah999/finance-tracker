@@ -996,7 +996,7 @@
                     {se.showGenSav!==false&&(()=>{const on=!!bd.saveGen,paid=bdPF["generalSavings"];const amt=bd.genSavAmt>0?bd.genSavAmt:(se.genSavAmount||0);return(
                       <div style={rw}><div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
                         {on&&<PaidBtn paid={paid} onToggle={()=>tPF(bm,"generalSavings")}/>}
-                        <span style={{flex:1,color:on?(paid?c.muted:c.text):c.muted,textDecoration:paid?"line-through":"none",fontWeight:on&&!paid?500:400}}>💰 General Savings{!on&&<span style={{fontSize:10,color:c.muted,marginLeft:6}}>· not saving</span>}</span>
+                        <span style={{flex:1,color:on?(paid?c.muted:c.text):c.muted,textDecoration:paid?"line-through":"none",fontWeight:on&&!paid?500:400}}>General Savings{!on&&<span style={{fontSize:10,color:c.muted,marginLeft:6}}>· not saving</span>}</span>
                         {on?<input type="number" inputMode="numeric" value={amt||""} placeholder={String(se.genSavAmount||0)} onChange={e=>sM(bm,"genSavAmt",Number(e.target.value)||0)} style={{...inp,width:84,padding:"6px 10px",textAlign:"right",flexShrink:0}}/>:<span style={{color:c.muted,flexShrink:0}}>—</span>}
                         <button onClick={()=>sM(bm,"saveGen",!on)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:on?c.muted:c.greenD,fontFamily:mn,padding:"0 2px",flexShrink:0,fontWeight:on?400:700}}>{on?"Skip":"Save this month"}</button>
                       </div></div>
@@ -1004,7 +1004,7 @@
                     {se.showSilver!==false&&(()=>{const on=bd.saveSilver!==false;const paid=bdPF["silverInvest"];const inv=bd.silverInvest||0;const usd=se.usdToJpy>0?inv/se.usdToJpy:0;return(
                       <div style={rw}><div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
                         {on&&<PaidBtn paid={paid} onToggle={()=>tPF(bm,"silverInvest")}/>}
-                        <span style={{flex:1,color:on?(paid?c.muted:c.text):c.muted,textDecoration:paid?"line-through":"none",fontWeight:on&&!paid?500:400}}>🪙 Silver investment{inv>0&&on&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>≈ ${usd.toFixed(2)}</span>}{!on&&<span style={{fontSize:10,color:c.muted,marginLeft:6}}>· not investing</span>}</span>
+                        <span style={{flex:1,color:on?(paid?c.muted:c.text):c.muted,textDecoration:paid?"line-through":"none",fontWeight:on&&!paid?500:400}}>Silver investment{inv>0&&on&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>≈ ${usd.toFixed(2)}</span>}{!on&&<span style={{fontSize:10,color:c.muted,marginLeft:6}}>· not investing</span>}</span>
                         {on?<input type="number" inputMode="numeric" value={inv||""} placeholder="0" onChange={e=>sM(bm,"silverInvest",Number(e.target.value)||0)} style={{...inp,width:84,padding:"6px 10px",textAlign:"right",flexShrink:0}}/>:<span style={{color:c.muted,flexShrink:0}}>—</span>}
                         <button onClick={()=>sM(bm,"saveSilver",!on)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:on?c.muted:c.greenD,fontFamily:mn,padding:"0 2px",flexShrink:0,fontWeight:on?400:700}}>{on?"Skip":"Invest this month"}</button>
                       </div></div>
