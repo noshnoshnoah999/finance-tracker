@@ -255,8 +255,13 @@ struct Calc {
         return ov > 0 ? ov : genSavAmount
     }
     // Silver investment (¥) for a month — a budget outflow; syncs to the Silver page as USD.
+    // saveSilver mirrors saveGen's toggle, but defaults ON (undefined != false) for
+    // back-compat with entries made before the toggle existed — matches web's silverM().
     var showSilver: Bool { se["showSilver"]?.bool != false }
-    func silverInvest(_ mk: String) -> Double { showSilver ? month(mk).d("silverInvest") : 0 }
+    func silverInvest(_ mk: String) -> Double {
+        guard showSilver, month(mk)["saveSilver"]?.bool != false, month(mk).d("silverInvest") > 0 else { return 0 }
+        return month(mk).d("silverInvest")
+    }
     func silverUsd(_ mk: String) -> Double {
         let inv = silverInvest(mk)
         return inv > 0 ? (inv / (se.d("usdToJpy", DS.usdToJpy))).rounded() : month(mk).d("silverUsd")
@@ -308,6 +313,7 @@ struct Calc {
         ids += ["suica", "food"]
         if showSkin && skin(mk) > 0 { ids.append("skinTreatment") }
         if showGenSav && genSav(mk) > 0 { ids.append("generalSavings") }
+        if showSilver && silverInvest(mk) > 0 { ids.append("silverInvest") }
         return ids
     }
     func paidCount(_ mk: String) -> Int {
@@ -327,6 +333,7 @@ struct Calc {
         if pf["food"]?.bool != true { u += food(mk) }
         if pf["skinTreatment"]?.bool != true { u += skin(mk) }
         if pf["generalSavings"]?.bool != true { u += genSav(mk) }
+        if pf["silverInvest"]?.bool != true { u += silverInvest(mk) }
         return u
     }
 

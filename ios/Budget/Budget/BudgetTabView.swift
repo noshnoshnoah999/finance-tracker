@@ -331,16 +331,26 @@ struct BudgetTabView: View {
         .font(.footnote)
     }
     @ViewBuilder private func silverRow(_ c: Calc) -> some View {
+        let on = store.blob.data[bm]?["saveSilver"]?.bool != false
+        let paid = store.blob.data[bm]?["paidFixed"]?["silverInvest"]?.bool ?? false
         let inv = store.blob.data[bm]?["silverInvest"]?.double ?? 0
         let usd = c.usdToJpy > 0 ? inv / c.usdToJpy : 0
         HStack(spacing: 10) {
-            Text("🪙 Silver investment").foregroundStyle(inv > 0 ? T.text : T.muted)
-            if inv > 0 { Text("≈ $\(String(format: "%.2f", usd))").font(.caption2).foregroundStyle(T.sub) }
+            if on { paidCircle(paid) { store.toggleBoolMap(bm, "paidFixed", "silverInvest") } }
+            Text("🪙 Silver investment").foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted).strikethrough(paid)
+            if on && inv > 0 { Text("≈ $\(String(format: "%.2f", usd))").font(.caption2).foregroundStyle(T.sub) }
+            if !on { Text("· not investing").font(.caption2).foregroundStyle(T.muted) }
             Spacer()
-            TextField("0", value: Binding<Double>(
-                get: { store.blob.data[bm]?["silverInvest"]?.double ?? 0 },
-                set: { store.setMonth(bm, "silverInvest", .number($0)) }
-            ), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 80).modifier(FieldStyle())
+            if on {
+                TextField("0", value: Binding<Double>(
+                    get: { store.blob.data[bm]?["silverInvest"]?.double ?? 0 },
+                    set: { store.setMonth(bm, "silverInvest", .number($0)) }
+                ), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 80).modifier(FieldStyle())
+            } else {
+                Text("—").fontWeight(.semibold).foregroundStyle(T.muted)
+            }
+            Button(on ? "Skip" : "Invest this month") { store.setMonth(bm, "saveSilver", .bool(!on)) }
+                .font(.caption2).foregroundStyle(on ? T.muted : T.greenD).buttonStyle(.plain)
         }
         .font(.footnote)
     }
