@@ -70,7 +70,10 @@ struct BudgetTabView: View {
                 ForEach(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], id: \.self) {
                     Text($0).font(.caption2).foregroundStyle(T.sub)
                 }
-                ForEach(0..<lead, id: \.self) { _ in Color.clear.frame(height: 40) }
+                // Leading blanks use negative ids so they can never collide with the
+                // positive day-number ids below — mirrors the web's "e"+i vs d2 key split,
+                // which this native port had dropped (plain 0..<lead ids overlapped 1...dim).
+                ForEach((-lead)..<0, id: \.self) { _ in Color.clear.frame(height: 40) }
                 ForEach(1...dim, id: \.self) { d in
                     dayCell(c, y, mo, d)
                 }
