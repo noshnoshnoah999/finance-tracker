@@ -4,6 +4,7 @@
 
 import Foundation
 import SwiftUI
+import WidgetKit
 
 @MainActor
 final class BudgetStore: ObservableObject {
@@ -116,7 +117,15 @@ final class BudgetStore: ObservableObject {
         req.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
         let payload = Payload(user_key: userKey, data: blob, updated_at: ISO8601DateFormatter().string(from: Date()))
         req.httpBody = try? JSONEncoder().encode(payload)
-        do { _ = try await URLSession.shared.data(for: req); setSync("Synced") }
+        do {
+            _ = try await URLSession.shared.data(for: req)
+            setSync("Synced")
+            // Otherwise the Home/Lock-Screen widget only refreshes on its own 3-hour
+            // timeline schedule (BudgetWidgets.swift) and can show stale figures (e.g.
+            // an old Paid Leave total) for hours after an in-app edit like toggling a
+            // calendar day.
+            WidgetCenter.shared.reloadTimelines(ofKind: "BudgetWidget")
+        }
         catch { setSync("Offline") }
     }
 
