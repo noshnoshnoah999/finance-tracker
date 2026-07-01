@@ -22,6 +22,16 @@ _Last updated: 2026-07-01_
    - `allBillsPaid` (drives the "✅ All Bills Paid!" notification) now also
      requires silver to be paid before firing, when active.
    - Applied identically to both `app.html` and `index.html`.
+   - **Native (SwiftUI) was initially MISSED** — Claude only touched the web
+     app in the first pass. Noah caught this. Ported in commit `b6a78a3`:
+     `Finance.swift` (`silverInvest`, `homeBillIds`, `leftToPay` — same
+     `saveSilver!=false` back-compat gate) and `BudgetTabView.swift`
+     (`silverRow` UI, mirrors `genSavRow`). **Not built/tested — no Xcode in
+     the Cowork sandbox. Build on Mac (Catalyst + iPhone) before trusting.**
+     New standing rule saved to memory (`web-native-parity.md`): any budget
+     logic/feature change must hit both `app.html`/`index.html` AND
+     `ios/Budget/` going forward — check for the native codebase before
+     starting, not after.
 
 2. **Duplicate-work incident, resolved.** A separate Claude Code terminal
    session (branch `claude/things-need-fixing-qgyh2n`, commit `c35263b`,
@@ -52,25 +62,33 @@ _Last updated: 2026-07-01_
 **Open / to do (carried forward, still unresolved):**
 
 1. ~~Push commit `1654ed3` to GitHub.~~ **Done — confirmed on `origin/main`.**
-2. **5-week-month contradiction — still UNRESOLVED, blocks 2027 build-out.**
+2. **Build + verify native app after today's silver-toggle port
+   (`b6a78a3`).** Written but never compiled — Xcode isn't available in the
+   Cowork sandbox. Confirm it builds on Catalyst + iPhone and that the Silver
+   Investment row behaves like web (checkbox, skip toggle, amounts match)
+   before trusting it.
+3. **5-week-month contradiction — still UNRESOLVED, blocks 2027 build-out.**
    Code (`MONTHS`, ~line 68) flags Mar/Jun/Aug/Nov 2026 as `is5wk` (drives
    ¥20k vs ¥25k food money to Mum). Noah said Jan/May/Jul/Oct. Need to settle
    which is right (test: which 2026 month did Noah actually send Mum
    ¥25,000?) before building 2027 months — `MONTHS` currently ends Dec 2026.
-3. **Calendar work-days override displayed days** — stored `days` were
+4. **Calendar work-days override displayed days** — stored `days` were
    corrected per payslip, but the on-screen count comes from the Budget-tab
    calendar via `gWorkDays`, so displayed numbers (e.g. Jan showed 12 not 4)
-   may still be wrong. Noah needs to fix the calendar entries directly.
-4. **Stale transport rates for calculated (May-2026-onward) months** —
+   may still be wrong. **Possibly partially addressed by `e98a4b8`** (pushed
+   to `origin/main` today, 2026-07-01, by a separate session — changed
+   Days Worked/Transport to reference the previous calendar month). Not
+   independently verified this session; re-check before assuming it's fixed.
+5. **Stale transport rates for calculated (May-2026-onward) months** —
    `commuteOneWay`, `trBefore`, `trAfter` (~line 82) reflect Noah's old
    address; he's moved and new daily transport cost is higher. Code's
    rate-change cutoff is `k<="2026-03"` (14 Mar), not May — needs correcting.
    Note: `commuteOneWay` is one-way (×2 in code, ~line 370) and drives SUICA
    only, not the monthly transport figure (that's `trBefore`/`trAfter`).
-5. **¥1,030,000 limit assumption unverified** — app excludes transport from
+6. **¥1,030,000 limit assumption unverified** — app excludes transport from
    the limit count (standard JP treatment) but Noah's exact threshold hasn't
    been confirmed against his actual situation.
-6. **Two unfinished side tasks** (unrelated to the app itself): (a) Google
+7. **Two unfinished side tasks** (unrelated to the app itself): (a) Google
    Doc on Nitori topper (product 7544982, semi-double) with price +
    alternatives; (b) Google Doc of JR Keiyō Line trains departing
    Shin-Urayasu 9:00–11:00, both directions.
