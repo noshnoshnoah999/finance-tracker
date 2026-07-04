@@ -10,12 +10,12 @@ struct ContentView: View {
     var body: some View {
         // Keep to 5 tabs so iOS doesn't auto-create its own white "More" overflow
         // list — Limit/Savings/Goals/Settings live in a themed More screen instead.
-        TabView {
-            HomeView().tabItem { Label("Home", systemImage: "house.fill") }
-            WageView().tabItem { Label("Wage", systemImage: "yensign.circle") }
-            BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }
-            SavingsView().tabItem { Label("Savings", systemImage: "banknote") }
-            MoreView().tabItem { Label("More", systemImage: "ellipsis") }
+        TabView(selection: $store.selectedTab) {
+            HomeView().tabItem { Label("Home", systemImage: "house.fill") }.tag(0)
+            WageView().tabItem { Label("Wage", systemImage: "yensign.circle") }.tag(1)
+            BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }.tag(2)
+            SavingsView().tabItem { Label("Savings", systemImage: "banknote") }.tag(3)
+            MoreView().tabItem { Label("More", systemImage: "ellipsis") }.tag(4)
         }
         // Numeric keypads (.numberPad / .decimalPad) have no built-in Return/Done key,
         // so every amount field across the app was previously impossible to dismiss
@@ -38,6 +38,7 @@ func dismissKeyboard() {
 // MARK: - More (custom, themed — replaces iOS's white system overflow tab)
 
 struct MoreView: View {
+    @EnvironmentObject var store: BudgetStore
     var body: some View {
         NavigationStack {
             ZStack {
@@ -52,6 +53,9 @@ struct MoreView: View {
                 }
             }
             .navigationTitle("More")
+            // Deep link: a Home card ("Limit →") switches to this tab and sets openLimit,
+            // which pushes the Limit screen automatically.
+            .navigationDestination(isPresented: $store.openLimit) { LimitView() }
         }
     }
 
@@ -159,6 +163,8 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(T.greenD)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .contentShape(Rectangle())
+        .onTapGesture { store.selectedTab = 1 }
     }
     private func payRow(_ label: String, _ v: Double) -> some View {
         HStack { Text(label).foregroundStyle(.white.opacity(0.9)); Spacer(); Text(yen(v)).fontWeight(.bold).foregroundStyle(.white) }
@@ -202,6 +208,8 @@ struct HomeView: View {
             ProgressBar(fraction: billCount > 0 ? Double(paid) / Double(billCount) : 0, color: leftPay > 0 ? T.lavD : T.greenD)
         }
         .card()
+        .contentShape(Rectangle())
+        .onTapGesture { store.selectedTab = 2 }
     }
 
     // MARK: Room left to earn
@@ -224,6 +232,8 @@ struct HomeView: View {
             }
         }
         .card()
+        .contentShape(Rectangle())
+        .onTapGesture { store.selectedTab = 4; store.openLimit = true }
     }
 
     // MARK: Saved + Silver

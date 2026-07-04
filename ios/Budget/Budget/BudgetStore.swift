@@ -12,6 +12,12 @@ final class BudgetStore: ObservableObject {
     @Published var syncState: String = "Local"
     @Published var loaded = false
 
+    // Cross-view navigation: Home cards ("Wages →", "Budget →", "Limit →") set these
+    // to jump between tabs. Tab order: 0 Home, 1 Wage, 2 Budget, 3 Savings, 4 More.
+    @Published var selectedTab: Int = 0
+    // When true, the More tab deep-links straight into the Limit screen.
+    @Published var openLimit: Bool = false
+
     // Passbook AI UI state
     @Published var pbLoading = false
     @Published var pbMsg = ""

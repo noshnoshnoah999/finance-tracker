@@ -209,6 +209,8 @@
       const [pH,setPH]=useState({pMon:0,pTue:0,pSun:0});
       // Limit-page shift simulator: a list of shifts you're thinking of working.
       const [simShifts,setSimShifts]=useState([]);
+      // Which month the simulator plans for (null = default to the current month).
+      const [simPlanMK,setSimPlanMK]=useState(null);
       const [simAdvice,setSimAdvice]=useState(null);
       const [simLoading,setSimLoading]=useState(false);
       const [simErr,setSimErr]=useState("");
@@ -1222,15 +1224,21 @@
                 })()}
 
                 {/* ── This month's target + shift simulator ── */}
-                {nMK&&(()=>{
+                {(cMN>=1)&&(()=>{
+                  // The month the simulator plans for. Defaults to the current month; the
+                  // picker lets Noah choose any month from now through December.
+                  const curMK=MONTHS[Math.max(0,Math.min(11,cMN-1))].key;
+                  const planMK=simPlanMK&&MONTHS.some(m=>m.key===simPlanMK)?simPlanMK:curMK;
+                  const planLabel=(MONTHS.find(m=>m.key===planMK)||{}).label||"";
+                  const planMonths=MONTHS.slice(Math.max(0,cMN-1)); // current → December
                   // Raw duration of one occurrence of the shift, before any break is subtracted.
                   const rawH=s=>{const a=(s.start||"0:0").split(":").map(Number),b=(s.end||"0:0").split(":").map(Number);return Math.max(0,(b[0]+b[1]/60)-(a[0]+a[1]/60));};
-                  // Breaks are only required (and only deducted) once a shift reaches 3 hours —
-                  // under that, Noah can't take a break at work, so nothing should be subtracted.
-                  const shiftH=s=>{const r=rawH(s);const brk=r>=3?(s.breakMin??60)/60:0;return Math.max(0,r-brk);};
+                  // Breaks are only deducted once a shift runs MORE than 3 hours — a shift of
+                  // 3 hours or under gets no break, so nothing is subtracted.
+                  const shiftH=s=>{const r=rawH(s);const brk=r>3?(s.breakMin??60)/60:0;return Math.max(0,r-brk);};
                   // Day-of-week name -> JS getDay() number, used to count occurrences in the month.
                   const DOWN={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
-                  const occ=s=>s.freq==="once"?1:cDIM(nMK,DOWN[s.day]);
+                  const occ=s=>s.freq==="once"?1:cDIM(planMK,DOWN[s.day]);
                   const plannedH=simShifts.reduce((t,s)=>t+shiftH(s)*occ(s),0);
                   const plannedPay=Math.round(plannedH*se.hourlyWage);
                   const diff=eS-plannedPay;
@@ -1238,7 +1246,7 @@
                   const overYear=projYear>se.annualLimit;
                   const verdict=plannedPay===0?"none":(plannedPay<=eS?"yes":(overYear?"over":"caution"));
                   const vColor=verdict==="yes"?c.greenD:verdict==="caution"?c.peachD:verdict==="over"?c.roseD:c.muted;
-                  const shiftLines=simShifts.map(s=>`- ${s.day} ${s.start}-${s.end}${shiftH(s)>0&&rawH(s)>=3?` (${s.breakMin??60}m break)`:""}${s.freq==="once"?" (this occurrence only)":" (every week)"} = ${shiftH(s).toFixed(1)}h/occurrence × ${occ(s)} this month`).join("\n");
+                  const shiftLines=simShifts.map(s=>`- ${s.day} ${s.start}-${s.end}${shiftH(s)>0&&rawH(s)>3?` (${s.breakMin??60}m break)`:""}${s.freq==="once"?" (this occurrence only)":" (every week)"} = ${shiftH(s).toFixed(1)}h/occurrence × ${occ(s)} in ${planLabel}`).join("\n");
                   return(
                     <React.Fragment>
                       {/* Monthly target — plain language */}
@@ -1257,7 +1265,11 @@
                       {/* Shift simulator */}
                       <div style={crd}>
                         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Can I work these shifts?</span></div>
-                        <div style={{fontSize:12,color:c.sub,marginBottom:14}}>Add the shifts you're thinking of working this month — I'll tell you if you can.</div>
+                        <div style={{fontSize:12,color:c.sub,marginBottom:10}}>Add the shifts you're thinking of working, pick the month, and I'll tell you if you can.</div>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+                          <span style={{fontSize:12,color:c.sub,flexShrink:0}}>Planning for</span>
+                          <select value={planMK} onChange={e=>setSimPlanMK(e.target.value)} style={{...inp,flex:1,padding:"8px 10px",fontWeight:600}}>{planMonths.map(m=>(<option key={m.key} value={m.key}>{m.label}{m.key===curMK?" (this month)":""}</option>))}</select>
+                        </div>
                         {simShifts.length===0&&<div style={{fontSize:13,color:c.muted,marginBottom:10}}>No shifts yet — add one below.</div>}
                         {simShifts.map(s=>(
                           <div key={s.id} style={{marginBottom:10,paddingBottom:10,borderBottom:`1px solid ${c.border}`}}>
@@ -1270,19 +1282,19 @@
                             </div>
                             <div style={{display:"flex",alignItems:"center",gap:6,paddingLeft:2}}>
                               <select value={s.freq||"weekly"} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,freq:e.target.value}:x))} style={{...inp,flex:1,padding:"6px 8px",fontSize:12}}>
-                                <option value="weekly">Every week this month</option>
+                                <option value="weekly">Every week in {planLabel}</option>
                                 <option value="once">Just this once</option>
                               </select>
-                              {(s.freq||"weekly")==="weekly"&&<span style={{fontSize:11,color:c.muted,flexShrink:0}}>× {cDIM(nMK,{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[s.day])} this month</span>}
+                              {(s.freq||"weekly")==="weekly"&&<span style={{fontSize:11,color:c.muted,flexShrink:0}}>× {cDIM(planMK,{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[s.day])} in {planLabel}</span>}
                             </div>
                           </div>
                         ))}
                         <button onClick={()=>setSimShifts(p=>[...p,{id:Date.now(),day:"Mon",start:"09:00",end:"16:00",breakMin:60,freq:"weekly"}])} style={{width:"100%",padding:10,borderRadius:12,border:`1.5px dashed ${c.border}`,background:c.cardAlt,color:c.sub,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:ft,marginBottom:6}}>+ Add a shift</button>
-                        <div style={{fontSize:11,color:c.muted,marginBottom:14}}>Breaks are only deducted for shifts of 3 hours or more (defaults to 60 min). "Every week" repeats the shift for every matching weekday in the month.</div>
+                        <div style={{fontSize:11,color:c.muted,marginBottom:14}}>Breaks are only deducted for shifts longer than 3 hours (defaults to 60 min); a shift of 3 hours or under keeps its full time. "Every week" repeats the shift for every matching weekday in the chosen month.</div>
 
                         {simShifts.length>0&&(<React.Fragment>
                           <div style={{padding:14,background:c.cardAlt,borderRadius:14,fontSize:13,marginBottom:10}}>
-                            <div style={rw}><span style={{color:c.sub}}>This month</span><span style={{fontWeight:700,fontSize:16}}>{plannedH.toFixed(1)}h · {yn(plannedPay)}</span></div>
+                            <div style={rw}><span style={{color:c.sub}}>{planLabel}</span><span style={{fontWeight:700,fontSize:16}}>{plannedH.toFixed(1)}h · {yn(plannedPay)}</span></div>
                             <div style={rw}><span style={{color:c.sub}}>Your monthly target</span><span style={{fontWeight:600}}>{mHP.toFixed(0)}h · {yn(eS)}</span></div>
                             <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{color:c.sub}}>If every month were like this</span><span style={{fontWeight:600,color:overYear?c.roseD:c.text}}>≈ {yn(projYear)}/yr</span></div>
                           </div>

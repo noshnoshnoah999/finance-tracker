@@ -16,8 +16,27 @@ struct LimitView: View {
     @State private var advice: BudgetStore.LimitAdvice?
     @State private var adviceLoading = false
     @State private var adviceErr = ""
+    // Which month the simulator plans for (nil = default to the current month).
+    @State private var planMK: String? = nil
 
     private let dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+    // The current calendar month's key, clamped into the MONTHS array.
+    private var currentMK: String {
+        let cMN = store.calc.currentMonthNumber
+        return MONTHS[max(0, min(MONTHS.count - 1, cMN - 1))].key
+    }
+    // The month actually being planned (chosen month, or current month by default).
+    private var effectivePlanMK: String {
+        if let p = planMK, MONTHS.contains(where: { $0.key == p }) { return p }
+        return currentMK
+    }
+    // Months offered in the picker: current month through December.
+    private var planMonths: [MonthMeta] {
+        let start = max(0, store.calc.currentMonthNumber - 1)
+        return Array(MONTHS[start...])
+    }
+    private var planLabel: String { monthMeta(effectivePlanMK)?.label ?? "" }
 
     var body: some View {
         let c = store.calc
@@ -131,8 +150,24 @@ struct LimitView: View {
                 // Shift simulator
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 10) { RoundedRectangle(cornerRadius: 2).fill(T.peachD).frame(width: 3, height: 18); Text("Can I work these shifts?").font(.headline) }
-                    Text("Add the shifts you're thinking of working this month — I'll tell you if you can.")
+                    Text("Add the shifts you're thinking of working, pick the month, and I'll tell you if you can.")
                         .font(.caption).foregroundStyle(T.sub)
+                    HStack(spacing: 8) {
+                        Text("Planning for").font(.caption).foregroundStyle(T.sub)
+                        Menu {
+                            ForEach(planMonths, id: \.key) { m in
+                                Button(m.key == currentMK ? "\(m.label) (this month)" : m.label) { planMK = m.key }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(planLabel).font(.caption).fontWeight(.semibold)
+                                Image(systemName: "chevron.down").font(.system(size: 9))
+                            }.foregroundStyle(T.text)
+                            .padding(.vertical, 6).padding(.horizontal, 10)
+                            .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        Spacer()
+                    }
 
                     if shifts.isEmpty {
                         Text("No shifts yet — add one below.").font(.footnote).foregroundStyle(T.muted)
@@ -155,18 +190,18 @@ struct LimitView: View {
                             }
                             HStack(spacing: 6) {
                                 Menu {
-                                    Button("Every week this month") { shift.freq = "weekly" }
+                                    Button("Every week in \(planLabel)") { shift.freq = "weekly" }
                                     Button("Just this once") { shift.freq = "once" }
                                 } label: {
                                     HStack(spacing: 4) {
-                                        Text(shift.freq == "once" ? "Just this once" : "Every week this month").font(.caption2)
+                                        Text(shift.freq == "once" ? "Just this once" : "Every week in \(planLabel)").font(.caption2)
                                         Image(systemName: "chevron.down").font(.system(size: 9))
                                     }.foregroundStyle(T.sub)
                                     .padding(.vertical, 5).padding(.horizontal, 8)
                                     .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
                                 if shift.freq != "once" {
-                                    Text("× \(occurrences(shift)) this month").font(.caption2).foregroundStyle(T.muted)
+                                    Text("× \(occurrences(shift)) in \(planLabel)").font(.caption2).foregroundStyle(T.muted)
                                 }
                                 Spacer()
                             }
@@ -178,12 +213,12 @@ struct LimitView: View {
                             .frame(maxWidth: .infinity).padding(10)
                             .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }.buttonStyle(.plain)
-                    Text("Breaks are only deducted for shifts of 3 hours or more (defaults to 60 min). \"Every week\" repeats the shift for every matching weekday in the month.")
+                    Text("Breaks are only deducted for shifts longer than 3 hours (defaults to 60 min); a shift of 3 hours or under keeps its full time. \"Every week\" repeats the shift for every matching weekday in the chosen month.")
                         .font(.caption2).foregroundStyle(T.muted)
 
                     if !shifts.isEmpty {
                         VStack(spacing: 8) {
-                            HStack { Text("This month").foregroundStyle(T.sub); Spacer(); Text("\(fmt1(plannedH))h · \(yen(plannedPay))").fontWeight(.bold) }
+                            HStack { Text(planLabel).foregroundStyle(T.sub); Spacer(); Text("\(fmt1(plannedH))h · \(yen(plannedPay))").fontWeight(.bold) }
                             HStack { Text("Your monthly target").foregroundStyle(T.sub); Spacer(); Text("\(Int(hoursPerMonth))h · \(yen(safe))").fontWeight(.semibold) }
                             Divider().overlay(T.border)
                             HStack { Text("If every month were like this").foregroundStyle(T.sub); Spacer(); Text("≈ \(yen(projYear))/yr").fontWeight(.semibold).foregroundStyle(overYear ? T.roseD : T.text) }
@@ -279,19 +314,16 @@ struct LimitView: View {
     private func at(_ h: Int, _ m: Int) -> Date { Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date()) ?? Date() }
     // Raw duration before any break.
     private func rawHours(_ s: SimShift) -> Double { max(0, s.end.timeIntervalSince(s.start) / 3600) }
-    // Breaks only apply once a shift reaches 3 hours — under that, no break is required or deducted.
+    // Breaks only apply once a shift runs longer than 3 hours — 3h or under gets no break deducted.
     private func shiftHours(_ s: SimShift) -> Double {
         let r = rawHours(s)
-        let brk = r >= 3 ? Double(s.breakMin) / 60 : 0
+        let brk = r > 3 ? Double(s.breakMin) / 60 : 0
         return max(0, r - brk)
     }
     private func occurrences(_ s: SimShift) -> Int {
         guard s.freq != "once" else { return 1 }
         let dowMap: [String: Int] = ["Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6]
-        let c = store.calc
-        let cMN = c.currentMonthNumber
-        let planMK = cMN < MONTHS.count ? MONTHS[cMN].key : MONTHS[MONTHS.count - 1].key
-        return c.weekdayCount(planMK, dowMap[s.day] ?? 1)
+        return store.calc.weekdayCount(effectivePlanMK, dowMap[s.day] ?? 1)
     }
     private func fmt1(_ v: Double) -> String { String(format: "%.1f", v) }
 
@@ -302,7 +334,7 @@ struct LimitView: View {
         let projYear = (earned + plannedPay * Double(nFM)).rounded()
         let f = DateFormatter(); f.dateFormat = "HH:mm"
         let lines = shifts.map { s in
-            "- \(s.day) \(f.string(from: s.start))-\(f.string(from: s.end))\(rawHours(s) >= 3 ? " (\(s.breakMin)m break)" : "")\(s.freq == "once" ? " (this occurrence only)" : " (every week)") = \(fmt1(shiftHours(s)))h/occurrence × \(occurrences(s)) this month"
+            "- \(s.day) \(f.string(from: s.start))-\(f.string(from: s.end))\(rawHours(s) > 3 ? " (\(s.breakMin)m break)" : "")\(s.freq == "once" ? " (this occurrence only)" : " (every week)") = \(fmt1(shiftHours(s)))h/occurrence × \(occurrences(s)) in \(planLabel)"
         }.joined(separator: "\n")
         let ctx: [String: JSONValue] = [
             "annualLimit": .number(limit), "earnedSoFar": .number(earned), "roomLeft": .number(remaining),
