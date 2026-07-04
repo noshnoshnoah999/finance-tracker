@@ -135,6 +135,22 @@ final class BudgetStore: ObservableObject {
         blob.settings[key] = value
         persist()
     }
+    // MARK: - Budget card order (synced via settings.cardOrder; mirrors web se.cardOrder)
+    /// Normalized order: falls back to default, appends any missing cards, drops unknown ids.
+    var cardOrder: [String] {
+        var o = (blob.settings["cardOrder"]?.array ?? []).compactMap { $0.string }
+        if o.isEmpty { o = BUDGET_CARDS }
+        for id in BUDGET_CARDS where !o.contains(id) { o.append(id) }
+        return o.filter { BUDGET_CARDS.contains($0) }
+    }
+    /// Reorder from an EditMode List's .onMove and persist (syncs to web).
+    func moveCards(from source: IndexSet, to destination: Int) {
+        var o = cardOrder
+        o.move(fromOffsets: source, toOffset: destination)
+        blob.settings["cardOrder"] = .array(o.map { .string($0) })
+        persist()
+    }
+
     /// Edit one field of one weekday's shift (settings.shifts."1".start, etc.).
     func setShift(_ day: String, _ field: String, _ value: JSONValue) {
         var shifts = blob.settings["shifts"]?.object ?? [:]

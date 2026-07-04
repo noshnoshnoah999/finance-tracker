@@ -18,27 +18,68 @@ struct BudgetTabView: View {
     @State private var editingFood = false
     @State private var editingGenSav = false
     @State private var editingSilver = false
+    @State private var showReorder = false
 
     var body: some View {
         let c = store.calc
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 monthChips()
-                calendarCard(c)
-                incomeCard(c)
-                dadCard(c)
-                extraMoneyCard(c)
-                fixedCard(c)
-                subCard(c)
-                oneOffCard(c)
-                mumCard(c)
-                freeCard(c)
+                HStack {
+                    Spacer()
+                    Button { showReorder = true } label: {
+                        Label("Reorder cards", systemImage: "arrow.up.arrow.down")
+                            .font(.caption).fontWeight(.semibold)
+                            .padding(.vertical, 7).padding(.horizontal, 14)
+                            .background(T.card).foregroundStyle(T.sub).clipShape(Capsule())
+                    }.buttonStyle(.plain)
+                }
+                ForEach(store.cardOrder, id: \.self) { id in
+                    cardFor(id, c)
+                }
             }
             .padding(20)
         }
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
         .onChange(of: bm) { _, _ in editingFood = false; editingGenSav = false; editingSilver = false }
+        .sheet(isPresented: $showReorder) { reorderSheet }
+    }
+
+    /// Maps a card id to its view (order-driven render; mirrors web card ids).
+    @ViewBuilder private func cardFor(_ id: String, _ c: Calc) -> some View {
+        switch id {
+        case "work":      calendarCard(c)
+        case "income":    incomeCard(c)
+        case "dad":       dadCard(c)
+        case "extra":     extraMoneyCard(c)
+        case "fixed":     fixedCard(c)
+        case "subscribe": subCard(c)
+        case "oneoff":    oneOffCard(c)
+        case "mum":       mumCard(c)
+        case "free":      freeCard(c)
+        default:          EmptyView()
+        }
+    }
+
+    // MARK: Reorder sheet — List in permanent edit mode gives native drag handles.
+    private var reorderSheet: some View {
+        NavigationStack {
+            List {
+                ForEach(store.cardOrder, id: \.self) { id in
+                    Text(BUDGET_CARD_NAMES[id] ?? id)
+                }
+                .onMove { store.moveCards(from: $0, to: $1) }
+            }
+            .environment(\.editMode, .constant(.active))
+            .navigationTitle("Reorder cards")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showReorder = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 
     // MARK: Month chips

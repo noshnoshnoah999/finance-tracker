@@ -82,6 +82,7 @@
       hourlyWage:1400,annualLimit:1030000,commuteOneWay:178,
       trBefore:1040,trAfter:1100,food4wk:20000,food5wk:25000,
       gbpToJpy:215,usdToJpy:155,silverSpot:0,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,themeMigrated:false,subItems:[],showSkin:true,showGenSav:true,genSavAmount:0,showSilver:true,
+      cardOrder:["work","income","dad","extra","fixed","subscribe","oneoff","mum","free"],
       shifts:{
         1:{start:"09:00",end:"16:00",breakMin:60,label:"Mon"},
         2:{start:"09:00",end:"12:00",breakMin:0,label:"Tue"},
@@ -95,6 +96,7 @@
         {id:3,name:"Claude Pro",amount:3200},
       ],
     };
+    const BUDGET_CARDS = ["work","income","dad","extra","fixed","subscribe","oneoff","mum","free"];
     const PAID_LEAVE = ["2026-05-24","2026-05-25","2026-05-31","2026-06-01","2026-06-07"];
     // Returns: "work" | "hol" | "pl" | "off" | "none"
     const getDayState=(ds,dt,customDays,wd)=>{const ov=(customDays||{})[ds];if(ov)return ov;const isSched=wd.includes(dt.getDay());if(PAID_LEAVE.includes(ds))return"pl";if(isSched)return"work";return"none";};
@@ -236,6 +238,15 @@
       const c=_t.c;
       const crd={background:c.card,borderRadius:24,padding:20,marginBottom:12,border:`1px solid ${c.border}`,boxShadow:"0 1px 2px rgba(70,45,20,0.05)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)"};
       const inp={fontSize:14,border:`1px solid ${c.border}`,borderRadius:12,padding:"10px 14px",width:"100%",boxSizing:"border-box",outline:"none",color:c.text,background:c.cardAlt,fontWeight:500,fontFamily:mn};
+      // ── Budget card reorder (edit-mode drag handles; order synced via settings) ──
+      const [cardEdit,setCardEdit]=useState(false);
+      const [dragId,setDragId]=useState(null);
+      const cardOrder=(()=>{const o=(se.cardOrder&&se.cardOrder.length?se.cardOrder.slice():BUDGET_CARDS.slice());BUDGET_CARDS.forEach(id=>{if(!o.includes(id))o.push(id);});return o.filter(id=>BUDGET_CARDS.includes(id));})();
+      const moveCard=(from,to)=>{if(from===to||from<0||to<0)return;setSe(p=>{let o=(p.cardOrder&&p.cardOrder.length?p.cardOrder.slice():BUDGET_CARDS.slice());BUDGET_CARDS.forEach(id=>{if(!o.includes(id))o.push(id);});o=o.filter(id=>BUDGET_CARDS.includes(id));const [m]=o.splice(from,1);o.splice(to,0,m);return{...p,cardOrder:o};});};
+      const cwStyle=(id)=>({order:cardOrder.indexOf(id),position:"relative"});
+      const cwHandle=(id)=>cardEdit?(<div key={"h"+id} onPointerDown={e=>{e.preventDefault();e.stopPropagation();try{e.target.releasePointerCapture(e.pointerId);}catch(_){}setDragId(id);}} style={{position:"absolute",right:14,top:14,zIndex:20,cursor:"grab",touchAction:"none",fontSize:20,lineHeight:1,color:dragId===id?c.accent:c.muted,padding:"6px 9px",background:c.cardAlt,borderRadius:10,userSelect:"none",boxShadow:"0 1px 3px rgba(0,0,0,0.12)"}}>⣿</div>):null;
+      const cardPM=(e)=>{if(!dragId)return;const el=document.elementFromPoint(e.clientX,e.clientY);const w=el&&el.closest&&el.closest("[data-cardid]");if(!w)return;const over=w.getAttribute("data-cardid");if(over&&over!==dragId){moveCard(cardOrder.indexOf(dragId),cardOrder.indexOf(over));}};
+      const cardEnd=()=>{if(dragId)setDragId(null);};
       const lbl={fontSize:11,color:c.sub,marginBottom:6,display:"block",textTransform:"uppercase",letterSpacing:0.8,fontWeight:600,fontFamily:mn};
 
       // Load
@@ -886,6 +897,12 @@
                   {MONTHS.map(mo=>(<button key={mo.key} onClick={()=>setBm(mo.key)} style={{padding:"7px 14px",borderRadius:10,border:"none",background:bm===mo.key?c.accent:c.card,color:bm===mo.key?c.white:c.sub,fontSize:12,cursor:"pointer",fontWeight:bm===mo.key?600:400,fontFamily:ft}}>{mo.short}</button>))}
                 </div>
 
+                <div style={{display:"flex",justifyContent:"flex-end",marginBottom:10}}>
+                  <button onClick={()=>{setCardEdit(v=>!v);setDragId(null);}} style={{border:"none",background:cardEdit?c.accent:c.card,color:cardEdit?c.white:c.sub,borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:ft}}>{cardEdit?"Done":"↕ Reorder cards"}</button>
+                </div>
+
+                <div style={{display:"flex",flexDirection:"column",touchAction:dragId?"none":"auto"}} onPointerMove={cardPM} onPointerUp={cardEnd} onPointerLeave={cardEnd} onPointerCancel={cardEnd}>
+                <div data-cardid="work" style={cwStyle("work")}>{cwHandle("work")}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Work Schedule</span></div>
@@ -947,6 +964,8 @@
                   </div>
                 </div>
 
+                </div>
+                <div data-cardid="income" style={cwStyle("income")}>{cwHandle("income")}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Income</span></div>
                   <div style={{fontSize:13}}>
@@ -959,6 +978,8 @@
                   </div>
                 </div>
 
+                </div>
+                <div data-cardid="dad" style={cwStyle("dad")}>{cwHandle("dad")}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Dad's Contributions</span></div>
@@ -973,6 +994,8 @@
                   </div>
                 </div>
 
+                </div>
+                <div data-cardid="extra" style={cwStyle("extra")}>{cwHandle("extra")}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Extra money</span></div>
@@ -992,6 +1015,8 @@
                   </div>
                 </div>
 
+                </div>
+                <div data-cardid="fixed" style={cwStyle("fixed")}>{cwHandle("fixed")}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.lavD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Fixed Expenses</span></div>
                   <div style={{fontSize:13}}>
@@ -1020,6 +1045,8 @@
                   </div>
                 </div>
 
+                </div>
+                <div data-cardid="subscribe" style={cwStyle("subscribe")}>{cwHandle("subscribe")}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Subscribe & Save</span></div>
                   <div style={{fontSize:11,color:c.sub,marginBottom:12}}>Tick what's arriving this month — scheduled items are pre-ticked. The total feeds the Amazon expense above.<br/>💡 This pay period (paid on the 15th) covers the Amazon delivery on the <b>4th of next month</b>.</div>
@@ -1030,6 +1057,8 @@
                   <div style={{display:"flex",gap:6,marginTop:12,flexWrap:"wrap"}}><input placeholder="Item name" value={nSub.name} onChange={e=>setNSub(p=>({...p,name:e.target.value}))} style={{...inp,flex:2,minWidth:110}}/><div style={{flex:1,position:"relative",minWidth:70}}><span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",fontSize:13,color:c.sub}}>¥</span><input type="number" inputMode="numeric" placeholder="0" value={nSub.price||""} onChange={e=>setNSub(p=>({...p,price:Number(e.target.value)||0}))} style={{...inp,paddingLeft:22}}/></div><select value={nSub.everyN} onChange={e=>setNSub(p=>({...p,everyN:Number(e.target.value)}))} style={{...inp,flex:1,minWidth:96}}>{[1,2,3,4,6].map(n=>(<option key={n} value={n}>{n===1?"monthly":`every ${n}mo`}</option>))}</select><button onClick={aSub} style={{border:"none",background:c.peachD,color:c.white,borderRadius:12,padding:"10px 16px",cursor:"pointer",fontFamily:ft,fontWeight:700,fontSize:16}}>+</button></div>
                 </div>
 
+                </div>
+                <div data-cardid="oneoff" style={cwStyle("oneoff")}>{cwHandle("oneoff")}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>One-off Expenses</span></div>
                   {bd.oneOffs.length===0&&<div style={{fontSize:13,color:c.muted,marginBottom:10}}>None this month</div>}
@@ -1042,6 +1071,8 @@
                   </div>
                 </div>
 
+                </div>
+                <div data-cardid="mum" style={cwStyle("mum")}>{cwHandle("mum")}
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.roseD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Send to Mum</span></div>
@@ -1056,11 +1087,15 @@
                   {bdMTDisplay>0&&(<div style={{marginTop:14,padding:16,background:c.roseD,borderRadius:14,color:c.white}}><div style={{fontSize:12,opacity:0.8,marginBottom:4}}>{allMumItems.filter(x=>bdMC.includes(x.id)).map(x=>yn(x.amount)).join(" + ")}</div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontWeight:700,fontSize:14}}>Send to Mum</span><span style={{fontSize:24,fontWeight:800}}>{yn(bdMTDisplay)}</span></div></div>)}
                 </div>
 
+                </div>
+                <div data-cardid="free" style={cwStyle("free")}>{cwHandle("free")}
                 <div style={{...crd,background:bdFr>=0?c.greenD:c.roseD,padding:22}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <span style={{fontWeight:700,fontSize:15,color:c.white}}>Free to Spend</span>
                     <span style={{fontSize:26,fontWeight:800,color:c.white}}>{yn(bdFr)}</span>
                   </div>
+                </div>
+                </div>
                 </div>
               </div>
             )}
