@@ -16,6 +16,8 @@ struct BudgetTabView: View {
     @State private var ndNote = ""
     @State private var ndGbp = ""
     @State private var editingFood = false
+    @State private var editingGenSav = false
+    @State private var editingSilver = false
 
     var body: some View {
         let c = store.calc
@@ -36,22 +38,31 @@ struct BudgetTabView: View {
         }
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
-        .onChange(of: bm) { _, _ in editingFood = false }
+        .onChange(of: bm) { _, _ in editingFood = false; editingGenSav = false; editingSilver = false }
     }
 
     // MARK: Month chips
+    // Wrapped in ScrollViewReader so the selected month is always scrolled into view —
+    // without this, the row always opens scrolled to January and the current month
+    // (e.g. July) can sit off-screen past the right edge.
     @ViewBuilder private func monthChips() -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(MONTHS) { mo in
-                    Button { bm = mo.key } label: {
-                        Text(mo.short).font(.caption).fontWeight(bm == mo.key ? .semibold : .regular)
-                            .padding(.vertical, 7).padding(.horizontal, 14)
-                            .background(bm == mo.key ? T.accent : T.card)
-                            .foregroundStyle(bm == mo.key ? .white : T.sub)
-                            .clipShape(Capsule())
-                    }.buttonStyle(.plain)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(MONTHS) { mo in
+                        Button { withAnimation { bm = mo.key } } label: {
+                            Text(mo.short).font(.caption).fontWeight(bm == mo.key ? .semibold : .regular)
+                                .padding(.vertical, 7).padding(.horizontal, 14)
+                                .background(bm == mo.key ? T.accent : T.card)
+                                .foregroundStyle(bm == mo.key ? .white : T.sub)
+                                .clipShape(Capsule())
+                        }.buttonStyle(.plain).id(mo.key)
+                    }
                 }
+            }
+            .onAppear { proxy.scrollTo(bm, anchor: .center) }
+            .onChange(of: bm) { _, newValue in
+                withAnimation { proxy.scrollTo(newValue, anchor: .center) }
             }
         }
     }
@@ -64,6 +75,8 @@ struct BudgetTabView: View {
         let fw = c.firstWeekday(bm)               // 0=Sun
         let lead = fw == 0 ? 6 : fw - 1           // Monday-first grid
         let cols = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+        let tc = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        let todayYMD = (tc.year ?? 0, tc.month ?? 0, tc.day ?? 0)
 
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("Work Schedule", color: T.blueD)
@@ -77,7 +90,7 @@ struct BudgetTabView: View {
                 // which this native port had dropped (plain 0..<lead ids overlapped 1...dim).
                 ForEach((-lead)..<0, id: \.self) { _ in Color.clear.frame(height: 40) }
                 ForEach(1...dim, id: \.self) { d in
-                    dayCell(c, y, mo, d)
+                    dayCell(c, y, mo, d, today: todayYMD)
                 }
             }
             legend()
@@ -99,21 +112,26 @@ struct BudgetTabView: View {
         .card()
     }
 
-    @ViewBuilder private func dayCell(_ c: Calc, _ y: Int, _ mo: Int, _ d: Int) -> some View {
+    @ViewBuilder private func dayCell(_ c: Calc, _ y: Int, _ mo: Int, _ d: Int, today: (Int, Int, Int)) -> some View {
         let ds = String(format: "%04d-%02d-%02d", y, mo, d)
         let cd = store.blob.data[bm]?["customDays"] ?? .object([:])
         let state = c.dayState(ds, y, mo, d, cd)
         let bg: Color = state == "work" ? T.greenD : state == "pl" ? T.blueD : state == "hol" ? T.peachD : state == "off" ? T.cardAlt : .clear
         let fg: Color = (state == "work" || state == "pl" || state == "hol") ? .white : T.muted
         let tag = state == "pl" ? "PL" : state == "hol" ? "HOL" : state == "off" ? "OFF" : nil
+        let isToday = today == (y, mo, d)
         Button { store.toggleDay(bm, ds, y, mo, d) } label: {
             VStack(spacing: 1) {
-                Text("\(d)").font(.caption).fontWeight(state == "none" ? .regular : .bold)
+                Text("\(d)").font(.caption).fontWeight((state == "none" && !isToday) ? .regular : .bold)
                 if let tag { Text(tag).font(.system(size: 7)).opacity(0.85) }
             }
             .frame(maxWidth: .infinity).frame(height: 40)
             .background(bg).foregroundStyle(fg)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isToday ? T.lavD : .clear, lineWidth: 2)
+            )
         }.buttonStyle(.plain)
     }
 
@@ -317,47 +335,84 @@ struct BudgetTabView: View {
     @ViewBuilder private func genSavRow(_ c: Calc) -> some View {
         let on = store.blob.data[bm]?["saveGen"]?.bool == true
         let paid = store.blob.data[bm]?["paidFixed"]?["generalSavings"]?.bool ?? false
-        HStack(spacing: 10) {
-            if on { paidCircle(paid) { store.toggleBoolMap(bm, "paidFixed", "generalSavings") } }
-            Text("General savings").foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted).strikethrough(paid)
-            if !on { Text("· not saving").font(.caption2).foregroundStyle(T.muted) }
-            Spacer()
-            if on {
-                TextField("0", value: Binding<Double>(
-                    get: { let ov = store.blob.data[bm]?["genSavAmt"]?.double ?? 0; return ov > 0 ? ov : c.genSavAmount },
-                    set: { store.setMonth(bm, "genSavAmt", .number($0)) }
-                ), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 80).modifier(FieldStyle())
-            } else {
-                Text("—").fontWeight(.semibold).foregroundStyle(T.muted)
+        let ov = store.blob.data[bm]?["genSavAmt"]?.double ?? 0
+        let hasOverride = ov > 0
+        let amt = hasOverride ? ov : c.genSavAmount
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                if on && !editingGenSav { paidCircle(paid) { store.toggleBoolMap(bm, "paidFixed", "generalSavings") } }
+                Text("General savings").foregroundStyle(on ? (paid && !editingGenSav ? T.muted : T.text) : T.muted).strikethrough(paid && !editingGenSav)
+                    .onTapGesture { if on { editingGenSav = true } }
+                if !on && !editingGenSav { Text("· not saving").font(.caption2).foregroundStyle(T.muted) }
+                Spacer()
+                if editingGenSav {
+                    TextField("0", value: Binding<Double>(
+                        get: { amt },
+                        set: { store.setMonth(bm, "genSavAmt", .number($0)) }
+                    ), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 90).modifier(FieldStyle())
+                } else if on {
+                    Text(yen(amt)).fontWeight(.semibold).foregroundStyle(paid ? T.muted : T.text)
+                        .onTapGesture { editingGenSav = true }
+                } else {
+                    Text("—").fontWeight(.semibold).foregroundStyle(T.muted)
+                }
+                if !editingGenSav {
+                    Button(on ? "Skip" : "Save this month") { store.setMonth(bm, "saveGen", .bool(!on)) }
+                        .font(.caption2).foregroundStyle(on ? T.muted : T.greenD).buttonStyle(.plain)
+                }
             }
-            Button(on ? "Skip" : "Save this month") { store.setMonth(bm, "saveGen", .bool(!on)) }
-                .font(.caption2).foregroundStyle(on ? T.muted : T.greenD).buttonStyle(.plain)
+            .font(.footnote)
+            if editingGenSav {
+                HStack(spacing: 12) {
+                    if hasOverride {
+                        Button("Reset") { store.setMonth(bm, "genSavAmt", .number(0)) }
+                            .font(.caption2).foregroundStyle(T.muted).buttonStyle(.plain)
+                    }
+                    Spacer()
+                    Button("Done") { editingGenSav = false }
+                        .font(.caption2).fontWeight(.semibold).foregroundStyle(T.greenD).buttonStyle(.plain)
+                }
+            }
         }
-        .font(.footnote)
     }
     @ViewBuilder private func silverRow(_ c: Calc) -> some View {
         let on = store.blob.data[bm]?["saveSilver"]?.bool != false
         let paid = store.blob.data[bm]?["paidFixed"]?["silverInvest"]?.bool ?? false
         let inv = store.blob.data[bm]?["silverInvest"]?.double ?? 0
         let usd = c.usdToJpy > 0 ? inv / c.usdToJpy : 0
-        HStack(spacing: 10) {
-            if on { paidCircle(paid) { store.toggleBoolMap(bm, "paidFixed", "silverInvest") } }
-            Text("Silver investment").foregroundStyle(on ? (paid ? T.muted : T.text) : T.muted).strikethrough(paid)
-            if on && inv > 0 { Text("≈ $\(String(format: "%.2f", usd))").font(.caption2).foregroundStyle(T.sub) }
-            if !on { Text("· not investing").font(.caption2).foregroundStyle(T.muted) }
-            Spacer()
-            if on {
-                TextField("0", value: Binding<Double>(
-                    get: { store.blob.data[bm]?["silverInvest"]?.double ?? 0 },
-                    set: { store.setMonth(bm, "silverInvest", .number($0)) }
-                ), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 80).modifier(FieldStyle())
-            } else {
-                Text("—").fontWeight(.semibold).foregroundStyle(T.muted)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                if on && !editingSilver { paidCircle(paid) { store.toggleBoolMap(bm, "paidFixed", "silverInvest") } }
+                Text("Silver investment").foregroundStyle(on ? (paid && !editingSilver ? T.muted : T.text) : T.muted).strikethrough(paid && !editingSilver)
+                    .onTapGesture { if on { editingSilver = true } }
+                if on && inv > 0 && !editingSilver { Text("≈ $\(String(format: "%.2f", usd))").font(.caption2).foregroundStyle(T.sub) }
+                if !on && !editingSilver { Text("· not investing").font(.caption2).foregroundStyle(T.muted) }
+                Spacer()
+                if editingSilver {
+                    TextField("0", value: Binding<Double>(
+                        get: { store.blob.data[bm]?["silverInvest"]?.double ?? 0 },
+                        set: { store.setMonth(bm, "silverInvest", .number($0)) }
+                    ), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 90).modifier(FieldStyle())
+                } else if on {
+                    Text(yen(inv)).fontWeight(.semibold).foregroundStyle(paid ? T.muted : T.text)
+                        .onTapGesture { editingSilver = true }
+                } else {
+                    Text("—").fontWeight(.semibold).foregroundStyle(T.muted)
+                }
+                if !editingSilver {
+                    Button(on ? "Skip" : "Invest this month") { store.setMonth(bm, "saveSilver", .bool(!on)) }
+                        .font(.caption2).foregroundStyle(on ? T.muted : T.greenD).buttonStyle(.plain)
+                }
             }
-            Button(on ? "Skip" : "Invest this month") { store.setMonth(bm, "saveSilver", .bool(!on)) }
-                .font(.caption2).foregroundStyle(on ? T.muted : T.greenD).buttonStyle(.plain)
+            .font(.footnote)
+            if editingSilver {
+                HStack {
+                    Spacer()
+                    Button("Done") { editingSilver = false }
+                        .font(.caption2).fontWeight(.semibold).foregroundStyle(T.greenD).buttonStyle(.plain)
+                }
+            }
         }
-        .font(.footnote)
     }
     @ViewBuilder private func foodRow(_ c: Calc) -> some View {
         let paid = store.blob.data[bm]?["paidFixed"]?["food"]?.bool ?? false

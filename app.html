@@ -419,8 +419,11 @@
       const silverM=mk=>{const d=da[mk];return(se.showSilver!==false&&d&&d.saveSilver!==false&&d.silverInvest>0)?d.silverInvest:0;};
       // USD invested in silver for a month: from the budget's ¥ silver investment (÷ rate), else the manual figure.
       const silverUsdM=mk=>{const d=da[mk]||{};const inv=silverM(mk);return inv>0?Math.round(inv/(se.usdToJpy||155)):(d.silverUsd||0);};
-      const genSavTotal=MONTHS.reduce((s,mo)=>s+genSavM(mo.key),0);
-      const tS=MONTHS.reduce((s,mo)=>s+(da[mo.key]?.savings||0),0)+genSavTotal;
+      // Effective saved amount for a month: a manual entry always wins; otherwise it
+      // defaults to that month's General Savings figure. Intentionally NOT additive —
+      // typing your own number replaces the auto amount rather than stacking on it.
+      const savEff=mk=>{const s=da[mk]?.savings||0;return s>0?s:genSavM(mk);};
+      const tS=MONTHS.reduce((s,mo)=>s+savEff(mo.key),0);
       const tSd=useCountUp(tS);
       const sA=cMN>0?tS/cMN:0;
       // ── Silver / investment tracking (USD) ──
@@ -582,6 +585,8 @@
         for(let i=0;i<ms;i++)cells.push(null);
         for(let d=1;d<=dim;d++)cells.push(d);
         const cd=da[bm]?.customDays||{};
+        const now2=new Date();
+        const todayStr=`${now2.getFullYear()}-${String(now2.getMonth()+1).padStart(2,"0")}-${String(now2.getDate()).padStart(2,"0")}`;
         const toggleDay=(ds,dt)=>{
           const isSched=se.workDays.includes(dt.getDay());
           const isPL=PAID_LEAVE.includes(ds);
@@ -614,8 +619,9 @@
                 const bg=state==="work"?c.greenD:state==="pl"?c.blueD:state==="hol"?c.peachD:state==="off"?c.cardAlt:"transparent";
                 const col=(state==="work"||state==="pl"||state==="hol")?c.white:state==="off"?c.muted:c.muted;
                 const lbl2=state==="pl"?"PL":state==="hol"?"HOL":state==="off"?"OFF":null;
+                const isToday=ds===todayStr;
                 return(
-                  <button key={d2} onClick={()=>toggleDay(ds,dt)} style={{padding:6,borderRadius:8,fontSize:12,fontWeight:(state==="work"||state==="pl"||state==="hol")?700:400,background:bg,color:col,border:"none",cursor:"pointer",fontFamily:ft,lineHeight:1.3}}>
+                  <button key={d2} onClick={()=>toggleDay(ds,dt)} style={{padding:6,borderRadius:8,fontSize:12,fontWeight:(state==="work"||state==="pl"||state==="hol"||isToday)?700:400,background:bg,color:col,border:"none",cursor:"pointer",fontFamily:ft,lineHeight:1.3,boxShadow:isToday?`inset 0 0 0 2px ${c.lavD}`:"none"}}>
                     {d2}{lbl2&&<div style={{fontSize:7,lineHeight:1,opacity:0.85}}>{lbl2}</div>}
                   </button>
                 );
@@ -993,21 +999,21 @@
                     <div style={rw}>{eF==="suica"?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>SUICA ({bdSI.start} → {bdSI.end} · {bdSI.days} days)</span><input type="number" inputMode="numeric" value={bd.suicaOverride??bdCm} onChange={e=>sM(bm,"suicaOverride",Number(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button>{bd.suicaOverride!=null&&<button onClick={()=>{sM(bm,"suicaOverride",null);setEF(null);}} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer"}}>reset</button>}</div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><PaidBtn paid={bdPF["suica"]} onToggle={()=>tPF(bm,"suica")}/><span onClick={()=>setEF("suica")} style={{flex:1,color:bdPF["suica"]?c.muted:c.text,textDecoration:bdPF["suica"]?"line-through":"none",cursor:"pointer",fontWeight:bdPF["suica"]?400:500}}>SUICA ({bdSI.start} → {bdSI.end} · {bdSI.days} days{bd.suicaOverride!=null?" · edited":""})</span><span style={{fontWeight:500,color:bdPF["suica"]?c.muted:c.text,flexShrink:0}}>{yn(bdCm)}</span></div>}</div>
                     <div style={rw}>{eF==="food"?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>Food budget</span><input type="number" inputMode="numeric" value={bd.foodOverride??bdFd} onChange={e=>sM(bm,"foodOverride",Number(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button>{bd.foodOverride!=null&&<button onClick={()=>{sM(bm,"foodOverride",null);setEF(null);}} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer"}}>reset</button>}</div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><PaidBtn paid={bdPF["food"]} onToggle={()=>tPF(bm,"food")}/><span onClick={()=>setEF("food")} style={{flex:1,color:bdPF["food"]?c.muted:c.text,textDecoration:bdPF["food"]?"line-through":"none",cursor:"pointer",fontWeight:bdPF["food"]?400:500}}>Food ({bd.foodOverride!=null?"custom":MONTHS.find(x=>x.key===bm)?.is5wk?"5-wk":"4-wk"})</span><span style={{fontWeight:500,color:bdPF["food"]?c.muted:c.text,flexShrink:0}}>{yn(bdFd)}</span></div>}</div>
                     {[{label:"Skin Treatment",field:"skinTreatment",val:bdSkin,on:se.showSkin!==false}].filter(x=>x.on).map(({label,field,val})=>{const paid=bdPF[field];return(<div key={field} style={rw}>{eF===field?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>{label}</span><input type="number" inputMode="numeric" value={val||""} placeholder="0" onChange={e=>{const v=parseFloat(e.target.value)||0;field==="generalSavings"?setSe(p=>({...p,genSavAmount:v})):sM(bm,field,v);}} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><PaidBtn paid={paid} onToggle={()=>tPF(bm,field)}/><span onClick={()=>setEF(field)} style={{flex:1,color:paid?c.muted:c.text,textDecoration:paid?"line-through":"none",cursor:"pointer",fontWeight:paid?400:500}}>{label}</span><span style={{fontWeight:500,color:paid?c.muted:c.text,flexShrink:0}}>{yn(val)}</span></div>}</div>);})}
-                    {se.showGenSav!==false&&(()=>{const on=!!bd.saveGen,paid=bdPF["generalSavings"];const amt=bd.genSavAmt>0?bd.genSavAmt:(se.genSavAmount||0);return(
-                      <div style={rw}><div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
+                    {se.showGenSav!==false&&(()=>{const on=!!bd.saveGen,paid=bdPF["generalSavings"];const amt=bd.genSavAmt>0?bd.genSavAmt:(se.genSavAmount||0);const hasOverride=(bd.genSavAmt||0)>0;return(
+                      <div style={rw}>{eF==="generalSavings"?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>General Savings</span><input type="number" inputMode="numeric" value={amt||""} placeholder={String(se.genSavAmount||0)} onChange={e=>sM(bm,"genSavAmt",Number(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button>{hasOverride&&<button onClick={()=>sM(bm,"genSavAmt",0)} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer"}}>reset</button>}</div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
                         {on&&<PaidBtn paid={paid} onToggle={()=>tPF(bm,"generalSavings")}/>}
-                        <span style={{flex:1,color:on?(paid?c.muted:c.text):c.muted,textDecoration:paid?"line-through":"none",fontWeight:on&&!paid?500:400}}>General Savings{!on&&<span style={{fontSize:10,color:c.muted,marginLeft:6}}>· not saving</span>}</span>
-                        {on?<input type="number" inputMode="numeric" value={amt||""} placeholder={String(se.genSavAmount||0)} onChange={e=>sM(bm,"genSavAmt",Number(e.target.value)||0)} style={{...inp,width:84,padding:"6px 10px",textAlign:"right",flexShrink:0}}/>:<span style={{color:c.muted,flexShrink:0}}>—</span>}
+                        <span onClick={()=>on&&setEF("generalSavings")} style={{flex:1,color:on?(paid?c.muted:c.text):c.muted,textDecoration:paid?"line-through":"none",cursor:on?"pointer":"default",fontWeight:on&&!paid?500:400}}>General Savings{!on&&<span style={{fontSize:10,color:c.muted,marginLeft:6}}>· not saving</span>}</span>
+                        {on?<span style={{fontWeight:500,color:paid?c.muted:c.text,flexShrink:0}}>{yn(amt)}</span>:<span style={{color:c.muted,flexShrink:0}}>—</span>}
                         <button onClick={()=>sM(bm,"saveGen",!on)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:on?c.muted:c.greenD,fontFamily:mn,padding:"0 2px",flexShrink:0,fontWeight:on?400:700}}>{on?"Skip":"Save this month"}</button>
-                      </div></div>
+                      </div>}</div>
                     );})()}
                     {se.showSilver!==false&&(()=>{const on=bd.saveSilver!==false;const paid=bdPF["silverInvest"];const inv=bd.silverInvest||0;const usd=se.usdToJpy>0?inv/se.usdToJpy:0;return(
-                      <div style={rw}><div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
+                      <div style={rw}>{eF==="silverInvest"?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>Silver investment</span><input type="number" inputMode="numeric" value={inv||""} placeholder="0" onChange={e=>sM(bm,"silverInvest",Number(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>
                         {on&&<PaidBtn paid={paid} onToggle={()=>tPF(bm,"silverInvest")}/>}
-                        <span style={{flex:1,color:on?(paid?c.muted:c.text):c.muted,textDecoration:paid?"line-through":"none",fontWeight:on&&!paid?500:400}}>Silver investment{inv>0&&on&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>≈ ${usd.toFixed(2)}</span>}{!on&&<span style={{fontSize:10,color:c.muted,marginLeft:6}}>· not investing</span>}</span>
-                        {on?<input type="number" inputMode="numeric" value={inv||""} placeholder="0" onChange={e=>sM(bm,"silverInvest",Number(e.target.value)||0)} style={{...inp,width:84,padding:"6px 10px",textAlign:"right",flexShrink:0}}/>:<span style={{color:c.muted,flexShrink:0}}>—</span>}
+                        <span onClick={()=>on&&setEF("silverInvest")} style={{flex:1,color:on?(paid?c.muted:c.text):c.muted,textDecoration:paid?"line-through":"none",cursor:on?"pointer":"default",fontWeight:on&&!paid?500:400}}>Silver investment{inv>0&&on&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>≈ ${usd.toFixed(2)}</span>}{!on&&<span style={{fontSize:10,color:c.muted,marginLeft:6}}>· not investing</span>}</span>
+                        {on?<span style={{fontWeight:500,color:paid?c.muted:c.text,flexShrink:0}}>{yn(inv)}</span>:<span style={{color:c.muted,flexShrink:0}}>—</span>}
                         <button onClick={()=>sM(bm,"saveSilver",!on)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:on?c.muted:c.greenD,fontFamily:mn,padding:"0 2px",flexShrink:0,fontWeight:on?400:700}}>{on?"Skip":"Invest this month"}</button>
-                      </div></div>
+                      </div>}</div>
                     );})()}
                     <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total Fixed</span><span style={{fontWeight:700,fontSize:16,color:c.lavD}}>{yn(bdFT)}</span></div>
                     {(()=>{let unpaid=0;se.fixed.forEach(f=>{if(!bdSF[f.id]&&!bdPF[f.id])unpaid+=fxAmt(f);});if(!bdPF["suica"])unpaid+=bdCm;if(!bdPF["food"])unpaid+=bdFd;if(!bdPF["skinTreatment"])unpaid+=bdSkin;if(!bdPF["generalSavings"])unpaid+=bdGenSav;const allPaid=unpaid===0;return(<div style={{marginTop:8,padding:14,borderRadius:14,background:allPaid?c.greenD:c.lavBg,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,fontWeight:600,color:allPaid?c.white:c.lavD}}>Left to pay</span><span style={{fontSize:18,fontWeight:800,color:allPaid?c.white:c.lavD}}>{allPaid?"All paid ✓":yn(unpaid)}</span></div>);})()}
@@ -1149,17 +1155,22 @@
                             </div>
                             <span style={{fontSize:11,color:c.sub}}>even share {yn(Math.round(monthlyShare))}</span>
                           </div>
+                          <div style={{fontSize:11,color:c.muted,marginBottom:10}}>Each bar's full width is this month's highest earning ({yn(Math.round(maxW))}) — the tick mark shows where the even share ({yn(Math.round(monthlyShare))}/month) falls. Orange means that month earned more than the even share.</div>
                           {MONTHS.map((mo,i)=>{
                             const w=gTx(da[mo.key],mo.key);
                             const isFut=i>=cMN;
                             const isCur=i===cMN-1;
                             const heavy=w>monthlyShare;
+                            const sharePct=Math.min(100,(monthlyShare/maxW)*100);
                             return(
                               <div key={mo.key} style={{marginBottom:10,opacity:isFut?0.35:1}}>
                                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
                                   <span style={{fontSize:12,color:isCur?c.blueD:c.sub,fontWeight:isCur?800:400,width:36,flexShrink:0}}>{mo.short}</span>
-                                  <div style={{flex:1,margin:"0 10px",height:8,borderRadius:4,background:c.cardAlt,overflow:"hidden"}}>
-                                    {w>0&&<div style={{height:"100%",borderRadius:4,width:`${(w/maxW)*100}%`,background:heavy?c.peachD:c.blueD,transition:"width 0.3s"}}/>}
+                                  <div style={{position:"relative",flex:1,margin:"0 10px",height:8,borderRadius:4,background:c.cardAlt,overflow:"visible"}}>
+                                    <div style={{height:"100%",borderRadius:4,overflow:"hidden"}}>
+                                      {w>0&&<div style={{height:"100%",borderRadius:4,width:`${(w/maxW)*100}%`,background:heavy?c.peachD:c.blueD,transition:"width 0.3s"}}/>}
+                                    </div>
+                                    <div title={`Even share: ${yn(Math.round(monthlyShare))}`} style={{position:"absolute",top:-2,bottom:-2,left:`${sharePct}%`,width:2,background:c.text,opacity:0.55}}/>
                                   </div>
                                   <span style={{fontSize:13,fontWeight:w>0?600:400,color:w>0?c.text:c.muted,width:80,textAlign:"right",flexShrink:0}}>{w>0?yn(w):"—"}</span>
                                 </div>
@@ -1177,15 +1188,22 @@
 
                 {/* ── This month's target + shift simulator ── */}
                 {nMK&&(()=>{
-                  const shiftH=s=>{const a=(s.start||"0:0").split(":").map(Number),b=(s.end||"0:0").split(":").map(Number);return Math.max(0,(b[0]+b[1]/60)-(a[0]+a[1]/60)-((s.breakMin||0)/60));};
-                  const plannedH=simShifts.reduce((t,s)=>t+shiftH(s),0);
+                  // Raw duration of one occurrence of the shift, before any break is subtracted.
+                  const rawH=s=>{const a=(s.start||"0:0").split(":").map(Number),b=(s.end||"0:0").split(":").map(Number);return Math.max(0,(b[0]+b[1]/60)-(a[0]+a[1]/60));};
+                  // Breaks are only required (and only deducted) once a shift reaches 3 hours —
+                  // under that, Noah can't take a break at work, so nothing should be subtracted.
+                  const shiftH=s=>{const r=rawH(s);const brk=r>=3?(s.breakMin??60)/60:0;return Math.max(0,r-brk);};
+                  // Day-of-week name -> JS getDay() number, used to count occurrences in the month.
+                  const DOWN={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+                  const occ=s=>s.freq==="once"?1:cDIM(nMK,DOWN[s.day]);
+                  const plannedH=simShifts.reduce((t,s)=>t+shiftH(s)*occ(s),0);
                   const plannedPay=Math.round(plannedH*se.hourlyWage);
                   const diff=eS-plannedPay;
                   const projYear=Math.round(eT+plannedPay*nFM);
                   const overYear=projYear>se.annualLimit;
                   const verdict=plannedPay===0?"none":(plannedPay<=eS?"yes":(overYear?"over":"caution"));
                   const vColor=verdict==="yes"?c.greenD:verdict==="caution"?c.peachD:verdict==="over"?c.roseD:c.muted;
-                  const shiftLines=simShifts.map(s=>`- ${s.day} ${s.start}-${s.end}${s.breakMin?` (${s.breakMin}m break)`:""} = ${shiftH(s).toFixed(1)}h`).join("\n");
+                  const shiftLines=simShifts.map(s=>`- ${s.day} ${s.start}-${s.end}${shiftH(s)>0&&rawH(s)>=3?` (${s.breakMin??60}m break)`:""}${s.freq==="once"?" (this occurrence only)":" (every week)"} = ${shiftH(s).toFixed(1)}h/occurrence × ${occ(s)} this month`).join("\n");
                   return(
                     <React.Fragment>
                       {/* Monthly target — plain language */}
@@ -1207,16 +1225,25 @@
                         <div style={{fontSize:12,color:c.sub,marginBottom:14}}>Add the shifts you're thinking of working this month — I'll tell you if you can.</div>
                         {simShifts.length===0&&<div style={{fontSize:13,color:c.muted,marginBottom:10}}>No shifts yet — add one below.</div>}
                         {simShifts.map(s=>(
-                          <div key={s.id} style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"nowrap"}}>
-                            <select value={s.day} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,day:e.target.value}:x))} style={{...inp,flex:"0 0 64px",padding:"8px 4px"}}>{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>(<option key={d} value={d}>{d}</option>))}</select>
-                            <input type="time" value={s.start} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,start:e.target.value}:x))} style={{...inp,flex:1,minWidth:0,padding:"8px 4px"}}/>
-                            <input type="time" value={s.end} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,end:e.target.value}:x))} style={{...inp,flex:1,minWidth:0,padding:"8px 4px"}}/>
-                            <span style={{fontSize:12,color:c.sub,width:38,textAlign:"right",flexShrink:0}}>{shiftH(s).toFixed(1)}h</span>
-                            <button onClick={()=>setSimShifts(p=>p.filter(x=>x.id!==s.id))} style={{border:"none",background:"transparent",color:c.roseD,fontSize:16,cursor:"pointer",padding:"0 2px",flexShrink:0}}>×</button>
+                          <div key={s.id} style={{marginBottom:10,paddingBottom:10,borderBottom:`1px solid ${c.border}`}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"nowrap",marginBottom:6}}>
+                              <select value={s.day} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,day:e.target.value}:x))} style={{...inp,flex:"0 0 64px",padding:"8px 4px"}}>{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>(<option key={d} value={d}>{d}</option>))}</select>
+                              <input type="time" value={s.start} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,start:e.target.value}:x))} style={{...inp,flex:1,minWidth:0,padding:"8px 4px"}}/>
+                              <input type="time" value={s.end} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,end:e.target.value}:x))} style={{...inp,flex:1,minWidth:0,padding:"8px 4px"}}/>
+                              <span style={{fontSize:12,color:c.sub,width:38,textAlign:"right",flexShrink:0}}>{shiftH(s).toFixed(1)}h</span>
+                              <button onClick={()=>setSimShifts(p=>p.filter(x=>x.id!==s.id))} style={{border:"none",background:"transparent",color:c.roseD,fontSize:16,cursor:"pointer",padding:"0 2px",flexShrink:0}}>×</button>
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:6,paddingLeft:2}}>
+                              <select value={s.freq||"weekly"} onChange={e=>setSimShifts(p=>p.map(x=>x.id===s.id?{...x,freq:e.target.value}:x))} style={{...inp,flex:1,padding:"6px 8px",fontSize:12}}>
+                                <option value="weekly">Every week this month</option>
+                                <option value="once">Just this once</option>
+                              </select>
+                              {(s.freq||"weekly")==="weekly"&&<span style={{fontSize:11,color:c.muted,flexShrink:0}}>× {cDIM(nMK,{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[s.day])} this month</span>}
+                            </div>
                           </div>
                         ))}
-                        <button onClick={()=>setSimShifts(p=>[...p,{id:Date.now(),day:"Mon",start:"09:00",end:"16:00",breakMin:60}])} style={{width:"100%",padding:10,borderRadius:12,border:`1.5px dashed ${c.border}`,background:c.cardAlt,color:c.sub,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:ft,marginBottom:6}}>+ Add a shift</button>
-                        <div style={{fontSize:11,color:c.muted,marginBottom:14}}>Each shift's break is taken off automatically (defaults to 60 min).</div>
+                        <button onClick={()=>setSimShifts(p=>[...p,{id:Date.now(),day:"Mon",start:"09:00",end:"16:00",breakMin:60,freq:"weekly"}])} style={{width:"100%",padding:10,borderRadius:12,border:`1.5px dashed ${c.border}`,background:c.cardAlt,color:c.sub,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:ft,marginBottom:6}}>+ Add a shift</button>
+                        <div style={{fontSize:11,color:c.muted,marginBottom:14}}>Breaks are only deducted for shifts of 3 hours or more (defaults to 60 min). "Every week" repeats the shift for every matching weekday in the month.</div>
 
                         {simShifts.length>0&&(<React.Fragment>
                           <div style={{padding:14,background:c.cardAlt,borderRadius:14,fontSize:13,marginBottom:10}}>
@@ -1229,7 +1256,10 @@
                           </div>
                           <button onClick={()=>askLimitAdvisor(plannedH,plannedPay,shiftLines)} disabled={simLoading} style={{width:"100%",padding:12,borderRadius:12,border:"none",background:c.blueD,color:c.white,fontWeight:700,fontSize:13,fontFamily:ft,cursor:simLoading?"default":"pointer",opacity:simLoading?0.6:1}}>{simLoading?"Claude is thinking…":"🤖 Ask Claude for advice"}</button>
                           {simErr&&<div style={{marginTop:10,padding:12,borderRadius:12,background:c.roseBg,color:c.roseD,fontSize:12,fontWeight:600}}>{simErr}</div>}
-                          {simAdvice&&(
+                          {simAdvice&&!simAdvice.headline&&!simAdvice.reasoning&&!(simAdvice.suggestions||[]).length&&(
+                            <div style={{marginTop:10,padding:12,borderRadius:12,background:c.roseBg,color:c.roseD,fontSize:12,fontWeight:600}}>Claude's advice came back empty — try again in a moment. If this keeps happening, the advice service may be down.</div>
+                          )}
+                          {simAdvice&&(simAdvice.headline||simAdvice.reasoning||(simAdvice.suggestions||[]).length>0)&&(
                             <div style={{marginTop:10,padding:14,borderRadius:14,background:c.greenBg,border:`1px solid ${c.border}`}}>
                               <div style={{fontSize:14,fontWeight:700,color:c.text,marginBottom:6}}>{simAdvice.headline}</div>
                               <div style={{fontSize:13,color:c.sub,marginBottom:(simAdvice.suggestions||[]).length?10:0}}>{simAdvice.reasoning}</div>
@@ -1298,12 +1328,11 @@
                     <span style={{fontSize:15,fontWeight:700}}>Monthly Savings</span>
                   </div>
                   {(()=>{
-                    const tot=mo=>(da[mo.key].savings||0)+genSavM(mo.key);
-                    const maxS=Math.max(...MONTHS.map(mo=>tot(mo)),1);
+                    const maxS=Math.max(...MONTHS.map(mo=>savEff(mo.key)),1);
                     return MONTHS.map(mo=>{
                       const s=da[mo.key].savings||0;
                       const gs=genSavM(mo.key);
-                      const t=s+gs;
+                      const t=s>0?s:gs;
                       const isFut=mo.key>(MONTHS[cMN-1]?.key||"");
                       return(
                         <div key={mo.key} style={{marginBottom:16,opacity:isFut?0.5:1}}>
@@ -1311,8 +1340,9 @@
                             <span style={{fontSize:13,fontWeight:600,color:t>0?c.text:c.muted}}>{mo.label}</span>
                             {t>0&&<span style={{fontSize:13,fontWeight:700,color:c.blueD}}>{yn(t)}</span>}
                           </div>
-                          <NI prefix="¥" value={s} onChange={v=>sM(mo.key,"savings",v)} placeholder={isFut?"Future…":"Enter amount…"}/>
-                          {gs>0&&<div style={{fontSize:11,color:c.sub,marginTop:4}}>+ {yn(gs)} general savings (from budget)</div>}
+                          <NI prefix="¥" value={t} onChange={v=>sM(mo.key,"savings",v)} placeholder={isFut?"Future…":"Enter amount…"}/>
+                          {s===0&&gs>0&&<div style={{fontSize:11,color:c.sub,marginTop:4}}>Defaulted from General Savings — edit to override</div>}
+                          {s>0&&gs>0&&s!==gs&&<div style={{fontSize:11,color:c.sub,marginTop:4}}>General Savings is {yn(gs)} · <span onClick={()=>sM(mo.key,"savings",0)} style={{cursor:"pointer",textDecoration:"underline"}}>reset to default</span></div>}
                           {t>0&&<div style={{height:4,borderRadius:4,background:c.cardAlt,overflow:"hidden",marginTop:6}}><div style={{height:"100%",borderRadius:4,width:`${(t/maxS)*100}%`,background:c.blueD,transition:"width 0.3s"}}/></div>}
                         </div>
                       );
@@ -1557,10 +1587,9 @@
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Transport</span></div>
                   <div style={{display:"grid",gap:12}}>
                     <div><label style={lbl}>Commute One-Way</label><NI prefix="¥" value={se.commuteOneWay} onChange={v=>setSe(p=>({...p,commuteOneWay:v}))}/></div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-                      <div><label style={lbl}>Before 14 Mar</label><NI prefix="¥" value={se.trBefore} onChange={v=>setSe(p=>({...p,trBefore:v}))}/></div>
-                      <div><label style={lbl}>After 14 Mar</label><NI prefix="¥" value={se.trAfter} onChange={v=>setSe(p=>({...p,trAfter:v}))}/></div>
-                    </div>
+                    {/* "Before 14 Mar" rate is hidden here by request — it's no longer relevant day-to-day,
+                        but se.trBefore stays in state and trf() still uses it for months <= 2026-03. */}
+                    <div><label style={lbl}>Current rate</label><NI prefix="¥" value={se.trAfter} onChange={v=>setSe(p=>({...p,trAfter:v}))}/></div>
                     <div style={{fontSize:12,color:c.sub}}>Round trip: {yn(rt)}</div>
                   </div>
                 </div>

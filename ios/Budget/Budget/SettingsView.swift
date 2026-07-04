@@ -75,10 +75,10 @@ struct SettingsView: View {
     @ViewBuilder private func transport(_ c: Calc) -> some View {
         card("Transport", T.blueD) {
             field("COMMUTE ONE-WAY", "¥", set("commuteOneWay"))
-            HStack(spacing: 10) {
-                fieldCol("BEFORE 14 MAR", "¥", set("trBefore"))
-                fieldCol("AFTER 14 MAR", "¥", set("trAfter"))
-            }
+            // "Before 14 Mar" rate is hidden here by request — no longer relevant day-to-day,
+            // but se.trBefore / DS.trBefore stay in Models.swift and transportRate(_:) still
+            // uses it for any month key <= 2026-03.
+            field("CURRENT RATE", "¥", set("trAfter"))
             Text("Round trip: \(yen(c.rt))").font(.caption).foregroundStyle(T.sub)
         }
     }

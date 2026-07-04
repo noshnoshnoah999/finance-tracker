@@ -2,6 +2,7 @@
 // Phase 1: tab shell + a working Home dashboard reading the live shared blob.
 
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @EnvironmentObject var store: BudgetStore
@@ -16,7 +17,22 @@ struct ContentView: View {
             SavingsView().tabItem { Label("Savings", systemImage: "banknote") }
             MoreView().tabItem { Label("More", systemImage: "ellipsis") }
         }
+        // Numeric keypads (.numberPad / .decimalPad) have no built-in Return/Done key,
+        // so every amount field across the app was previously impossible to dismiss
+        // without switching tabs. This toolbar attaches a "Done" button above ANY
+        // keyboard shown anywhere in the tab hierarchy.
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { dismissKeyboard() }.fontWeight(.semibold)
+            }
+        }
     }
+}
+
+/// Resigns whatever text field currently has focus, anywhere in the app.
+func dismissKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
 }
 
 // MARK: - More (custom, themed — replaces iOS's white system overflow tab)
@@ -212,7 +228,7 @@ struct HomeView: View {
 
     // MARK: Saved + Silver
     @ViewBuilder private func savedAndSilver(_ c: Calc) -> some View {
-        let totalSaved = MONTHS.reduce(0.0) { $0 + c.month($1.key).d("savings") }
+        let totalSaved = MONTHS.reduce(0.0) { $0 + c.savingsTotal($1.key) }
         let slvOz = MONTHS.reduce(0.0) { $0 + c.month($1.key).d("silverOz") }
         let slvUsd = MONTHS.reduce(0.0) { $0 + c.month($1.key).d("silverUsd") }
         HStack(spacing: 10) {

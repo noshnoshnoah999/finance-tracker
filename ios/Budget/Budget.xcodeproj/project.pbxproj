@@ -10,12 +10,12 @@
 		B0D6E700000000000000A054 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D6E700000000000000A051 /* Models.swift */; };
 		B0D6E700000000000000A055 /* Finance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D6E700000000000000A052 /* Finance.swift */; };
 		B0D6E700000000000000A056 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D6E700000000000000A053 /* Theme.swift */; };
-		B0D6E700000000000000A071 /* AppPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D6E700000000000000A070 /* AppPaths.swift */; };
 		B0D6E700000000000000A057 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D6E700000000000000A051 /* Models.swift */; };
 		B0D6E700000000000000A058 /* Finance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D6E700000000000000A052 /* Finance.swift */; };
 		B0D6E700000000000000A059 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D6E700000000000000A053 /* Theme.swift */; };
 		B0D6E700000000000000A063 /* BudgetWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D6E700000000000000A061 /* BudgetWidgets.swift */; };
 		B0D6E700000000000000A06D /* BudgetWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B0D6E700000000000000A064 /* BudgetWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B0D6E700000000000000A071 /* AppPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D6E700000000000000A070 /* AppPaths.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -47,10 +47,10 @@
 		B0D6E700000000000000A051 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		B0D6E700000000000000A052 /* Finance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Finance.swift; sourceTree = "<group>"; };
 		B0D6E700000000000000A053 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		B0D6E700000000000000A070 /* AppPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPaths.swift; sourceTree = "<group>"; };
 		B0D6E700000000000000A061 /* BudgetWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetWidgets.swift; sourceTree = "<group>"; };
 		B0D6E700000000000000A062 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B0D6E700000000000000A064 /* BudgetWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BudgetWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B0D6E700000000000000A070 /* AppPaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPaths.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */

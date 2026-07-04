@@ -73,6 +73,15 @@ struct Calc {
     func daysIn(_ mk: String) -> Int { let (y, m) = ym(mk); return daysInMonth(y, m) }
     /// JS weekday (0=Sun) of the 1st of the month — for calendar leading blanks.
     func firstWeekday(_ mk: String) -> Int { let (y, m) = ym(mk); return jsDay(y, m, 1) }
+    /// How many times a given weekday (0=Sun...6=Sat) occurs in this month — mirrors web's cDIM,
+    /// used to project a weekly-recurring shift's total hours/pay across the whole month.
+    func weekdayCount(_ mk: String, _ dow: Int) -> Int {
+        let (y, m) = ym(mk)
+        let dim = daysInMonth(y, m)
+        var n = 0
+        for d in 1...dim { if jsDay(y, m, d) == dow { n += 1 } }
+        return n
+    }
 
     // MARK: Day state (work / hol / pl / off / none)
     func dayState(_ ds: String, _ y: Int, _ m: Int, _ d: Int, _ customDays: JSONValue) -> String {
@@ -253,6 +262,13 @@ struct Calc {
         guard showGenSav, month(mk)["saveGen"]?.bool == true else { return 0 }
         let ov = month(mk).d("genSavAmt")
         return ov > 0 ? ov : genSavAmount
+    }
+    // Effective "amount saved" for the Savings tab: a manual entry always wins;
+    // otherwise it defaults to that month's General Savings figure. Intentionally
+    // NOT additive — typing your own number replaces the auto amount, not stacks on it.
+    func savingsTotal(_ mk: String) -> Double {
+        let manual = month(mk).d("savings")
+        return manual > 0 ? manual : genSav(mk)
     }
     // Silver investment (¥) for a month — a budget outflow; syncs to the Silver page as USD.
     // saveSilver mirrors saveGen's toggle, but defaults ON (undefined != false) for

@@ -9,7 +9,9 @@ import SwiftUI
 struct LimitView: View {
     @EnvironmentObject var store: BudgetStore
 
-    struct SimShift: Identifiable { let id = UUID(); var day: String; var start: Date; var end: Date; var breakMin: Int }
+    // freq: "weekly" repeats the shift for every matching weekday in the month (the default —
+    // Noah's normal work pattern repeats every week); "once" counts it a single time.
+    struct SimShift: Identifiable { let id = UUID(); var day: String; var start: Date; var end: Date; var breakMin: Int; var freq: String = "weekly" }
     @State private var shifts: [SimShift] = []
     @State private var advice: BudgetStore.LimitAdvice?
     @State private var adviceLoading = false
@@ -27,8 +29,8 @@ struct LimitView: View {
         let safe = nFM > 0 ? floor(remaining / Double(nFM)) : 0
         let hoursPerMonth = c.hourlyWage > 0 ? safe / c.hourlyWage : 0
 
-        // Simulator
-        let plannedH = shifts.reduce(0.0) { $0 + shiftHours($1) }
+        // Simulator — "weekly" shifts repeat for every matching weekday in the month being planned.
+        let plannedH = shifts.reduce(0.0) { $0 + shiftHours($1) * Double(occurrences($1)) }
         let plannedPay = (plannedH * c.hourlyWage).rounded()
         let diff = safe - plannedPay
         let projYear = (earned + plannedPay * Double(nFM)).rounded()
@@ -136,27 +138,47 @@ struct LimitView: View {
                         Text("No shifts yet — add one below.").font(.footnote).foregroundStyle(T.muted)
                     }
                     ForEach($shifts) { $shift in
-                        HStack(spacing: 6) {
-                            Menu {
-                                ForEach(dayOptions, id: \.self) { d in Button(d) { shift.day = d } }
-                            } label: {
-                                Text(shift.day).font(.caption).fontWeight(.semibold).foregroundStyle(T.text)
-                                    .frame(width: 42).padding(.vertical, 9)
-                                    .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 8))
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 6) {
+                                Menu {
+                                    ForEach(dayOptions, id: \.self) { d in Button(d) { shift.day = d } }
+                                } label: {
+                                    Text(shift.day).font(.caption).fontWeight(.semibold).foregroundStyle(T.text)
+                                        .frame(width: 42).padding(.vertical, 9)
+                                        .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                DatePicker("", selection: $shift.start, displayedComponents: .hourAndMinute).labelsHidden()
+                                DatePicker("", selection: $shift.end, displayedComponents: .hourAndMinute).labelsHidden()
+                                Text("\(fmt1(shiftHours(shift)))h").font(.caption).foregroundStyle(T.sub).frame(width: 36, alignment: .trailing)
+                                Button { shifts.removeAll { $0.id == shift.id } } label: { Image(systemName: "xmark").font(.caption2) }
+                                    .buttonStyle(.plain).foregroundStyle(T.roseD)
                             }
-                            DatePicker("", selection: $shift.start, displayedComponents: .hourAndMinute).labelsHidden()
-                            DatePicker("", selection: $shift.end, displayedComponents: .hourAndMinute).labelsHidden()
-                            Text("\(fmt1(shiftHours(shift)))h").font(.caption).foregroundStyle(T.sub).frame(width: 36, alignment: .trailing)
-                            Button { shifts.removeAll { $0.id == shift.id } } label: { Image(systemName: "xmark").font(.caption2) }
-                                .buttonStyle(.plain).foregroundStyle(T.roseD)
+                            HStack(spacing: 6) {
+                                Menu {
+                                    Button("Every week this month") { shift.freq = "weekly" }
+                                    Button("Just this once") { shift.freq = "once" }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Text(shift.freq == "once" ? "Just this once" : "Every week this month").font(.caption2)
+                                        Image(systemName: "chevron.down").font(.system(size: 9))
+                                    }.foregroundStyle(T.sub)
+                                    .padding(.vertical, 5).padding(.horizontal, 8)
+                                    .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                if shift.freq != "once" {
+                                    Text("× \(occurrences(shift)) this month").font(.caption2).foregroundStyle(T.muted)
+                                }
+                                Spacer()
+                            }
                         }
+                        .padding(.bottom, 6)
                     }
-                    Button { shifts.append(SimShift(day: "Mon", start: at(9, 0), end: at(16, 0), breakMin: 60)) } label: {
+                    Button { shifts.append(SimShift(day: "Mon", start: at(9, 0), end: at(16, 0), breakMin: 60, freq: "weekly")) } label: {
                         Text("+ Add a shift").font(.footnote).fontWeight(.semibold).foregroundStyle(T.sub)
                             .frame(maxWidth: .infinity).padding(10)
                             .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }.buttonStyle(.plain)
-                    Text("Each shift's break is taken off automatically (defaults to 60 min).")
+                    Text("Breaks are only deducted for shifts of 3 hours or more (defaults to 60 min). \"Every week\" repeats the shift for every matching weekday in the month.")
                         .font(.caption2).foregroundStyle(T.muted)
 
                     if !shifts.isEmpty {
@@ -188,7 +210,13 @@ struct LimitView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(T.roseBg).clipShape(RoundedRectangle(cornerRadius: 12))
                         }
-                        if let a = advice {
+                        if let a = advice, a.headline.isEmpty, a.reasoning.isEmpty, a.suggestions.isEmpty {
+                            Text("Claude's advice came back empty — try again in a moment. If this keeps happening, the advice service may be down.")
+                                .font(.caption).foregroundStyle(T.roseD).padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(T.roseBg).clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        if let a = advice, !(a.headline.isEmpty && a.reasoning.isEmpty && a.suggestions.isEmpty) {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(a.headline).font(.subheadline).fontWeight(.bold).foregroundStyle(T.text)
                                 if !a.reasoning.isEmpty { Text(a.reasoning).font(.footnote).foregroundStyle(T.sub) }
@@ -212,17 +240,22 @@ struct LimitView: View {
                         Spacer()
                         Text("even share \(yen(monthlyShare.rounded()))").font(.caption2).foregroundStyle(T.sub)
                     }
+                    Text("Each bar's full width is this month's highest earning (\(yen(maxW))) — the tick mark shows where the even share (\(yen(monthlyShare.rounded()))/month) falls. Orange means that month earned more than the even share.")
+                        .font(.caption2).foregroundStyle(T.muted)
                     ForEach(Array(MONTHS.enumerated()), id: \.offset) { i, mo in
                         let w = amounts[i]
                         let isFut = i >= c.currentMonthNumber
                         let isCur = i == c.currentMonthNumber - 1
                         let heavy = w > monthlyShare
+                        let sharePct = min(1, monthlyShare / maxW)
                         HStack(spacing: 10) {
                             Text(mo.short).font(.caption).fontWeight(isCur ? .bold : .regular).foregroundStyle(isCur ? T.blueD : T.sub).frame(width: 34, alignment: .leading)
                             GeometryReader { geo in
                                 ZStack(alignment: .leading) {
                                     Capsule().fill(T.cardAlt)
                                     if w > 0 { Capsule().fill(heavy ? T.peachD : T.blueD).frame(width: w / maxW * geo.size.width) }
+                                    Rectangle().fill(T.text.opacity(0.55)).frame(width: 2, height: 12)
+                                        .offset(x: sharePct * geo.size.width - 1, y: -2)
                                 }
                             }.frame(height: 8)
                             Text(w > 0 ? yen(w) : "—").font(.caption).fontWeight(w > 0 ? .semibold : .regular)
@@ -244,17 +277,32 @@ struct LimitView: View {
 
     // MARK: helpers
     private func at(_ h: Int, _ m: Int) -> Date { Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: Date()) ?? Date() }
-    private func shiftHours(_ s: SimShift) -> Double { max(0, s.end.timeIntervalSince(s.start) / 3600 - Double(s.breakMin) / 60) }
+    // Raw duration before any break.
+    private func rawHours(_ s: SimShift) -> Double { max(0, s.end.timeIntervalSince(s.start) / 3600) }
+    // Breaks only apply once a shift reaches 3 hours — under that, no break is required or deducted.
+    private func shiftHours(_ s: SimShift) -> Double {
+        let r = rawHours(s)
+        let brk = r >= 3 ? Double(s.breakMin) / 60 : 0
+        return max(0, r - brk)
+    }
+    private func occurrences(_ s: SimShift) -> Int {
+        guard s.freq != "once" else { return 1 }
+        let dowMap: [String: Int] = ["Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6]
+        let c = store.calc
+        let cMN = c.currentMonthNumber
+        let planMK = cMN < MONTHS.count ? MONTHS[cMN].key : MONTHS[MONTHS.count - 1].key
+        return c.weekdayCount(planMK, dowMap[s.day] ?? 1)
+    }
     private func fmt1(_ v: Double) -> String { String(format: "%.1f", v) }
 
     private func runAdvisor(earned: Double, limit: Double, remaining: Double, nFM: Int, safe: Double, hoursPerMonth: Double) {
         let c = store.calc
-        let plannedH = shifts.reduce(0.0) { $0 + shiftHours($1) }
+        let plannedH = shifts.reduce(0.0) { $0 + shiftHours($1) * Double(occurrences($1)) }
         let plannedPay = (plannedH * c.hourlyWage).rounded()
         let projYear = (earned + plannedPay * Double(nFM)).rounded()
         let f = DateFormatter(); f.dateFormat = "HH:mm"
         let lines = shifts.map { s in
-            "- \(s.day) \(f.string(from: s.start))-\(f.string(from: s.end))\(s.breakMin > 0 ? " (\(s.breakMin)m break)" : "") = \(fmt1(shiftHours(s)))h"
+            "- \(s.day) \(f.string(from: s.start))-\(f.string(from: s.end))\(rawHours(s) >= 3 ? " (\(s.breakMin)m break)" : "")\(s.freq == "once" ? " (this occurrence only)" : " (every week)") = \(fmt1(shiftHours(s)))h/occurrence × \(occurrences(s)) this month"
         }.joined(separator: "\n")
         let ctx: [String: JSONValue] = [
             "annualLimit": .number(limit), "earnedSoFar": .number(earned), "roomLeft": .number(remaining),

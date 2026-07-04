@@ -41,7 +41,7 @@ struct SavingsView: View {
 
     // MARK: Cash
     @ViewBuilder private func cashSection(_ c: Calc) -> some View {
-        let total = MONTHS.reduce(0.0) { $0 + c.month($1.key).d("savings") + c.genSav($1.key) }
+        let total = MONTHS.reduce(0.0) { $0 + c.savingsTotal($1.key) }
         let cMN = max(1, c.currentMonthNumber)
         let avg = total / Double(cMN)
         let goal = store.blob.settings["savingsGoal"]?.double ?? 0
@@ -78,7 +78,7 @@ struct SavingsView: View {
             ForEach(MONTHS) { mo in
                 let s = c.month(mo.key).d("savings")
                 let gs = c.genSav(mo.key)
-                let t = s + gs
+                let t = s > 0 ? s : gs
                 let isFut = mo.key > (MONTHS[safe: cMN - 1]?.key ?? "")
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
@@ -86,8 +86,16 @@ struct SavingsView: View {
                         Spacer()
                         if t > 0 { Text(yen(t)).font(.footnote).fontWeight(.bold).foregroundStyle(T.blueD) }
                     }
-                    yenField(mo.key, "savings", placeholder: isFut ? "Future…" : "Enter amount…")
-                    if gs > 0 { Text("+ \(yen(gs)) general savings (from budget)").font(.caption2).foregroundStyle(T.sub) }
+                    savingsField(mo.key, effective: t, placeholder: isFut ? "Future…" : "Enter amount…")
+                    if s == 0 && gs > 0 {
+                        Text("Defaulted from General Savings — edit to override").font(.caption2).foregroundStyle(T.sub)
+                    } else if s > 0 && gs > 0 && s != gs {
+                        HStack(spacing: 4) {
+                            Text("General Savings is \(yen(gs)) ·").font(.caption2).foregroundStyle(T.sub)
+                            Button("reset to default") { store.setMonth(mo.key, "savings", .number(0)) }
+                                .font(.caption2).foregroundStyle(T.sub).underline().buttonStyle(.plain)
+                        }
+                    }
                 }
                 .opacity(isFut ? 0.55 : 1)
             }
@@ -204,6 +212,18 @@ struct SavingsView: View {
         HStack(spacing: 6) {
             Text("¥").foregroundStyle(T.sub)
             TextField(placeholder, value: monthBinding(mk, field), format: .number).keyboardType(.numberPad)
+        }
+        .modifier(FieldStyle())
+    }
+    /// Like yenField, but displays an effective (possibly defaulted) value while still
+    /// writing the user's typed number straight into the raw "savings" field.
+    private func savingsField(_ mk: String, effective: Double, placeholder: String) -> some View {
+        HStack(spacing: 6) {
+            Text("¥").foregroundStyle(T.sub)
+            TextField(placeholder, value: Binding<Double>(
+                get: { effective },
+                set: { store.setMonth(mk, "savings", .number($0)) }
+            ), format: .number).keyboardType(.numberPad)
         }
         .modifier(FieldStyle())
     }
