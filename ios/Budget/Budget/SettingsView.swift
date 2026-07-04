@@ -4,6 +4,7 @@
 // (Web-push notifications + theme switching are web-only / Phase 3 for the native app.)
 
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @EnvironmentObject var store: BudgetStore
@@ -11,6 +12,7 @@ struct SettingsView: View {
     @State private var nfName = ""; @State private var nfAmount = ""; @State private var nfVariable = false
     @State private var nsName = ""; @State private var nsPrice = ""; @State private var nsEveryN = 1
     @State private var notifsOn = Notifs.isEnabled
+    @AppStorage(Notifs.deniedKey) private var notifDenied = false
 
     var body: some View {
         let c = store.calc
@@ -30,6 +32,7 @@ struct SettingsView: View {
         }
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
+        .onAppear { if notifsOn { Notifs.refreshAuthState() } }
     }
 
     // MARK: Privacy & alerts
@@ -45,6 +48,19 @@ struct SettingsView: View {
                     get: { notifsOn },
                     set: { on in notifsOn = on; if on { Notifs.enable(store) } else { Notifs.disable() } }
                 )).labelsHidden().tint(T.greenD)
+            }
+            if notifsOn && notifDenied {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Notifications are turned off for Budget in iOS Settings — reminders won't be delivered.")
+                        .font(.caption2).foregroundStyle(T.roseD)
+                    Button {
+                        if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                    } label: {
+                        Text("Open iOS Settings").font(.caption).fontWeight(.semibold).foregroundStyle(T.accent)
+                            .frame(maxWidth: .infinity).padding(.vertical, 9)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(T.border))
+                    }.buttonStyle(.plain)
+                }
             }
             if notifsOn {
                 Button { Notifs.sendTest() } label: {
