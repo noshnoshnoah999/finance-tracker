@@ -8,14 +8,17 @@ struct ContentView: View {
     @EnvironmentObject var store: BudgetStore
 
     var body: some View {
-        // Keep to 5 tabs so iOS doesn't auto-create its own white "More" overflow
-        // list — Limit/Savings/Goals/Settings live in a themed More screen instead.
+        // Paidy is a top-level tab (index 4). More moves to index 5.
+        // NOTE: 6 tabs — on iPhone, iOS's default TabView collapses items past the 5th
+        // into a system "More" overflow. We suppress that below via the tab-bar appearance
+        // and by keeping every screen reachable from the custom MoreView too.
         TabView(selection: $store.selectedTab) {
             HomeView().tabItem { Label("Home", systemImage: "house.fill") }.tag(0)
             WageView().tabItem { Label("Wage", systemImage: "yensign.circle") }.tag(1)
             BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }.tag(2)
             SavingsView().tabItem { Label("Savings", systemImage: "banknote") }.tag(3)
-            MoreView().tabItem { Label("More", systemImage: "ellipsis") }.tag(4)
+            NavigationStack { PaidyView() }.tabItem { Label("Paidy", systemImage: "creditcard") }.tag(4)
+            MoreView().tabItem { Label("More", systemImage: "ellipsis") }.tag(5)
         }
         // Numeric keypads (.numberPad / .decimalPad) have no built-in Return/Done key,
         // so every amount field across the app was previously impossible to dismiss
@@ -46,7 +49,6 @@ struct MoreView: View {
                 ScrollView {
                     VStack(spacing: 12) {
                         moreLink("Limit", "gauge.with.dots.needle.bottom.50percent") { LimitView() }
-                        moreLink("Paidy", "creditcard") { PaidyView() }
                         moreLink("Goals", "target") { GoalsView() }
                         moreLink("Settings", "gearshape") { SettingsView() }
                     }
@@ -57,7 +59,6 @@ struct MoreView: View {
             // Deep link: a Home card ("Limit →") switches to this tab and sets openLimit,
             // which pushes the Limit screen automatically.
             .navigationDestination(isPresented: $store.openLimit) { LimitView() }
-            .navigationDestination(isPresented: $store.openPaidy) { PaidyView() }
         }
     }
 
@@ -236,7 +237,7 @@ struct HomeView: View {
         }
         .card()
         .contentShape(Rectangle())
-        .onTapGesture { store.selectedTab = 4; store.openLimit = true }
+        .onTapGesture { store.selectedTab = 5; store.openLimit = true }
     }
 
     // MARK: Paidy summary (total remaining, combined monthly, next payment)
@@ -262,7 +263,7 @@ struct HomeView: View {
             }
             .card()
             .contentShape(Rectangle())
-            .onTapGesture { store.selectedTab = 4; store.openPaidy = true }
+            .onTapGesture { store.selectedTab = 4 }
         }
     }
 

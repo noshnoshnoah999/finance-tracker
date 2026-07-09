@@ -116,7 +116,7 @@ struct PaidyView: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
-                        Text(p["paidCountOverride"] == nil || p["paidCountOverride"] == .null ? "Paid so far (auto)" : "Paid so far (manual)")
+                        Text(p["paidCountOverride"] == nil || p["paidCountOverride"] == .null ? "Payments made (auto)" : "Payments made (manual)")
                             .font(.caption2).foregroundStyle(T.sub)
                         Spacer()
                         if let ov = p["paidCountOverride"], ov != .null {
@@ -127,19 +127,23 @@ struct PaidyView: View {
                     HStack(spacing: 6) { Text("¥").foregroundStyle(T.sub).opacity(0); TextField("auto", text: intOptBinding(p, "paidCountOverride") { store.updatePaidyPlan(id, paidCountOverride: .some($0)) }).keyboardType(.numberPad) }.modifier(FieldStyle())
                 }
             }
+            Text("“Payments made” = a count (how many times you’ve paid), not ¥. Blank = auto-calc.")
+                .font(.caption2).foregroundStyle(T.muted).frame(maxWidth: .infinity, alignment: .leading)
+            Text("Start of plan").font(.caption).fontWeight(.semibold).foregroundStyle(T.sub).frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 8) {
-                Text("Start").font(.caption2).foregroundStyle(T.sub).frame(width: 36, alignment: .leading)
                 Picker("", selection: Binding(
                     get: { p.i("startMonth", 0) },
                     set: { store.updatePaidyPlan(id, startMonth: .some($0 == 0 ? nil : $0)) })) {
                         Text("Month").tag(0)
                         ForEach(1...12, id: \.self) { Text(MO_SHORT[$0 - 1]).tag($0) }
-                    }.pickerStyle(.menu).tint(T.text)
-                TextField("Year", text: intOptBinding(p, "startYear") { store.updatePaidyPlan(id, startYear: .some($0)) }).keyboardType(.numberPad).modifier(FieldStyle()).frame(width: 70)
-                TextField("Day", text: intBinding(p, "paymentDay") { store.updatePaidyPlan(id, paymentDay: $0) }).keyboardType(.numberPad).modifier(FieldStyle()).frame(width: 56)
+                    }.pickerStyle(.menu).tint(T.text).frame(maxWidth: .infinity, alignment: .leading)
+                TextField("Year", text: intOptBinding(p, "startYear") { store.updatePaidyPlan(id, startYear: .some($0)) }).keyboardType(.numberPad).modifier(FieldStyle()).frame(width: 80)
             }
-            Text("Leave “Paid so far” blank to auto-calc from the start date. Setting it overrides the auto count.")
-                .font(.caption2).foregroundStyle(T.muted).frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                Text("Payment day of month").font(.caption).foregroundStyle(T.sub)
+                Spacer()
+                TextField("27", text: intBinding(p, "paymentDay") { store.updatePaidyPlan(id, paymentDay: $0) }).keyboardType(.numberPad).multilineTextAlignment(.center).modifier(FieldStyle()).frame(width: 64)
+            }
         }
     }
 
@@ -156,14 +160,20 @@ struct PaidyView: View {
                 TextField("Installments", text: $nInstall).keyboardType(.numberPad).modifier(FieldStyle())
                 TextField("Paid so far", text: $nPaid).keyboardType(.numberPad).modifier(FieldStyle())
             }
+            Text("“Payments made” = how many times you’ve paid (a count, not ¥). Blank = auto-calc.")
+                .font(.caption2).foregroundStyle(T.muted).frame(maxWidth: .infinity, alignment: .leading)
+            Text("Start of plan").font(.caption).fontWeight(.semibold).foregroundStyle(T.sub).frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 8) {
-                Text("Start").font(.caption2).foregroundStyle(T.sub).frame(width: 36, alignment: .leading)
                 Picker("", selection: $nStartMonth) {
                     Text("Month").tag(0)
                     ForEach(1...12, id: \.self) { Text(MO_SHORT[$0 - 1]).tag($0) }
-                }.pickerStyle(.menu).tint(T.text)
-                TextField("Year", text: $nStartYear).keyboardType(.numberPad).modifier(FieldStyle()).frame(width: 70)
-                TextField("Day", text: $nDay).keyboardType(.numberPad).modifier(FieldStyle()).frame(width: 56)
+                }.pickerStyle(.menu).tint(T.text).frame(maxWidth: .infinity, alignment: .leading)
+                TextField("Year", text: $nStartYear).keyboardType(.numberPad).modifier(FieldStyle()).frame(width: 80)
+            }
+            HStack(spacing: 8) {
+                Text("Payment day of month").font(.caption).foregroundStyle(T.sub)
+                Spacer()
+                TextField("27", text: $nDay).keyboardType(.numberPad).multilineTextAlignment(.center).modifier(FieldStyle()).frame(width: 64)
             }
             Button {
                 let install = Int(nInstall) ?? 0

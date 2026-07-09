@@ -172,7 +172,7 @@ struct SettingsView: View {
                     Text(f.b("paidyDerived") ? yen(c.paidyMonthly(cmk)) : (f.b("variable") ? "varies" : yen(f.d("amount"))))
                         .font(.footnote).foregroundStyle(f.b("variable") || f.b("paidyDerived") ? T.sub : T.text)
                     if f.b("paidyDerived") {
-                        Button { store.selectedTab = 4; store.openPaidy = true } label: { Image(systemName: "chevron.right").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.muted)
+                        Button { store.selectedTab = 4 } label: { Image(systemName: "chevron.right").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.muted)
                     } else {
                         Button { store.removeFixed(id) } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.roseD)
                     }
