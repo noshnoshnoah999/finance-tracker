@@ -1,42 +1,46 @@
 # Claude Code — commit, push & verify (2026-07-09)
 
-Cowork built the **Paidy Tracking + Send-to-Mum Settings** feature across the web
-app and the native iOS/macOS app, but did **NOT commit** — a stale
-`.git/index.lock` (the sandbox shares this repo's `.git`) blocked it, and the
-sandbox can't remove that lock. So the commit + push happens here.
+The **Paidy Tracking + Send-to-Mum** feature is already committed locally as
+`ddac5b5` (NOT yet pushed). Cowork then made **follow-up fixes** (auto-calc paid
+count, "Payments made" relabel + layout fix, and promoting Paidy to a top-level
+nav tab) that are **still uncommitted** — the sandbox can't run git (stale
+`.git/index.lock` it lacks permission to remove). **Fold these into `ddac5b5`,
+then push.**
 
 ## 1. Clear any stale lock, then check state
 ```bash
 cd /path/to/finance-tracker   # your local repo
 rm -f .git/index.lock .git/HEAD.lock
-git status
+git log --oneline -1      # expect: ddac5b5 Paidy tracking + Send-to-Mum settings (web + iOS/macOS)
+git status                # expect main ahead of origin/main by 1, plus the modified files below
 ```
-You should see these modified files plus one new file:
-- `app.html`, `index.html`
-- `ios/Budget/Budget/BudgetStore.swift`
-- `ios/Budget/Budget/BudgetTabView.swift`
-- `ios/Budget/Budget/ContentView.swift`
-- `ios/Budget/Budget/Notifications.swift`
-- `ios/Budget/Budget/SettingsView.swift`
-- `ios/Budget/Shared/Finance.swift`
-- `ios/Budget/Shared/Models.swift`
-- **new:** `ios/Budget/Budget/PaidyView.swift`
-- **new:** `HANDOFF_2026-07-09_paidy-mum.md`
+Outstanding (uncommitted) follow-up changes:
+- `app.html`, `index.html` — auto-calc + "Payments made" relabel + Paidy form layout fix
+- `ios/Budget/Budget/ContentView.swift` — Paidy as 6th TabView tab (index 4, More→5), deep-link reindex
+- `ios/Budget/Budget/PaidyView.swift` — isAuto tag, relabel, layout fix
+- `ios/Budget/Budget/SettingsView.swift` — Settings "Open Paidy" reindex
+- `CLAUDE_CODE_PROMPT.md` — this file
 
-## 2. Commit
+## 2. Fold into the existing commit (amend)
 ```bash
 git add -A
-git commit -m "Paidy tracking + Send-to-Mum settings (web + iOS/macOS)
+git commit --amend -m "Paidy tracking + Send-to-Mum settings (web + iOS/macOS)
 
-- New Paidy tab: tracks installment plans (iPhone/MacBook), progress, payoff.
+- New Paidy tab (top-level nav): tracks installment plans (iPhone/MacBook), progress, payoff.
 - Paid count AUTO-CALCULATES from start date + payment day (self-updating monthly);
   manual override only for exceptions, with an 'auto'/'manual' tag + reset-to-auto.
-- Fixed 'Paidy' line now DERIVED from paidyPlans (single source of truth; auto-drops as plans finish).
+- Fixed 'Paidy' line DERIVED from paidyPlans (single source of truth; auto-drops as plans finish).
 - Send-to-Mum block in Settings with per-item month window (blank end = ongoing).
 - Home Paidy summary card. iOS parity: PaidyView + store mutations + nav + settings.
 - Web migration seeds paidyPlans, flags the cached fixed Paidy line, and clears the
-  stale hand-seeded paid-count override (one-time, paidyMigV=1) so counts auto-calc."
+  stale hand-seeded paid-count override (one-time, paidyMigV=1) so counts auto-calc.
+- Paidy form UX: 'Payments made' (a count, not ¥) with hint; Start row split so the
+  Month picker no longer wraps and the payment-day field is labeled.
+- iOS/Mac TabView: Paidy at index 4, More→5; deep links + Settings 'Open' reindexed;
+  removed the redundant Paidy link from the custom MoreView."
 ```
+> ⚠️ Amending is safe here because `ddac5b5` was **never pushed**. Do NOT amend if
+> `git status` shows it already on `origin/main`.
 
 ## 3. Build the iOS/macOS app to VERIFY (not compiled in Cowork)
 The Swift was written carefully and brace/paren-balanced, but **never compiled** —
