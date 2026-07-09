@@ -25,16 +25,12 @@ struct ContentView: View {
             }
             MoreView().tabItem { Label("More", systemImage: "ellipsis") }.tag(5)
         }
-        // Numeric keypads (.numberPad / .decimalPad) have no built-in Return/Done key,
-        // so every amount field across the app was previously impossible to dismiss
-        // without switching tabs. This toolbar attaches a "Done" button above ANY
-        // keyboard shown anywhere in the tab hierarchy.
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") { dismissKeyboard() }.fontWeight(.semibold)
-            }
-        }
+        // Numeric keypads (.numberPad / .decimalPad) have no built-in Return/Done key.
+        // A TabView-level keyboard toolbar does NOT reliably reach screens that live in
+        // their own NavigationStack (Budget, Paidy, and the More screens), which is why
+        // many fields had no Done button. Instead, .keyboardDoneBar() is applied directly
+        // to each screen that owns numeric fields (Wage, Savings, Budget, Paidy, Limit,
+        // Goals, Settings) — guaranteed to be the nearest toolbar, so no duplicates.
         // Safety: on iPhone there is no tab 4 (Paidy), so never leave selection stranded there.
         .onChange(of: showPaidyTab) { _, shown in if !shown && store.selectedTab == 4 { store.selectedTab = 5; store.openPaidy = true } }
         .onAppear { if !showPaidyTab && store.selectedTab == 4 { store.selectedTab = 5 } }

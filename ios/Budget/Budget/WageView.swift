@@ -44,6 +44,7 @@ struct WageView: View {
         }
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
+        .keyboardDoneBar()
     }
 
     // MARK: - One month

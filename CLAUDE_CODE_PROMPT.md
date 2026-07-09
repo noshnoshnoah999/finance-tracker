@@ -1,36 +1,51 @@
-# Claude Code — Push Prompt (2026-07-09) — Savings sync / keyboard / Face ID
+# Claude Code — Push Prompt (2026-07-09) — Savings sync / keyboard Done / Face ID
 
-The Cowork session already committed locally (`e40eacc`). It could NOT delete two stale
-git lock files due to a sandbox permission quirk. Do this:
+Cowork committed some work locally (`e40eacc`, `dd7afce`) but a shared-`.git` lock
+blocked the LAST batch, so four files are staged-but-uncommitted. Finish it:
 
-1. From the repo root (`~/Claude/finance-tracker`), remove any stale locks first:
+1. From the repo root (`~/Claude/finance-tracker`), remove stale locks FIRST:
    ```
    rm -f .git/HEAD.lock .git/index.lock
    ```
-2. Confirm the working tree is clean and the commit is there:
+2. Check state:
    ```
    git status
-   git log --oneline -1        # expect e40eacc (or later) — savings sync / keyboard / face id
+   git log --oneline -3
    ```
-3. Push:
+   You should see `dd7afce` and `e40eacc` already committed, plus these still modified:
+   - ios/Budget/Budget/WageView.swift
+   - ios/Budget/Budget/SavingsView.swift
+   - ios/Budget/Budget/BudgetTabView.swift
+   - ios/Budget/Budget/ContentView.swift
+   - CLAUDE_CODE_PROMPT.md (this file)
+3. Commit the remaining files:
+   ```
+   git add ios/Budget/Budget/WageView.swift ios/Budget/Budget/SavingsView.swift \
+           ios/Budget/Budget/BudgetTabView.swift ios/Budget/Budget/ContentView.swift \
+           CLAUDE_CODE_PROMPT.md
+   git commit -m "Keyboard Done bar on every numeric screen; update push prompt"
+   ```
+4. Push:
    ```
    git push origin main
    ```
-4. After the push completes, clean up any stale/leftover lock files again so the next
-   session starts smoothly:
+5. After push, clear any leftover locks so next session is smooth:
    ```
    rm -f .git/*.lock .git/refs/**/*.lock 2>/dev/null; true
    ```
 
-## What this commit contains
-- Savings tab now respects the Budget "not saving"/"not investing" toggle (web + iOS):
-  opted-out months contribute ¥0; fixes the phantom ¥10,000 / ¥1,429 / ¥17,143.
-- Web: new keyboard "Done" bar for numeric inputs (iOS already had one).
-- iOS: 60-second Face ID grace period — only locks if backgrounded ≥60s.
+## What all this contains
+- **Savings sync (web + iOS):** Budget "not saving"/"not investing" toggle wins;
+  opted-out months = ¥0. Fixes phantom ¥10,000 / ¥1,429 / ¥17,143.
+- **Keyboard Done bar:** web got a global bar; iOS now applies `.keyboardDoneBar()`
+  directly to every screen with numeric fields (Wage, Savings, Budget, Paidy, Limit,
+  Goals, Settings). The old TabView-level toolbar didn't reach screens in their own
+  NavigationStack — that's why many fields had no Done button.
+- **Face ID:** 60-second grace period — only locks if backgrounded ≥60s.
 
-## After push — please build & test on device (not done in Cowork; no Xcode there)
-- Face ID: background <60s → reopen with no prompt; background ≥60s → Face ID required;
-  cold launch → Face ID required.
-- Savings tab: a "not saving" month shows the pill + note and no input, Total = ¥0.
-- Web keyboard bar: on a real iPhone, focus an amount field → "Done" appears above the
-  keyboard and dismisses it.
+## After push — BUILD & TEST on device (no Xcode in Cowork; Swift is static-reviewed only)
+- Open EACH screen with a number field (Wage, Savings, Budget cards, Paidy add-plan,
+  Limit, Goals, Settings) → tap a numeric field → confirm "Done" appears above the keypad
+  and dismisses it. Paidy add-plan screen was the reported failure — verify it now works.
+- Face ID: background <60s → no prompt; ≥60s → Face ID; cold launch → Face ID.
+- Savings tab: an opted-out month shows "not saving" and no input; Total = ¥0.

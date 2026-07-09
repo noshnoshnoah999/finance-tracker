@@ -42,6 +42,7 @@ struct BudgetTabView: View {
         }
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
+        .keyboardDoneBar()
         .onChange(of: bm) { _, _ in editingFood = false; editingGenSav = false; editingSilver = false }
         .sheet(isPresented: $showReorder) { reorderSheet }
     }
