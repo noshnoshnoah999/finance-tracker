@@ -308,6 +308,7 @@ struct LimitView: View {
         }
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
+        .keyboardDoneBar()
     }
 
     // MARK: helpers

@@ -51,6 +51,7 @@ struct PaidyView: View {
         .background(T.background.ignoresSafeArea())
         .navigationTitle("Paidy")
         .refreshable { await store.refresh() }
+        .keyboardDoneBar()
     }
 
     // MARK: Plan card

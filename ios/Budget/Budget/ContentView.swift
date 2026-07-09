@@ -21,7 +21,7 @@ struct ContentView: View {
             BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }.tag(2)
             SavingsView().tabItem { Label("Savings", systemImage: "banknote") }.tag(3)
             if showPaidyTab {
-                NavigationStack { PaidyView() }.keyboardDoneBar().tabItem { Label("Paidy", systemImage: "creditcard") }.tag(4)
+                NavigationStack { PaidyView() }.tabItem { Label("Paidy", systemImage: "creditcard") }.tag(4)
             }
             MoreView().tabItem { Label("More", systemImage: "ellipsis") }.tag(5)
         }
@@ -42,17 +42,25 @@ func dismissKeyboard() {
     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
 }
 
-/// Attaches a "Done" button above the keyboard. The TabView already has one, but views
-/// pushed inside MoreView's OWN NavigationStack (Paidy, Limit, Goals, Settings on iPhone)
-/// don't reliably inherit the TabView's keyboard toolbar — so apply this there too.
+/// Makes the numeric keyboard dismissable. `ToolbarItemGroup(placement:.keyboard)` is
+/// unreliable — it often renders NOTHING inside nested NavigationStacks — so we do NOT
+/// depend on it. Instead we use two mechanisms that always work on a ScrollView:
+///   1. `.scrollDismissesKeyboard(.immediately)` — scroll/swipe the page closes the keypad.
+///   2. a full-area tap gesture — tapping empty space closes it.
+/// The `.toolbar` Done button is kept as a bonus for when it does render.
 extension View {
     func keyboardDoneBar() -> some View {
-        self.toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") { dismissKeyboard() }.fontWeight(.semibold)
+        self
+            .scrollDismissesKeyboard(.immediately)
+            // Tap on empty space closes the keypad. `.simultaneousGesture` so it never
+            // swallows taps meant for buttons/fields underneath.
+            .simultaneousGesture(TapGesture().onEnded { dismissKeyboard() })
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { dismissKeyboard() }.fontWeight(.semibold)
+                }
             }
-        }
     }
 }
 
@@ -84,9 +92,6 @@ struct MoreView: View {
             // which pushes the Limit screen automatically.
             .navigationDestination(isPresented: $store.openLimit) { LimitView() }
             .navigationDestination(isPresented: $store.openPaidy) { PaidyView() }
-            // This NavigationStack is separate from the TabView's, so its pushed screens
-            // (Paidy, Limit, Goals, Settings) need their own keyboard Done bar.
-            .keyboardDoneBar()
         }
     }
 

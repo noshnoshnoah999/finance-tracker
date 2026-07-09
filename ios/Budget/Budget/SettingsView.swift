@@ -38,6 +38,7 @@ struct SettingsView: View {
         }
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
+        .keyboardDoneBar()
         .onAppear { if notifsOn { Notifs.refreshAuthState() } }
     }
 

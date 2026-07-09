@@ -31,6 +31,7 @@ struct GoalsView: View {
         }
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
+        .keyboardDoneBar()
     }
 
     @ViewBuilder private func goalCard(_ c: Calc, _ g: JSONValue) -> some View {
