@@ -17,6 +17,8 @@ final class BudgetStore: ObservableObject {
     @Published var selectedTab: Int = 0
     // When true, the More tab deep-links straight into the Limit screen.
     @Published var openLimit: Bool = false
+    // When true, the More tab deep-links straight into the Paidy screen.
+    @Published var openPaidy: Bool = false
 
     // Passbook AI UI state
     @Published var pbLoading = false
@@ -395,6 +397,90 @@ final class BudgetStore: ObservableObject {
         blob.settings["fixed"] = .array(arr)
         persist()
     }
+    // MARK: Send to Mum items (mirror web mumItems; start/end month+year window, blank end = ongoing)
+    func addMumItem(name: String, amount: Double, startMonth: Int?, startYear: Int?, endMonth: Int?, endYear: Int?) {
+        var arr = blob.settings["mumItems"]?.array ?? []
+        let id = "m" + String(UUID().uuidString.prefix(12))
+        var o: [String: JSONValue] = ["id": .string(id), "name": .string(name), "amount": .number(amount)]
+        o["startMonth"] = startMonth.map { .number(Double($0)) } ?? .null
+        o["startYear"]  = startYear.map  { .number(Double($0)) } ?? .null
+        o["endMonth"]   = endMonth.map   { .number(Double($0)) } ?? .null
+        o["endYear"]    = endYear.map    { .number(Double($0)) } ?? .null
+        arr.append(.object(o))
+        blob.settings["mumItems"] = .array(arr)
+        persist()
+    }
+    func updateMumItem(_ id: String, name: String? = nil, amount: Double? = nil,
+                       startMonth: Int?? = nil, startYear: Int?? = nil, endMonth: Int?? = nil, endYear: Int?? = nil) {
+        let c = calc
+        let arr = (blob.settings["mumItems"]?.array ?? []).map { m -> JSONValue in
+            guard c.idStr(m["id"]) == id else { return m }
+            var o = m.object ?? [:]
+            if let name { o["name"] = .string(name) }
+            if let amount { o["amount"] = .number(amount) }
+            if let startMonth { o["startMonth"] = startMonth.map { .number(Double($0)) } ?? .null }
+            if let startYear  { o["startYear"]  = startYear.map  { .number(Double($0)) } ?? .null }
+            if let endMonth   { o["endMonth"]   = endMonth.map   { .number(Double($0)) } ?? .null }
+            if let endYear    { o["endYear"]    = endYear.map    { .number(Double($0)) } ?? .null }
+            return .object(o)
+        }
+        blob.settings["mumItems"] = .array(arr)
+        persist()
+    }
+    func removeMumItem(_ id: String) {
+        let c = calc
+        var arr = blob.settings["mumItems"]?.array ?? []
+        arr.removeAll { c.idStr($0["id"]) == id }
+        blob.settings["mumItems"] = .array(arr)
+        persist()
+    }
+
+    // MARK: Paidy plans (mirror web paidyPlans)
+    func addPaidyPlan(name: String, financedAmount: Double, installments: Int, monthlyPayment: Double,
+                      startMonth: Int?, startYear: Int?, paymentDay: Int, paidCountOverride: Int?) {
+        var arr = blob.settings["paidyPlans"]?.array ?? []
+        let id = "p" + String(UUID().uuidString.prefix(12))
+        var o: [String: JSONValue] = [
+            "id": .string(id), "name": .string(name),
+            "financedAmount": .number(financedAmount), "installments": .number(Double(installments)),
+            "monthlyPayment": .number(monthlyPayment), "paymentDay": .number(Double(paymentDay)),
+        ]
+        o["startMonth"] = startMonth.map { .number(Double($0)) } ?? .null
+        o["startYear"]  = startYear.map  { .number(Double($0)) } ?? .null
+        o["paidCountOverride"] = paidCountOverride.map { .number(Double($0)) } ?? .null
+        arr.append(.object(o))
+        blob.settings["paidyPlans"] = .array(arr)
+        persist()
+    }
+    func updatePaidyPlan(_ id: String, name: String? = nil, financedAmount: Double? = nil,
+                         installments: Int? = nil, monthlyPayment: Double? = nil,
+                         startMonth: Int?? = nil, startYear: Int?? = nil, paymentDay: Int? = nil,
+                         paidCountOverride: Int?? = nil) {
+        let c = calc
+        let arr = (blob.settings["paidyPlans"]?.array ?? []).map { p -> JSONValue in
+            guard c.idStr(p["id"]) == id else { return p }
+            var o = p.object ?? [:]
+            if let name { o["name"] = .string(name) }
+            if let financedAmount { o["financedAmount"] = .number(financedAmount) }
+            if let installments { o["installments"] = .number(Double(installments)) }
+            if let monthlyPayment { o["monthlyPayment"] = .number(monthlyPayment) }
+            if let paymentDay { o["paymentDay"] = .number(Double(paymentDay)) }
+            if let startMonth { o["startMonth"] = startMonth.map { .number(Double($0)) } ?? .null }
+            if let startYear  { o["startYear"]  = startYear.map  { .number(Double($0)) } ?? .null }
+            if let paidCountOverride { o["paidCountOverride"] = paidCountOverride.map { .number(Double($0)) } ?? .null }
+            return .object(o)
+        }
+        blob.settings["paidyPlans"] = .array(arr)
+        persist()
+    }
+    func removePaidyPlan(_ id: String) {
+        let c = calc
+        var arr = blob.settings["paidyPlans"]?.array ?? []
+        arr.removeAll { c.idStr($0["id"]) == id }
+        blob.settings["paidyPlans"] = .array(arr)
+        persist()
+    }
+
     func addSubItem(name: String, price: Double, everyN: Int) {
         var arr = blob.settings["subItems"]?.array ?? []
         let id = "s" + String(UUID().uuidString.prefix(12))

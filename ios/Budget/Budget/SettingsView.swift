@@ -10,6 +10,10 @@ struct SettingsView: View {
     @EnvironmentObject var store: BudgetStore
     @EnvironmentObject var lock: BiometricLock
     @State private var nfName = ""; @State private var nfAmount = ""; @State private var nfVariable = false
+    // Send-to-Mum new-item form
+    @State private var nmName = ""; @State private var nmAmount = ""
+    @State private var nmStartMonth = 0; @State private var nmStartYear = ""
+    @State private var nmEndMonth = 0; @State private var nmEndYear = ""
     @State private var nsName = ""; @State private var nsPrice = ""; @State private var nsEveryN = 1
     @State private var notifsOn = Notifs.isEnabled
     @AppStorage(Notifs.deniedKey) private var notifDenied = false
@@ -26,6 +30,7 @@ struct SettingsView: View {
                 budgetExtras()
                 schedule(c)
                 fixedExpenses(c)
+                sendToMumItems(c)
                 subItems(c)
             }
             .padding(20)
@@ -157,13 +162,20 @@ struct SettingsView: View {
     }
     @ViewBuilder private func fixedExpenses(_ c: Calc) -> some View {
         card("Fixed Expenses", T.lavD) {
+            let cmk = String(format: "%04d-%02d", Calendar.current.component(.year, from: Date()), Calendar.current.component(.month, from: Date()))
             ForEach(Array(c.fixed.enumerated()), id: \.offset) { _, f in
                 let id = c.idStr(f["id"])
                 HStack(spacing: 8) {
                     Text(f.s("name")).font(.footnote)
+                    if f.b("paidyDerived") { Text("from Paidy").font(.caption2).foregroundStyle(T.sub) }
                     Spacer()
-                    Text(f.b("variable") ? "varies" : yen(f.d("amount"))).font(.footnote).foregroundStyle(f.b("variable") ? T.sub : T.text)
-                    Button { store.removeFixed(id) } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.roseD)
+                    Text(f.b("paidyDerived") ? yen(c.paidyMonthly(cmk)) : (f.b("variable") ? "varies" : yen(f.d("amount"))))
+                        .font(.footnote).foregroundStyle(f.b("variable") || f.b("paidyDerived") ? T.sub : T.text)
+                    if f.b("paidyDerived") {
+                        Button { store.selectedTab = 4; store.openPaidy = true } label: { Image(systemName: "chevron.right").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.muted)
+                    } else {
+                        Button { store.removeFixed(id) } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.roseD)
+                    }
                 }
                 .padding(.vertical, 4).overlay(Divider().overlay(T.border), alignment: .bottom)
             }
@@ -181,6 +193,62 @@ struct SettingsView: View {
             .padding(.top, 4)
         }
     }
+    // MARK: Send to Mum (reminders with an optional month window; blank end = ongoing)
+    @ViewBuilder private func sendToMumItems(_ c: Calc) -> some View {
+        card("Send to Mum", T.roseD) {
+            Text("Reminders for money you send Mum. Each item shows only within its month window. Leave the end blank for an ongoing item. These are reminders and don’t change your budget totals.")
+                .font(.caption2).foregroundStyle(T.sub).frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 4)
+            ForEach(Array(c.se.arr("mumItems").enumerated()), id: \.offset) { _, m in
+                let id = c.idStr(m["id"])
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Text(m.s("name")).font(.footnote)
+                        Spacer()
+                        Text(yen(m.d("amount"))).font(.footnote).foregroundStyle(T.text)
+                        Button { store.removeMumItem(id) } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.roseD)
+                    }
+                    Text(mumWindowLabel(m)).font(.caption2).foregroundStyle(T.sub)
+                }
+                .padding(.vertical, 4).overlay(Divider().overlay(T.border), alignment: .bottom)
+            }
+            VStack(spacing: 8) {
+                TextField("Name", text: $nmName).modifier(FieldStyle())
+                HStack(spacing: 6) { Text("¥").foregroundStyle(T.sub); TextField("Amount", text: $nmAmount).keyboardType(.numberPad) }.modifier(FieldStyle())
+                HStack(spacing: 8) {
+                    Text("Start").font(.caption2).foregroundStyle(T.sub).frame(width: 34, alignment: .leading)
+                    Picker("", selection: $nmStartMonth) { Text("Month").tag(0); ForEach(1...12, id: \.self) { Text(MO_SHORT[$0 - 1]).tag($0) } }.pickerStyle(.menu).tint(T.text)
+                    TextField("Year", text: $nmStartYear).keyboardType(.numberPad).modifier(FieldStyle()).frame(width: 70)
+                }
+                HStack(spacing: 8) {
+                    Text("End").font(.caption2).foregroundStyle(T.sub).frame(width: 34, alignment: .leading)
+                    Picker("", selection: $nmEndMonth) { Text("Ongoing").tag(0); ForEach(1...12, id: \.self) { Text(MO_SHORT[$0 - 1]).tag($0) } }.pickerStyle(.menu).tint(T.text)
+                    TextField("Year", text: $nmEndYear).keyboardType(.numberPad).modifier(FieldStyle()).frame(width: 70)
+                }
+                Button {
+                    guard !nmName.isEmpty else { return }
+                    store.addMumItem(
+                        name: nmName, amount: Double(nmAmount) ?? 0,
+                        startMonth: nmStartMonth == 0 ? nil : nmStartMonth, startYear: Int(nmStartYear),
+                        endMonth: nmEndMonth == 0 ? nil : nmEndMonth, endYear: Int(nmEndYear))
+                    nmName = ""; nmAmount = ""; nmStartMonth = 0; nmStartYear = ""; nmEndMonth = 0; nmEndYear = ""
+                } label: {
+                    Text("+ Add Mum item").fontWeight(.semibold).foregroundStyle(.white)
+                        .frame(maxWidth: .infinity).padding(.vertical, 11)
+                        .background(T.roseD).clipShape(RoundedRectangle(cornerRadius: 10))
+                }.buttonStyle(.plain)
+            }
+            .padding(.top, 4)
+        }
+    }
+    private func mumWindowLabel(_ m: JSONValue) -> String {
+        guard let sM = m["startMonth"]?.int, let sY = m["startYear"]?.int else { return "always" }
+        let start = "\(MO_SHORT[max(0, min(11, sM - 1))]) \(sY)"
+        if let eM = m["endMonth"]?.int, let eY = m["endYear"]?.int {
+            return "\(start) → \(MO_SHORT[max(0, min(11, eM - 1))]) \(eY)"
+        }
+        return "\(start) → ongoing"
+    }
+
     private static let subFreqs = [1, 2, 3, 4, 6]
     private func freqLabel(_ n: Int) -> String { n <= 1 ? "every month" : "every \(n) months" }
 

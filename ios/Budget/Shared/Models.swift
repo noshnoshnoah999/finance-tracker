@@ -129,6 +129,9 @@ let MONTHS: [MonthMeta] = [
 
 func monthMeta(_ key: String) -> MonthMeta? { MONTHS.first { $0.key == key } }
 
+/// Short month names, 0-indexed (Jan=0). Used for Paidy payoff labels across any year.
+let MO_SHORT: [String] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
 /// Default settings fallbacks (mirror DS in app.html) — used when a field is absent.
 enum DS {
     static let hourlyWage = 1400.0

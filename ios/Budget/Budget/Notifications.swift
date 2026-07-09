@@ -115,8 +115,8 @@ enum Notifs {
                 }
             }
 
-            // Send to Mum — payday and the two days after, if there are any Mum items.
-            if !c.se.arr("mumItems").isEmpty {
+            // Send to Mum — payday and the two days after, if there are any Mum items active this month.
+            if c.se.arr("mumItems").contains(where: { c.mumActive($0, mo.key) }) {
                 for k in 0...2 {
                     if let d = cal.date(byAdding: .day, value: k, to: payDate) {
                         add(center, "mum\(k)-\(mo.key)", d, "👩 Send to Mum?",

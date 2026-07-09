@@ -217,7 +217,7 @@ struct Calc {
         let checked = Set((month(mk)["mumChecked"]?.array ?? []).map { idStr($0) })
         var total = 0.0
         if checked.contains("food") { total += food(mk) }
-        for it in se.arr("mumItems") where checked.contains(idStr(it["id"])) {
+        for it in se.arr("mumItems") where checked.contains(idStr(it["id"])) && mumActive(it, mk) {
             total += it.d("amount")
         }
         return total
@@ -244,8 +244,88 @@ struct Calc {
     // MARK: Fixed expenses
     func fixedAmount(_ f: JSONValue, _ mk: String) -> Double {
         if f.b("sub") { return subTotal(mk) }
+        if f.b("paidyDerived") { return paidyMonthly(mk) }   // ¥ derived from active Paidy plans (mirror web paidyMonthlyForMonth)
         if f.b("variable") { return month(mk)["fixedAmounts"]?[idStr(f["id"])]?.double ?? 0 }
         return f.d("amount")
+    }
+
+    // MARK: Paidy installment plans (mirror app.html paidyPlans / paidyCalc / paidyMonthlyForMonth)
+    var paidyPlans: [JSONValue] { se.arr("paidyPlans") }
+
+    /// Combined monthly Paidy cost active in month `mk` ("YYYY-MM").
+    /// A plan counts if `mk` is within [start, start + installments - 1].
+    func paidyMonthly(_ mk: String) -> Double {
+        let (y, mo) = ym(mk)
+        let mkIdx = y * 12 + (mo - 1)
+        var s = 0.0
+        for p in paidyPlans {
+            let inst = p.i("installments")
+            let startIdx = p.i("startYear", y) * 12 + (p.i("startMonth", 1) - 1)
+            let endIdx = startIdx + max(0, inst - 1)
+            if mkIdx >= startIdx && mkIdx <= endIdx { s += p.d("monthlyPayment") }
+        }
+        return s
+    }
+
+    /// Live computed state for one Paidy plan as of `now`.
+    struct PaidyState {
+        let paid: Int, installments: Int, remainingInst: Int
+        let monthly: Double, remainingBal: Double, financed: Double
+        let done: Bool, pct: Int, payoffLabel: String
+        let isAuto: Bool   // true when paid count is derived from the schedule (no manual override)
+    }
+
+    func paidyCalc(_ p: JSONValue, _ now: Date = Date()) -> PaidyState {
+        let inst = p.i("installments")
+        let mp = p.d("monthlyPayment")
+        let financed = p["financedAmount"]?.double ?? (mp * Double(inst))
+        let startMonth = p.i("startMonth", 1), startYear = p.i("startYear", cal.component(.year, from: now))
+        let paymentDay = p.i("paymentDay", 1)
+        var paid: Int
+        var isAuto = false
+        if let ov = p["paidCountOverride"], ov != .null, let n = ov.int {
+            paid = n
+        } else {
+            isAuto = true
+            let startIdx = startYear * 12 + (startMonth - 1)
+            let nowIdx = cal.component(.year, from: now) * 12 + (cal.component(.month, from: now) - 1)
+            let dayBump = cal.component(.day, from: now) >= paymentDay ? 1 : 0
+            paid = max(0, nowIdx - startIdx + dayBump)
+        }
+        paid = max(0, min(inst, paid))
+        let remainingInst = max(0, inst - paid)
+        let remainingBal = max(0, financed - Double(paid) * mp)
+        let done = remainingInst <= 0
+        let startIdx = startYear * 12 + (startMonth - 1)
+        let payoffIdx = startIdx + max(0, inst - 1)
+        let payoffLabel = "\(MO_SHORT[((payoffIdx % 12) + 12) % 12]) \(payoffIdx / 12)"
+        let pct = inst > 0 ? Int((Double(paid) / Double(inst) * 100).rounded()) : 0
+        return PaidyState(paid: paid, installments: inst, remainingInst: remainingInst,
+                          monthly: mp, remainingBal: remainingBal, financed: financed,
+                          done: done, pct: pct, payoffLabel: payoffLabel, isAuto: isAuto)
+    }
+
+    /// Next Paidy payment date label. Uses the most common payment day (default 27).
+    func paidyNextPayLabel(_ now: Date = Date(), day: Int? = nil) -> String {
+        let d = day ?? paidyPlans.first.map { $0.i("paymentDay", 27) } ?? 27
+        var y = cal.component(.year, from: now)
+        var m = cal.component(.month, from: now)   // 1-based
+        if cal.component(.day, from: now) > d {
+            m += 1
+            if m > 12 { m = 1; y += 1 }
+        }
+        return "\(MO_SHORT[m - 1]) \(d), \(y)"
+    }
+
+    /// Whether a mum item is active in month `mk` (blank start = always; blank end = ongoing).
+    func mumActive(_ it: JSONValue, _ mk: String) -> Bool {
+        let (y, mo) = ym(mk)
+        let mkIdx = y * 12 + (mo - 1)
+        let sM = it["startMonth"]?.int, sY = it["startYear"]?.int
+        let eM = it["endMonth"]?.int, eY = it["endYear"]?.int
+        let start = (sM != nil && sY != nil) ? (sY! * 12 + (sM! - 1)) : Int.min
+        let end = (eM != nil && eY != nil) ? (eY! * 12 + (eM! - 1)) : Int.max
+        return mkIdx >= start && mkIdx <= end
     }
 
     // MARK: Month roll-ups (mirror the Home/Budget computeds)

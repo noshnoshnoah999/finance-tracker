@@ -88,12 +88,16 @@
         2:{start:"09:00",end:"12:00",breakMin:0,label:"Tue"},
         0:{start:"10:30",end:"17:00",breakMin:60,label:"Sun"},
       },
-      mumItems:[{id:1,name:"MacBook Air Payment",amount:6783}],
+      mumItems:[],
       dadFreeSpend:{},
       fixed:[
-        {id:1,name:"Paidy (MacBook + iPhone)",amount:9916},
+        {id:1,name:"Paidy (MacBook + iPhone)",amount:9916,paidyDerived:true},
         {id:2,name:"Japanese Lessons",amount:3026},
         {id:3,name:"Claude Pro",amount:3200},
+      ],
+      paidyPlans:[
+        {id:1,name:"iPhone 17 Pro 256GB",financedAmount:112800,installments:36,monthlyPayment:3133,startMonth:3,startYear:2026,paymentDay:27,paidCountOverride:null},
+        {id:2,name:"MacBook Air 13\" Midnight",financedAmount:162800,installments:24,monthlyPayment:6783,startMonth:1,startYear:2026,paymentDay:27,paidCountOverride:null},
       ],
     };
     const BUDGET_CARDS = ["work","income","dad","extra","fixed","subscribe","oneoff","mum","free"];
@@ -126,6 +130,39 @@
     const sHIM=(mk,shifts)=>{if(!shifts)return 0;let t=0;Object.keys(shifts).forEach(d=>{t+=cDIM(mk,Number(d))*sH(shifts[d]);});return t;};
     const gPD=mk=>{const[y,mo]=mk.split("-").map(Number);const d=new Date(y,mo-1,15);const dw=d.getDay();if(dw===6)d.setDate(14);if(dw===0)d.setDate(13);return d.getDate();};
     const pMN=mk=>{const[y,mo]=mk.split("-").map(Number);if(mo===1)return"Dec "+(y-1);return MONTHS[mo-2].label;};
+
+    const MO_SHORT=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    // Compute a Paidy plan's live state. paidCountOverride wins when set; otherwise derive from elapsed months since start (capped 0..installments).
+    const paidyCalc=(p,now)=>{
+      const nw=now||new Date();
+      const inst=Number(p.installments)||0;
+      const mp=Number(p.monthlyPayment)||0;
+      const financed=Number(p.financedAmount)||(mp*inst);
+      let paid;
+      const hasOverride=p.paidCountOverride!=null&&p.paidCountOverride!=="";
+      if(hasOverride){paid=Number(p.paidCountOverride)||0;}
+      else{
+        const startIdx=(Number(p.startYear)||nw.getFullYear())*12+((Number(p.startMonth)||1)-1);
+        const nowIdx=nw.getFullYear()*12+nw.getMonth();
+        // A payment lands on paymentDay each month; count how many payment dates have passed since (and incl.) start month.
+        let elapsed=nowIdx-startIdx+ (nw.getDate()>=(Number(p.paymentDay)||1)?1:0);
+        paid=Math.max(0,elapsed);
+      }
+      paid=Math.max(0,Math.min(inst,paid));
+      const remainingInst=Math.max(0,inst-paid);
+      const remainingBal=Math.max(0,financed-paid*mp);
+      const done=remainingInst<=0;
+      // Payoff month = start + (installments-1) months (last payment date).
+      const startIdx=(Number(p.startYear)||nw.getFullYear())*12+((Number(p.startMonth)||1)-1);
+      const payoffIdx=startIdx+Math.max(0,inst-1);
+      const payoffYear=Math.floor(payoffIdx/12),payoffMonth=(payoffIdx%12);
+      const pct=inst>0?Math.round(paid/inst*100):0;
+      return{financed,inst,mp,paid,remainingInst,remainingBal,done,pct,isAuto:!hasOverride,payoffLabel:`${MO_SHORT[payoffMonth]} ${payoffYear}`};
+    };
+    // Next payment date label for a set of active plans (assumes common payment day; uses each plan's own day otherwise).
+    const nextPayLabel=(now,day)=>{const nw=now||new Date();const d=Number(day)||27;let y=nw.getFullYear(),m=nw.getMonth();if(nw.getDate()>d){m++;if(m>11){m=0;y++;}}return`${MO_SHORT[m]} ${d}, ${y}`;};
+    // Combined monthly Paidy cost active in month mk ("YYYY-MM"). A plan counts if mk is within [start, start+installments-1].
+    const paidyMonthlyForMonth=(plans,mk)=>{if(!plans||!plans.length)return 0;const[y,mo]=mk.split("-").map(Number);const mkIdx=y*12+(mo-1);let s=0;plans.forEach(p=>{const inst=Number(p.installments)||0;const startIdx=(Number(p.startYear)||y)*12+((Number(p.startMonth)||1)-1);const endIdx=startIdx+Math.max(0,inst-1);if(mkIdx>=startIdx&&mkIdx<=endIdx)s+=Number(p.monthlyPayment)||0;});return s;};
 
     const yn=n=>"¥"+Math.round(n).toLocaleString();
     const gf=n=>"£"+n.toFixed(2);
@@ -176,7 +213,21 @@
 
     // Read last-saved state synchronously so the app paints instantly (no network wait)
     const CACHED=(()=>{try{return JSON.parse(localStorage.getItem(SK)||"null");}catch(_){return null;}})();
-    const initSe=()=>CACHED&&CACHED.settings?{...DS,...CACHED.settings,fixed:CACHED.settings.fixed||DS.fixed.map(f=>({...f}))}:DS;
+    // Migrate a cached settings blob to the current schema: ensure paidyPlans exists and the
+    // fixed "Paidy" line is flagged paidyDerived so its amount is computed from paidyPlans.
+    const migrateSe=s=>{
+      const out={...s};
+      if(!Array.isArray(out.paidyPlans)||out.paidyPlans.length===0){if(!Array.isArray(out.paidyPlans))out.paidyPlans=DS.paidyPlans.map(p=>({...p}));}
+      if(Array.isArray(out.fixed)){out.fixed=out.fixed.map(f=>((f.paidyDerived||/paidy/i.test(f.name||""))?{...f,paidyDerived:true}:f));}
+      // One-time (v1): clear the stale hand-seeded paidCountOverride so the paid count
+      // auto-calculates from the payment schedule. Runs once; user-set overrides afterwards are kept.
+      if(out.paidyMigV!==1){
+        if(Array.isArray(out.paidyPlans))out.paidyPlans=out.paidyPlans.map(p=>({...p,paidCountOverride:null}));
+        out.paidyMigV=1;
+      }
+      return out;
+    };
+    const initSe=()=>CACHED&&CACHED.settings?migrateSe({...DS,...CACHED.settings,fixed:CACHED.settings.fixed||DS.fixed.map(f=>({...f}))}):DS;
     const initDa=()=>{const x=gDef();if(CACHED&&CACHED.data)Object.keys(CACHED.data).forEach(k=>{if(x[k]!==undefined)x[k]={...eM(),...CACHED.data[k]};});return x;};
 
     function urlB64ToU8(s){const pad="=".repeat((4-s.length%4)%4);const r=(s+pad).replace(/-/g,"+").replace(/_/g,"/");const raw=atob(r);const a=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)a[i]=raw.charCodeAt(i);return a;}
@@ -215,8 +266,10 @@
       const [simLoading,setSimLoading]=useState(false);
       const [simErr,setSimErr]=useState("");
       const [th,setTh]=useState("coffee");
-      const [nM,setNM]=useState({name:"",amount:""});
+      const [nM,setNM]=useState({name:"",amount:"",startMonth:"",startYear:"",endMonth:"",endYear:""});
       const [eMI,setEMI]=useState(null);
+      const [nPP,setNPP]=useState({name:"",financedAmount:"",installments:"",monthlyPayment:"",startMonth:"",startYear:"",paymentDay:27,paidCountOverride:""});
+      const [ePP,setEPP]=useState(null);
       const [sv,setSv]=useState(false);
       const [confirmReset,setConfirmReset]=useState(false);
       const [sync,setSync]=useState("idle");
@@ -484,19 +537,21 @@
       const subTotal=mk=>(se.subItems||[]).filter(it=>subIncluded(it,mk)&&(it.payer||"me")!=="dad").reduce((s,it)=>s+(it.price||0),0);
       const subTotalDad=mk=>(se.subItems||[]).filter(it=>subIncluded(it,mk)&&(it.payer||"me")==="dad").reduce((s,it)=>s+(it.price||0),0);
       // Bills that DON'T appear as card transactions (fixed + skin + savings + one-offs).
-      const nonCardBills=mk=>{const d=da[mk]||eM();let s=0;(se.fixed||[]).forEach(f=>{if((d.skippedFixed||{})[f.id])return;s+=f.sub?subTotal(mk):f.variable?((d.fixedAmounts||{})[f.id]||0):f.amount;});if(se.showSkin!==false)s+=(d.skinTreatment||0);s+=genSavM(mk)+silverM(mk);(d.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;};
+      const nonCardBills=mk=>{const d=da[mk]||eM();let s=0;(se.fixed||[]).forEach(f=>{if((d.skippedFixed||{})[f.id])return;s+=f.sub?subTotal(mk):f.paidyDerived?paidyMonthlyForMonth(se.paidyPlans,mk):f.variable?((d.fixedAmounts||{})[f.id]||0):f.amount;});if(se.showSkin!==false)s+=(d.skinTreatment||0);s+=genSavM(mk)+silverM(mk);(d.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;};
       // Single source of truth for "money out this month" — used by Home to show budget breakdown.
       // Real (imported) months: non-card bills + actual card spending (card already covers food/transport).
       // Estimated months: the full budget (non-card bills + budgeted food + suica).
       const monthOut=mk=>{const tx=(da[mk]?.txns)||[];if(tx.length>0){return nonCardBills(mk)+tx.filter(t=>t.direction==="out").reduce((s,t)=>s+(Number(t.amount)||0),0);}const d=da[mk]||eM();return nonCardBills(mk)+(d.suicaOverride!=null?d.suicaOverride:gCm(d,mk))+(d.foodOverride!=null?d.foodOverride:fF(mk));};
-      const fxAmt=f=>f.sub?subTotal(bm):(f.variable?(bdFA[f.id]||0):f.amount);
+      const fxAmt=f=>f.sub?subTotal(bm):f.paidyDerived?paidyMonthlyForMonth(se.paidyPlans,bm):(f.variable?(bdFA[f.id]||0):f.amount);
       const bdFC=se.fixed.filter(f=>!bdSF[f.id]).reduce((s,f)=>s+fxAmt(f),0);
       const bdSilver=silverM(bm);
       const bdFT=bdFC+bdCm+bdFd+bdSkin+bdGenSav+bdSilver;
       const bdOY=bd.oneOffs.filter(x=>!x.mumPays).reduce((s,x)=>s+x.amount,0);
       const bdOM=bd.oneOffs.filter(x=>x.mumPays).reduce((s,x)=>s+x.amount,0);
       const bdFoodAmt=bdFd;
-      const allMumItems=[{id:"food",name:"Food Budget"+(bd.foodOverride!=null?" (custom)":MONTHS.find(x=>x.key===bm)?.is5wk?" (5-wk)":" (4-wk)"),amount:bdFoodAmt},...(se.mumItems||[])];
+      const bmNum=(()=>{const[y,mo]=bm.split("-").map(Number);return y*12+(mo-1);})();
+      const mumInWindow=it=>{const st=(it.startYear&&it.startMonth)?it.startYear*12+(it.startMonth-1):-Infinity;const en=(it.endYear&&it.endMonth)?it.endYear*12+(it.endMonth-1):Infinity;return bmNum>=st&&bmNum<=en;};
+      const allMumItems=[{id:"food",name:"Food Budget"+(bd.foodOverride!=null?" (custom)":MONTHS.find(x=>x.key===bm)?.is5wk?" (5-wk)":" (4-wk)"),amount:bdFoodAmt},...(se.mumItems||[]).filter(mumInWindow)];
       const bdMTDisplay=allMumItems.filter(x=>bdMC.includes(x.id)).reduce((s,x)=>s+x.amount,0);
       const bdExtra=extraInc(bm);
       const bdFr=bdI+bdPLW+bdDJFree+bdExtra-bdFT-bdOY;
@@ -506,7 +561,7 @@
       const cmk=(()=>{const k=`${nw.getFullYear()}-${String(nw.getMonth()+1).padStart(2,'0')}`;return da[k]?k:bm;})();
       const cmd=da[cmk]||eM();
       const cmPF=cmd.paidFixed||{},cmSF=cmd.skippedFixed||{},cmFA=cmd.fixedAmounts||{};
-      const cmFx=f=>f.sub?subTotal(cmk):(f.variable?(cmFA[f.id]||0):f.amount);
+      const cmFx=f=>f.sub?subTotal(cmk):f.paidyDerived?paidyMonthlyForMonth(se.paidyPlans,cmk):(f.variable?(cmFA[f.id]||0):f.amount);
       const cmCm=cmd.suicaOverride!=null?cmd.suicaOverride:gCm(cmd,cmk);
       const cmFd=cmd.foodOverride!=null?cmd.foodOverride:fF(cmk);
       const cmSkin=(se.showSkin!==false)?(cmd.skinTreatment||0):0;
@@ -562,9 +617,9 @@
       const rXI=(k,id)=>setDa(p=>({...p,[k]:{...p[k],extraIncome:((p[k]&&p[k].extraIncome)||[]).filter(x=>x.id!==id)}}));
       const uDI=(k,id,f,v)=>setDa(p=>({...p,[k]:{...p[k],dadItems:(p[k].dadItems||[]).map(x=>x.id===id?{...x,[f]:v}:x)}}));
       const tMC=(k,id)=>setDa(p=>{const cu=p[k]?.mumChecked||[];const nx=cu.includes(id)?cu.filter(x=>x!==id):[...cu,id];return{...p,[k]:{...p[k],mumChecked:nx}};});
-      const aMI=()=>{if(!nM.name||!nM.amount)return;setSe(p=>({...p,mumItems:[...p.mumItems,{id:Date.now(),name:nM.name,amount:Number(nM.amount)||0}]}));setNM({name:"",amount:""});};
+      const aMI=()=>{if(!nM.name||!nM.amount)return;setSe(p=>({...p,mumItems:[...p.mumItems,{id:Date.now(),name:nM.name,amount:Number(nM.amount)||0,startMonth:Number(nM.startMonth)||null,startYear:Number(nM.startYear)||null,endMonth:Number(nM.endMonth)||null,endYear:Number(nM.endYear)||null}]}));setNM({name:"",amount:"",startMonth:"",startYear:"",endMonth:"",endYear:""});};
       const rMI=id=>setSe(p=>({...p,mumItems:p.mumItems.filter(x=>x.id!==id)}));
-      const hR=()=>{setSe({...DS,fixed:DS.fixed.map(f=>({...f})),mumItems:DS.mumItems.map(x=>({...x}))});setDa(gDef());setConfirmReset(false);};
+      const hR=()=>{setSe({...DS,fixed:DS.fixed.map(f=>({...f})),mumItems:DS.mumItems.map(x=>({...x})),paidyPlans:DS.paidyPlans.map(x=>({...x}))});setDa(gDef());setConfirmReset(false);};
       // Limit page — ask Claude whether the planned shifts are wise this month.
       const askLimitAdvisor=async(plannedH,plannedPay,shiftLines)=>{
         setSimErr("");setSimAdvice(null);setSimLoading(true);
@@ -658,7 +713,7 @@
         </div>
       );
 
-      const tabs=["home","wage","budget","limit","savings","goals","settings"];
+      const tabs=["home","wage","budget","limit","savings","paidy","goals","settings"];
       const syncCol=sync==="saved"?c.greenD:sync==="error"?c.roseD:c.muted;
       const syncLabel=sync==="saving"?"↑":sync==="saved"?"✓":sync==="error"?"!":null;
 
@@ -769,6 +824,19 @@
                     {slvSpot>0&&slvUsd>0&&<div style={{fontSize:11,fontWeight:700,marginTop:6,color:slvGain>=0?c.greenD:c.roseD}}>{slvGain>=0?"▲":"▼"} {ud(Math.abs(slvGain))} ({slvGain>=0?"+":""}{slvGainPct.toFixed(0)}%)</div>}
                   </div>
                 </div>
+
+                {/* PAIDY summary */}
+                {(se.paidyPlans||[]).length>0&&(()=>{const cs=(se.paidyPlans||[]).map(p=>paidyCalc(p,nw));const totBal=cs.reduce((s,x)=>s+x.remainingBal,0);const totMo=cs.filter(x=>!x.done).reduce((s,x)=>s+x.mp,0);const totInst=cs.reduce((s,x)=>s+x.inst,0);const totPaid=cs.reduce((s,x)=>s+x.paid,0);const pctAll=totInst>0?Math.round(totPaid/totInst*100):0;return(
+                  <div onClick={()=>setTab("paidy")} style={{...crd,cursor:"pointer"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontSize:11,color:c.sub,textTransform:"uppercase",letterSpacing:0.5,fontWeight:600}}>Paidy</span>
+                      <span style={{fontSize:12,color:c.sub}}>{yn(totMo)}/mo · next {nextPayLabel(nw,27)}</span>
+                    </div>
+                    <div style={{fontSize:21,fontWeight:800,color:c.roseD,marginBottom:8}}>{yn(totBal)} <span style={{fontSize:12,fontWeight:500,color:c.sub}}>remaining</span></div>
+                    <div style={{background:c.cardAlt,borderRadius:5,height:5,overflow:"hidden"}}><div style={{height:"100%",borderRadius:5,width:`${pctAll}%`,background:c.accent,transition:"width 0.4s"}}/></div>
+                    <div style={{fontSize:10,color:c.muted,marginTop:4}}>{totPaid}/{totInst} payments · {pctAll}%</div>
+                  </div>
+                );})()}
 
                 {/* Quick links */}
                 <div style={{display:"flex",gap:8,marginTop:10}}>
@@ -1022,7 +1090,7 @@
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.lavD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Fixed Expenses</span></div>
                   <div style={{fontSize:13}}>
-                    {se.fixed.map(f=>{const paid=bdPF[f.id],skipped=bdSF[f.id];return(<div key={f.id} style={{...rw,opacity:skipped?0.4:1}}>{eF===f.id?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><input value={f.name} onChange={e=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,name:e.target.value}:x)}))} style={{...inp,flex:2}}/>{f.sub?<span style={{flex:1,fontSize:11,color:c.sub,textAlign:"center"}}>from items below</span>:f.variable?<span style={{flex:1,fontSize:11,color:c.sub,textAlign:"center"}}>varies monthly</span>:<NI prefix="¥" value={f.amount} onChange={v=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,amount:v}:x)}))} style={{flex:1}}/>}<button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>{!skipped&&<PaidBtn paid={paid} onToggle={()=>tPF(bm,f.id)}/>}<span onClick={()=>setEF(f.id)} style={{flex:1,color:paid||skipped?c.muted:c.text,textDecoration:paid||skipped?"line-through":"none",cursor:"pointer",fontWeight:paid||skipped?400:500}}>{f.name}{f.sub?<span style={{fontSize:10,color:c.sub,marginLeft:6}}>{(se.subItems||[]).filter(it=>subIncluded(it,bm)).length} items</span>:f.variable&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>monthly</span>}</span>{f.sub?<span style={{fontWeight:600,color:paid||skipped?c.muted:c.text,flexShrink:0}}>{yn(subTotal(bm))}</span>:f.variable?<input type="number" inputMode="numeric" value={bdFA[f.id]||""} placeholder="0" onChange={e=>sM(bm,"fixedAmounts",{...bdFA,[f.id]:Number(e.target.value)||0})} style={{...inp,width:84,padding:"6px 10px",textAlign:"right",flexShrink:0}}/>:<span style={{fontWeight:500,color:paid||skipped?c.muted:c.text,flexShrink:0}}>{yn(f.amount)}</span>}<button onClick={()=>tSF(bm,f.id)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:skipped?c.peachD:c.muted,fontFamily:mn,padding:"0 2px",flexShrink:0,fontWeight:skipped?600:400}}>{skipped?"↩ Undo":"Skip"}</button></div>}</div>);})}
+                    {se.fixed.map(f=>{const paid=bdPF[f.id],skipped=bdSF[f.id];return(<div key={f.id} style={{...rw,opacity:skipped?0.4:1}}>{eF===f.id?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><input value={f.name} onChange={e=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,name:e.target.value}:x)}))} style={{...inp,flex:2}}/>{f.sub?<span style={{flex:1,fontSize:11,color:c.sub,textAlign:"center"}}>from items below</span>:f.paidyDerived?<span style={{flex:1,fontSize:11,color:c.sub,textAlign:"center"}}>from Paidy tab</span>:f.variable?<span style={{flex:1,fontSize:11,color:c.sub,textAlign:"center"}}>varies monthly</span>:<NI prefix="¥" value={f.amount} onChange={v=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,amount:v}:x)}))} style={{flex:1}}/>}<button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}>{!skipped&&<PaidBtn paid={paid} onToggle={()=>tPF(bm,f.id)}/>}<span onClick={()=>setEF(f.id)} style={{flex:1,color:paid||skipped?c.muted:c.text,textDecoration:paid||skipped?"line-through":"none",cursor:"pointer",fontWeight:paid||skipped?400:500}}>{f.name}{f.sub?<span style={{fontSize:10,color:c.sub,marginLeft:6}}>{(se.subItems||[]).filter(it=>subIncluded(it,bm)).length} items</span>:f.paidyDerived?<span style={{fontSize:10,color:c.sub,marginLeft:6}}>Paidy</span>:f.variable&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>monthly</span>}</span>{f.sub?<span style={{fontWeight:600,color:paid||skipped?c.muted:c.text,flexShrink:0}}>{yn(subTotal(bm))}</span>:f.paidyDerived?<span style={{fontWeight:500,color:paid||skipped?c.muted:c.text,flexShrink:0}}>{yn(paidyMonthlyForMonth(se.paidyPlans,bm))}</span>:f.variable?<input type="number" inputMode="numeric" value={bdFA[f.id]||""} placeholder="0" onChange={e=>sM(bm,"fixedAmounts",{...bdFA,[f.id]:Number(e.target.value)||0})} style={{...inp,width:84,padding:"6px 10px",textAlign:"right",flexShrink:0}}/>:<span style={{fontWeight:500,color:paid||skipped?c.muted:c.text,flexShrink:0}}>{yn(f.amount)}</span>}<button onClick={()=>tSF(bm,f.id)} style={{border:"none",background:"transparent",cursor:"pointer",fontSize:11,color:skipped?c.peachD:c.muted,fontFamily:mn,padding:"0 2px",flexShrink:0,fontWeight:skipped?600:400}}>{skipped?"↩ Undo":"Skip"}</button></div>}</div>);})}
                     <div style={rw}>{eF==="suica"?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>SUICA ({bdSI.start} → {bdSI.end} · {bdSI.days} days)</span><input type="number" inputMode="numeric" value={bd.suicaOverride??bdCm} onChange={e=>sM(bm,"suicaOverride",Number(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button>{bd.suicaOverride!=null&&<button onClick={()=>{sM(bm,"suicaOverride",null);setEF(null);}} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer"}}>reset</button>}</div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><PaidBtn paid={bdPF["suica"]} onToggle={()=>tPF(bm,"suica")}/><span onClick={()=>setEF("suica")} style={{flex:1,color:bdPF["suica"]?c.muted:c.text,textDecoration:bdPF["suica"]?"line-through":"none",cursor:"pointer",fontWeight:bdPF["suica"]?400:500}}>SUICA ({bdSI.start} → {bdSI.end} · {bdSI.days} days{bd.suicaOverride!=null?" · edited":""})</span><span style={{fontWeight:500,color:bdPF["suica"]?c.muted:c.text,flexShrink:0}}>{yn(bdCm)}</span></div>}</div>
                     <div style={rw}>{eF==="food"?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>Food budget</span><input type="number" inputMode="numeric" value={bd.foodOverride??bdFd} onChange={e=>sM(bm,"foodOverride",Number(e.target.value)||0)} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button>{bd.foodOverride!=null&&<button onClick={()=>{sM(bm,"foodOverride",null);setEF(null);}} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer"}}>reset</button>}</div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><PaidBtn paid={bdPF["food"]} onToggle={()=>tPF(bm,"food")}/><span onClick={()=>setEF("food")} style={{flex:1,color:bdPF["food"]?c.muted:c.text,textDecoration:bdPF["food"]?"line-through":"none",cursor:"pointer",fontWeight:bdPF["food"]?400:500}}>Food ({bd.foodOverride!=null?"custom":MONTHS.find(x=>x.key===bm)?.is5wk?"5-wk":"4-wk"})</span><span style={{fontWeight:500,color:bdPF["food"]?c.muted:c.text,flexShrink:0}}>{yn(bdFd)}</span></div>}</div>
                     {[{label:"Skin Treatment",field:"skinTreatment",val:bdSkin,on:se.showSkin!==false}].filter(x=>x.on).map(({label,field,val})=>{const paid=bdPF[field];return(<div key={field} style={rw}>{eF===field?<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><span style={{color:c.sub,flex:1}}>{label}</span><input type="number" inputMode="numeric" value={val||""} placeholder="0" onChange={e=>{const v=parseFloat(e.target.value)||0;field==="generalSavings"?setSe(p=>({...p,genSavAmount:v})):sM(bm,field,v);}} style={{...inp,width:90,padding:"6px 10px",textAlign:"right"}} autoFocus/><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></div>:<div style={{display:"flex",alignItems:"center",gap:8,width:"100%"}}><PaidBtn paid={paid} onToggle={()=>tPF(bm,field)}/><span onClick={()=>setEF(field)} style={{flex:1,color:paid?c.muted:c.text,textDecoration:paid?"line-through":"none",cursor:"pointer",fontWeight:paid?400:500}}>{label}</span><span style={{fontWeight:500,color:paid?c.muted:c.text,flexShrink:0}}>{yn(val)}</span></div>}</div>);})}
@@ -1621,6 +1689,53 @@
               </div>
             )}
 
+            {tab==="paidy"&&(()=>{
+              const plans=se.paidyPlans||[];
+              const calcs=plans.map(p=>({p,cc:paidyCalc(p,nw)}));
+              const totRemBal=calcs.reduce((s,x)=>s+x.cc.remainingBal,0);
+              const totMonthly=calcs.filter(x=>!x.cc.done).reduce((s,x)=>s+x.cc.mp,0);
+              return(
+              <div>
+                <div style={crd}>
+                  <div style={{fontSize:12,color:c.sub,marginBottom:4}}>Total remaining Paidy debt</div>
+                  <div style={{fontSize:30,fontWeight:800,marginBottom:10}}>{yn(totRemBal)}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Combined monthly</span><span style={{fontWeight:700,color:c.text}}>{yn(totMonthly)}</span></div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub,marginTop:4}}><span>Next payment</span><span style={{fontWeight:700,color:c.text}}>{nextPayLabel(nw,27)}</span></div>
+                </div>
+                {calcs.map(({p,cc})=>{const editing=ePP===p.id;return(
+                  <div key={p.id} style={crd}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                      <span style={{fontSize:16,fontWeight:700}}>{p.name}{cc.done&&<span style={{fontSize:11,color:c.greenD,marginLeft:8,fontWeight:600}}>PAID OFF</span>}</span>
+                      <div style={{display:"flex",gap:6}}><button onClick={()=>setEPP(editing?null:p.id)} style={{border:"none",background:editing?c.greenD:c.cardAlt,color:editing?c.white:c.sub,borderRadius:8,padding:"5px 12px",cursor:"pointer",fontSize:11,fontWeight:500}}>{editing?"Done":"Edit"}</button><button onClick={()=>setSe(s=>({...s,paidyPlans:s.paidyPlans.filter(x=>x.id!==p.id)}))} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></div>
+                    </div>
+                    <div style={{height:8,borderRadius:6,background:c.cardAlt,overflow:"hidden",marginBottom:6}}><div style={{height:"100%",width:`${cc.pct}%`,background:cc.done?c.greenD:c.accent,borderRadius:6}}/></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:c.sub,marginBottom:12}}><span>{cc.paid} / {cc.inst} payments · {cc.pct}% <span style={{fontSize:10,fontWeight:600,color:cc.isAuto?c.greenD:c.peachD,background:cc.isAuto?c.greenBg:c.peachBg,borderRadius:6,padding:"1px 6px",marginLeft:4}}>{cc.isAuto?"auto":"manual"}</span></span><span>{cc.remainingInst} left</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span style={{color:c.sub}}>Monthly</span><span style={{fontWeight:600}}>{yn(cc.mp)}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span style={{color:c.sub}}>Remaining balance</span><span style={{fontWeight:600}}>{yn(cc.remainingBal)}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span style={{color:c.sub}}>Financed total</span><span style={{fontWeight:600}}>{yn(cc.financed)}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"4px 0"}}><span style={{color:c.sub}}>Projected payoff</span><span style={{fontWeight:600}}>{cc.payoffLabel}</span></div>
+                    {editing&&(<div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${c.border}`,display:"flex",flexDirection:"column",gap:8}}>
+                      <input value={p.name} onChange={e=>setSe(s=>({...s,paidyPlans:s.paidyPlans.map(x=>x.id===p.id?{...x,name:e.target.value}:x)}))} placeholder="Name" style={{...inp}}/>
+                      <div style={{display:"flex",gap:8}}><div style={{flex:1}}><div style={{fontSize:10,color:c.sub,marginBottom:2}}>Financed ¥</div><NI prefix="¥" value={p.financedAmount} onChange={v=>setSe(s=>({...s,paidyPlans:s.paidyPlans.map(x=>x.id===p.id?{...x,financedAmount:v}:x)}))}/></div><div style={{flex:1}}><div style={{fontSize:10,color:c.sub,marginBottom:2}}>Monthly ¥</div><NI prefix="¥" value={p.monthlyPayment} onChange={v=>setSe(s=>({...s,paidyPlans:s.paidyPlans.map(x=>x.id===p.id?{...x,monthlyPayment:v}:x)}))}/></div></div>
+                      <div style={{display:"flex",gap:8}}><div style={{flex:1}}><div style={{fontSize:10,color:c.sub,marginBottom:2}}>Installments</div><NI value={p.installments} onChange={v=>setSe(s=>({...s,paidyPlans:s.paidyPlans.map(x=>x.id===p.id?{...x,installments:v}:x)}))}/></div><div style={{flex:1}}><div style={{fontSize:10,color:c.sub,marginBottom:2,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>Paid so far {(p.paidCountOverride==null||p.paidCountOverride==="")?"(auto)":"(manual)"}</span>{(p.paidCountOverride!=null&&p.paidCountOverride!=="")&&<button onClick={()=>setSe(s=>({...s,paidyPlans:s.paidyPlans.map(x=>x.id===p.id?{...x,paidCountOverride:null}:x)}))} style={{border:"none",background:"transparent",color:c.greenD,fontSize:10,fontWeight:600,cursor:"pointer",padding:0}}>↻ auto</button>}</div><NI placeholder={String(cc.paid)} value={p.paidCountOverride} onChange={v=>setSe(s=>({...s,paidyPlans:s.paidyPlans.map(x=>x.id===p.id?{...x,paidCountOverride:v}:x)}))}/></div></div>
+                      <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:c.sub,width:36}}>Start</span><select value={p.startMonth||""} onChange={e=>setSe(s=>({...s,paidyPlans:s.paidyPlans.map(x=>x.id===p.id?{...x,startMonth:Number(e.target.value)||null}:x)}))} style={{...inp,flex:1}}><option value="">Month</option>{MO_SHORT.map((m,i)=><option key={i} value={i+1}>{m}</option>)}</select><input type="number" inputMode="numeric" placeholder="Year" value={p.startYear||""} onChange={e=>setSe(s=>({...s,paidyPlans:s.paidyPlans.map(x=>x.id===p.id?{...x,startYear:Number(e.target.value)||null}:x)}))} style={{...inp,width:70}}/><input type="number" inputMode="numeric" placeholder="Day" value={p.paymentDay||""} onChange={e=>setSe(s=>({...s,paidyPlans:s.paidyPlans.map(x=>x.id===p.id?{...x,paymentDay:Number(e.target.value)||27}:x)}))} style={{...inp,width:56}}/></div>
+                      <div style={{fontSize:10,color:c.muted}}>Leave "Paid so far" blank to auto-calc from start date. Setting it overrides the auto count.</div>
+                    </div>)}
+                  </div>
+                );})}
+                <div style={crd}>
+                  <div style={{fontSize:13,fontWeight:600,marginBottom:10}}>Add a Paidy plan</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <input placeholder="Name (e.g. iPad Pro)" value={nPP.name} onChange={e=>setNPP(p=>({...p,name:e.target.value}))} style={{...inp}}/>
+                    <div style={{display:"flex",gap:8}}><input placeholder="Financed ¥" type="number" inputMode="numeric" value={nPP.financedAmount} onChange={e=>setNPP(p=>({...p,financedAmount:e.target.value}))} style={{...inp,flex:1}}/><input placeholder="Monthly ¥" type="number" inputMode="numeric" value={nPP.monthlyPayment} onChange={e=>setNPP(p=>({...p,monthlyPayment:e.target.value}))} style={{...inp,flex:1}}/></div>
+                    <div style={{display:"flex",gap:8}}><input placeholder="Installments" type="number" inputMode="numeric" value={nPP.installments} onChange={e=>setNPP(p=>({...p,installments:e.target.value}))} style={{...inp,flex:1}}/><input placeholder="Paid so far" type="number" inputMode="numeric" value={nPP.paidCountOverride} onChange={e=>setNPP(p=>({...p,paidCountOverride:e.target.value}))} style={{...inp,flex:1}}/></div>
+                    <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:c.sub,width:36}}>Start</span><select value={nPP.startMonth} onChange={e=>setNPP(p=>({...p,startMonth:e.target.value}))} style={{...inp,flex:1}}><option value="">Month</option>{MO_SHORT.map((m,i)=><option key={i} value={i+1}>{m}</option>)}</select><input type="number" inputMode="numeric" placeholder="Year" value={nPP.startYear} onChange={e=>setNPP(p=>({...p,startYear:e.target.value}))} style={{...inp,width:70}}/><input type="number" inputMode="numeric" placeholder="Day" value={nPP.paymentDay} onChange={e=>setNPP(p=>({...p,paymentDay:e.target.value}))} style={{...inp,width:56}}/></div>
+                    <button onClick={()=>{if(!nPP.name||(!nPP.monthlyPayment&&!nPP.installments))return;const inst=Number(nPP.installments)||0;const mp=Number(nPP.monthlyPayment)||0;const fin=Number(nPP.financedAmount)||(mp*inst);setSe(s=>({...s,paidyPlans:[...(s.paidyPlans||[]),{id:Date.now(),name:nPP.name,financedAmount:fin,installments:inst,monthlyPayment:mp,startMonth:Number(nPP.startMonth)||null,startYear:Number(nPP.startYear)||null,paymentDay:Number(nPP.paymentDay)||27,paidCountOverride:nPP.paidCountOverride===""?null:Number(nPP.paidCountOverride)}]}));setNPP({name:"",financedAmount:"",installments:"",monthlyPayment:"",startMonth:"",startYear:"",paymentDay:27,paidCountOverride:""});}} style={{border:"none",background:c.accent,color:c.white,borderRadius:10,padding:"10px 14px",cursor:"pointer",fontFamily:ft,fontSize:13,fontWeight:600,width:"100%"}}>+ Add plan</button>
+                  </div>
+                </div>
+              </div>
+              );})()}
+
             {tab==="settings"&&(
               <div>
                 <div style={crd}>
@@ -1700,7 +1815,18 @@
                     <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.lavD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Fixed Expenses</span></div>
                     <button onClick={()=>{const id=Date.now();setSe(p=>({...p,fixed:[...p.fixed,{id,name:"New",amount:0}]}));setEF(id);}} style={{border:"none",background:c.lavD,color:c.white,borderRadius:10,padding:"6px 14px",cursor:"pointer",fontFamily:ft,fontSize:12,fontWeight:600}}>+ Add</button>
                   </div>
-                  {se.fixed.map(f=>(<div key={f.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>{eF===f.id?<><input value={f.name} onChange={e=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,name:e.target.value}:x)}))} style={{...inp,flex:2}}/>{f.variable?<span style={{flex:1,fontSize:11,color:c.sub,textAlign:"center"}}>varies monthly</span>:<NI prefix="¥" value={f.amount} onChange={v=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,amount:v}:x)}))} style={{flex:1}}/>}<button onClick={()=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,variable:!x.variable}:x)}))} style={{border:`2px solid ${f.variable?c.lavD:c.border}`,background:f.variable?c.lavD:"transparent",color:f.variable?c.white:c.sub,borderRadius:8,padding:"7px 10px",cursor:"pointer",fontSize:10,fontWeight:600,fontFamily:mn,whiteSpace:"nowrap"}}>Monthly</button><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></>:<><span style={{flex:2,fontSize:14,fontWeight:500}}>{f.name}{f.variable&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>monthly</span>}</span><span style={{flex:1,fontSize:13,textAlign:"right",fontWeight:500,color:f.variable?c.sub:c.text}}>{f.variable?"varies":yn(f.amount)}</span><button onClick={()=>setEF(f.id)} style={{border:"none",background:c.cardAlt,borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500}}>Edit</button><button onClick={()=>setSe(p=>({...p,fixed:p.fixed.filter(x=>x.id!==f.id)}))} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></>}</div>))}
+                  {se.fixed.map(f=>(<div key={f.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>{eF===f.id&&!f.paidyDerived?<><input value={f.name} onChange={e=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,name:e.target.value}:x)}))} style={{...inp,flex:2}}/>{f.variable?<span style={{flex:1,fontSize:11,color:c.sub,textAlign:"center"}}>varies monthly</span>:<NI prefix="¥" value={f.amount} onChange={v=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,amount:v}:x)}))} style={{flex:1}}/>}<button onClick={()=>setSe(p=>({...p,fixed:p.fixed.map(x=>x.id===f.id?{...x,variable:!x.variable}:x)}))} style={{border:`2px solid ${f.variable?c.lavD:c.border}`,background:f.variable?c.lavD:"transparent",color:f.variable?c.white:c.sub,borderRadius:8,padding:"7px 10px",cursor:"pointer",fontSize:10,fontWeight:600,fontFamily:mn,whiteSpace:"nowrap"}}>Monthly</button><button onClick={()=>setEF(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></>:<><span style={{flex:2,fontSize:14,fontWeight:500}}>{f.name}{f.paidyDerived?<span style={{fontSize:10,color:c.sub,marginLeft:6}}>from Paidy tab</span>:f.variable&&<span style={{fontSize:10,color:c.sub,marginLeft:6}}>monthly</span>}</span><span style={{flex:1,fontSize:13,textAlign:"right",fontWeight:500,color:f.variable||f.paidyDerived?c.sub:c.text}}>{f.paidyDerived?yn(paidyMonthlyForMonth(se.paidyPlans,cmk)):f.variable?"varies":yn(f.amount)}</span>{f.paidyDerived?<button onClick={()=>setTab("paidy")} style={{border:"none",background:c.cardAlt,borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500}}>Open</button>:<><button onClick={()=>setEF(f.id)} style={{border:"none",background:c.cardAlt,borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:11,color:c.sub,fontWeight:500}}>Edit</button><button onClick={()=>setSe(p=>({...p,fixed:p.fixed.filter(x=>x.id!==f.id)}))} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></>}</>}</div>))}
+                </div>
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:3,height:18,borderRadius:2,background:c.roseD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Send to Mum</span></div>
+                  <div style={{fontSize:12,color:c.sub,marginBottom:14}}>Reminders for money you send Mum. Each item shows only within its month window. Leave the end month blank for an ongoing item. These are reminders and don't change your budget totals.</div>
+                  {(se.mumItems||[]).map(it=>{const editing=eMI===it.id;const win=(it.startMonth&&it.startYear)?`${MO_SHORT[it.startMonth-1]} ${it.startYear}`+((it.endMonth&&it.endYear)?` → ${MO_SHORT[it.endMonth-1]} ${it.endYear}`:" → ongoing"):"always";return(<div key={it.id} style={{marginBottom:10}}><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{flex:2,fontSize:14,fontWeight:500}}>{it.name}<span style={{display:"block",fontSize:10,color:c.sub}}>{win}</span></span><span style={{flex:1,fontSize:13,textAlign:"right",fontWeight:500}}>{yn(it.amount)}</span><button onClick={()=>setEMI(editing?null:it.id)} style={{border:"none",background:editing?c.greenD:c.cardAlt,color:editing?c.white:c.sub,borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:500}}>{editing?"Done":"Edit"}</button><button onClick={()=>rMI(it.id)} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></div>{editing&&(<div style={{marginTop:8,display:"flex",flexDirection:"column",gap:8}}><div style={{display:"flex",gap:8}}><input value={it.name} onChange={e=>setSe(p=>({...p,mumItems:p.mumItems.map(x=>x.id===it.id?{...x,name:e.target.value}:x)}))} placeholder="Name" style={{...inp,flex:2}}/><NI prefix="¥" value={it.amount} onChange={v=>setSe(p=>({...p,mumItems:p.mumItems.map(x=>x.id===it.id?{...x,amount:v}:x)}))} style={{flex:1}}/></div><div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:c.sub,width:36}}>Start</span><select value={it.startMonth||""} onChange={e=>setSe(p=>({...p,mumItems:p.mumItems.map(x=>x.id===it.id?{...x,startMonth:Number(e.target.value)||null}:x)}))} style={{...inp,flex:1}}><option value="">Month</option>{MO_SHORT.map((m,i)=><option key={i} value={i+1}>{m}</option>)}</select><input type="number" inputMode="numeric" placeholder="Year" value={it.startYear||""} onChange={e=>setSe(p=>({...p,mumItems:p.mumItems.map(x=>x.id===it.id?{...x,startYear:Number(e.target.value)||null}:x)}))} style={{...inp,width:70}}/></div><div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:11,color:c.sub,width:36}}>End</span><select value={it.endMonth||""} onChange={e=>setSe(p=>({...p,mumItems:p.mumItems.map(x=>x.id===it.id?{...x,endMonth:Number(e.target.value)||null}:x)}))} style={{...inp,flex:1}}><option value="">Ongoing</option>{MO_SHORT.map((m,i)=><option key={i} value={i+1}>{m}</option>)}</select><input type="number" inputMode="numeric" placeholder="Year" value={it.endYear||""} onChange={e=>setSe(p=>({...p,mumItems:p.mumItems.map(x=>x.id===it.id?{...x,endYear:Number(e.target.value)||null}:x)}))} style={{...inp,width:70}}/></div></div>)}</div>);})}
+                  <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${c.border}`}}>
+                    <div style={{display:"flex",gap:8,marginBottom:8}}><input placeholder="Name" value={nM.name} onChange={e=>setNM(p=>({...p,name:e.target.value}))} style={{...inp,flex:2}}/><input placeholder="¥" type="number" inputMode="numeric" value={nM.amount} onChange={e=>setNM(p=>({...p,amount:e.target.value}))} style={{...inp,flex:1}}/></div>
+                    <div style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}><span style={{fontSize:11,color:c.sub,width:36}}>Start</span><select value={nM.startMonth} onChange={e=>setNM(p=>({...p,startMonth:e.target.value}))} style={{...inp,flex:1}}><option value="">Month</option>{MO_SHORT.map((m,i)=><option key={i} value={i+1}>{m}</option>)}</select><input type="number" inputMode="numeric" placeholder="Year" value={nM.startYear} onChange={e=>setNM(p=>({...p,startYear:e.target.value}))} style={{...inp,width:70}}/></div>
+                    <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"center"}}><span style={{fontSize:11,color:c.sub,width:36}}>End</span><select value={nM.endMonth} onChange={e=>setNM(p=>({...p,endMonth:e.target.value}))} style={{...inp,flex:1}}><option value="">Ongoing</option>{MO_SHORT.map((m,i)=><option key={i} value={i+1}>{m}</option>)}</select><input type="number" inputMode="numeric" placeholder="Year" value={nM.endYear} onChange={e=>setNM(p=>({...p,endYear:e.target.value}))} style={{...inp,width:70}}/></div>
+                    <button onClick={aMI} style={{border:"none",background:c.roseD,color:c.white,borderRadius:10,padding:"10px 14px",cursor:"pointer",fontFamily:ft,fontSize:13,fontWeight:600,width:"100%"}}>+ Add Mum item</button>
+                  </div>
                 </div>
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:3,height:18,borderRadius:2,background:c.peachD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Subscribe & Save</span></div>

@@ -550,7 +550,7 @@ struct BudgetTabView: View {
     private func mumCard(_ c: Calc) -> some View {
         let checked = Set((store.blob.data[bm]?["mumChecked"]?.array ?? []).compactMap { $0.string })
         var items: [(id: String, name: String, amount: Double)] = [("food", "Food Budget", c.food(bm))]
-        for m in c.se.arr("mumItems") { items.append((c.idStr(m["id"]), m.s("name"), m.d("amount"))) }
+        for m in c.se.arr("mumItems") where c.mumActive(m, bm) { items.append((c.idStr(m["id"]), m.s("name"), m.d("amount"))) }
         let total = items.filter { checked.contains($0.id) }.reduce(0) { $0 + $1.amount }
         return VStack(alignment: .leading, spacing: 8) {
             sectionHeader("Send to Mum", color: T.roseD)

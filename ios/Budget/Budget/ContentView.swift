@@ -46,6 +46,7 @@ struct MoreView: View {
                 ScrollView {
                     VStack(spacing: 12) {
                         moreLink("Limit", "gauge.with.dots.needle.bottom.50percent") { LimitView() }
+                        moreLink("Paidy", "creditcard") { PaidyView() }
                         moreLink("Goals", "target") { GoalsView() }
                         moreLink("Settings", "gearshape") { SettingsView() }
                     }
@@ -56,6 +57,7 @@ struct MoreView: View {
             // Deep link: a Home card ("Limit →") switches to this tab and sets openLimit,
             // which pushes the Limit screen automatically.
             .navigationDestination(isPresented: $store.openLimit) { LimitView() }
+            .navigationDestination(isPresented: $store.openPaidy) { PaidyView() }
         }
     }
 
@@ -98,6 +100,7 @@ struct HomeView: View {
                     leftToSpend(c, now)
                     roomToEarn(c)
                     savedAndSilver(c)
+                    paidySummary(c, now)
                 }
             }
             .padding(20)
@@ -234,6 +237,33 @@ struct HomeView: View {
         .card()
         .contentShape(Rectangle())
         .onTapGesture { store.selectedTab = 4; store.openLimit = true }
+    }
+
+    // MARK: Paidy summary (total remaining, combined monthly, next payment)
+    @ViewBuilder private func paidySummary(_ c: Calc, _ now: Date) -> some View {
+        let plans = c.paidyPlans
+        if !plans.isEmpty {
+            let states = plans.map { c.paidyCalc($0, now) }
+            let totBal = states.reduce(0) { $0 + $1.remainingBal }
+            let totMo = states.filter { !$0.done }.reduce(0) { $0 + $1.monthly }
+            let totInst = states.reduce(0) { $0 + $1.installments }
+            let totPaid = states.reduce(0) { $0 + $1.paid }
+            let frac = totInst > 0 ? Double(totPaid) / Double(totInst) : 0
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("PAIDY").font(.caption2).fontWeight(.semibold).foregroundStyle(T.sub)
+                    Spacer()
+                    Text("\(yen(totMo))/mo · next \(c.paidyNextPayLabel(now))").font(.caption2).fontWeight(.semibold).foregroundStyle(T.muted)
+                }
+                (Text(yen(totBal)).font(.system(size: 26, weight: .bold)).foregroundStyle(T.roseD)
+                 + Text("  remaining").font(.caption).foregroundStyle(T.sub))
+                ProgressBar(fraction: frac, color: T.accent)
+                Text("\(totPaid)/\(totInst) payments · \(Int((frac * 100).rounded()))%").font(.caption).foregroundStyle(T.sub)
+            }
+            .card()
+            .contentShape(Rectangle())
+            .onTapGesture { store.selectedTab = 4; store.openPaidy = true }
+        }
     }
 
     // MARK: Saved + Silver
