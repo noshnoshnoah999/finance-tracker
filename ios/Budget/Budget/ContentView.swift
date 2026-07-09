@@ -21,7 +21,7 @@ struct ContentView: View {
             BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }.tag(2)
             SavingsView().tabItem { Label("Savings", systemImage: "banknote") }.tag(3)
             if showPaidyTab {
-                NavigationStack { PaidyView() }.tabItem { Label("Paidy", systemImage: "creditcard") }.tag(4)
+                NavigationStack { PaidyView() }.keyboardDoneBar().tabItem { Label("Paidy", systemImage: "creditcard") }.tag(4)
             }
             MoreView().tabItem { Label("More", systemImage: "ellipsis") }.tag(5)
         }
@@ -44,6 +44,20 @@ struct ContentView: View {
 /// Resigns whatever text field currently has focus, anywhere in the app.
 func dismissKeyboard() {
     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+}
+
+/// Attaches a "Done" button above the keyboard. The TabView already has one, but views
+/// pushed inside MoreView's OWN NavigationStack (Paidy, Limit, Goals, Settings on iPhone)
+/// don't reliably inherit the TabView's keyboard toolbar — so apply this there too.
+extension View {
+    func keyboardDoneBar() -> some View {
+        self.toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { dismissKeyboard() }.fontWeight(.semibold)
+            }
+        }
+    }
 }
 
 // MARK: - More (custom, themed — replaces iOS's white system overflow tab)
@@ -74,6 +88,9 @@ struct MoreView: View {
             // which pushes the Limit screen automatically.
             .navigationDestination(isPresented: $store.openLimit) { LimitView() }
             .navigationDestination(isPresented: $store.openPaidy) { PaidyView() }
+            // This NavigationStack is separate from the TabView's, so its pushed screens
+            // (Paidy, Limit, Goals, Settings) need their own keyboard Done bar.
+            .keyboardDoneBar()
         }
     }
 
