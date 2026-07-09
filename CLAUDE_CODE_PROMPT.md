@@ -36,8 +36,10 @@ git commit --amend -m "Paidy tracking + Send-to-Mum settings (web + iOS/macOS)
   stale hand-seeded paid-count override (one-time, paidyMigV=1) so counts auto-calc.
 - Paidy form UX: 'Payments made' (a count, not ¥) with hint; Start row split so the
   Month picker no longer wraps and the payment-day field is labeled.
-- iOS/Mac TabView: Paidy at index 4, More→5; deep links + Settings 'Open' reindexed;
-  removed the redundant Paidy link from the custom MoreView."
+- iOS/Mac nav: Paidy is a top-level tab ONLY on regular width (iPad/Mac) at index 4;
+  on iPhone (compact) it stays inside MoreView to avoid iOS's white system 'More'
+  overflow. More is always tag 5; deep links route per size class (tab 4 on Mac,
+  More+openPaidy on iPhone). Web keeps Paidy in its scrollable top tab bar unchanged."
 ```
 > ⚠️ Amending is safe here because `ddac5b5` was **never pushed**. Do NOT amend if
 > `git status` shows it already on `origin/main`.
