@@ -6,18 +6,23 @@ import UIKit
 
 struct ContentView: View {
     @EnvironmentObject var store: BudgetStore
+    // Regular width (iPad / Mac) can show a 6th tab cleanly; compact width (iPhone)
+    // would collapse the 6th into iOS's white system "More" overflow — so on iPhone we
+    // keep 5 tabs and Paidy stays inside the custom MoreView (its "Paidy" row).
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var showPaidyTab: Bool { hSize == .regular }
 
     var body: some View {
-        // Paidy is a top-level tab (index 4). More moves to index 5.
-        // NOTE: 6 tabs — on iPhone, iOS's default TabView collapses items past the 5th
-        // into a system "More" overflow. We suppress that below via the tab-bar appearance
-        // and by keeping every screen reachable from the custom MoreView too.
+        // More is ALWAYS tag 5 (whether or not the Paidy tab at tag 4 is shown), so the
+        // deep-link indices (Limit → tab 5) stay consistent across devices.
         TabView(selection: $store.selectedTab) {
             HomeView().tabItem { Label("Home", systemImage: "house.fill") }.tag(0)
             WageView().tabItem { Label("Wage", systemImage: "yensign.circle") }.tag(1)
             BudgetTabView().tabItem { Label("Budget", systemImage: "list.bullet.rectangle") }.tag(2)
             SavingsView().tabItem { Label("Savings", systemImage: "banknote") }.tag(3)
-            NavigationStack { PaidyView() }.tabItem { Label("Paidy", systemImage: "creditcard") }.tag(4)
+            if showPaidyTab {
+                NavigationStack { PaidyView() }.tabItem { Label("Paidy", systemImage: "creditcard") }.tag(4)
+            }
             MoreView().tabItem { Label("More", systemImage: "ellipsis") }.tag(5)
         }
         // Numeric keypads (.numberPad / .decimalPad) have no built-in Return/Done key,
@@ -30,6 +35,9 @@ struct ContentView: View {
                 Button("Done") { dismissKeyboard() }.fontWeight(.semibold)
             }
         }
+        // Safety: on iPhone there is no tab 4 (Paidy), so never leave selection stranded there.
+        .onChange(of: showPaidyTab) { _, shown in if !shown && store.selectedTab == 4 { store.selectedTab = 5; store.openPaidy = true } }
+        .onAppear { if !showPaidyTab && store.selectedTab == 4 { store.selectedTab = 5 } }
     }
 }
 
@@ -42,6 +50,9 @@ func dismissKeyboard() {
 
 struct MoreView: View {
     @EnvironmentObject var store: BudgetStore
+    // On iPhone (compact) Paidy is not a top-level tab, so surface it here. On iPad/Mac
+    // (regular) it's already a tab, so hide the redundant row.
+    @Environment(\.horizontalSizeClass) private var hSize
     var body: some View {
         NavigationStack {
             ZStack {
@@ -49,6 +60,9 @@ struct MoreView: View {
                 ScrollView {
                     VStack(spacing: 12) {
                         moreLink("Limit", "gauge.with.dots.needle.bottom.50percent") { LimitView() }
+                        if hSize != .regular {
+                            moreLink("Paidy", "creditcard") { PaidyView() }
+                        }
                         moreLink("Goals", "target") { GoalsView() }
                         moreLink("Settings", "gearshape") { SettingsView() }
                     }
@@ -59,6 +73,7 @@ struct MoreView: View {
             // Deep link: a Home card ("Limit →") switches to this tab and sets openLimit,
             // which pushes the Limit screen automatically.
             .navigationDestination(isPresented: $store.openLimit) { LimitView() }
+            .navigationDestination(isPresented: $store.openPaidy) { PaidyView() }
         }
     }
 
@@ -85,6 +100,12 @@ struct MoreView: View {
 
 struct HomeView: View {
     @EnvironmentObject var store: BudgetStore
+    @Environment(\.horizontalSizeClass) private var hSize
+    /// Route to Paidy: a top-level tab on iPad/Mac, else the More tab with a deep-link push.
+    private func goToPaidy() {
+        if hSize == .regular { store.selectedTab = 4 }
+        else { store.selectedTab = 5; store.openPaidy = true }
+    }
 
     var body: some View {
         let c = store.calc
@@ -263,7 +284,7 @@ struct HomeView: View {
             }
             .card()
             .contentShape(Rectangle())
-            .onTapGesture { store.selectedTab = 4 }
+            .onTapGesture { goToPaidy() }
         }
     }
 
