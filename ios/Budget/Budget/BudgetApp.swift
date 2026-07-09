@@ -52,6 +52,8 @@ struct BudgetApp: App {
                         // visible (Stage Manager), not focused — so DON'T prompt here on Mac;
                         // the NSApplication active notification below does it on real focus.
                         #if !targetEnvironment(macCatalyst)
+                        // Grace period: locks only if we were backgrounded ≥60s, else stays open.
+                        lock.onForeground()
                         if lock.locked { lock.authenticate() }
                         #endif
                         Task { await store.refresh(); Notifs.schedule(store); MumReminder.sync(store) }
@@ -65,6 +67,7 @@ struct BudgetApp: App {
                 // behind another app in Stage Manager.
                 #if targetEnvironment(macCatalyst)
                 .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NSApplicationDidBecomeActiveNotification"))) { _ in
+                    lock.onForeground()
                     if lock.locked { lock.authenticate() }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NSApplicationDidResignActiveNotification"))) { _ in

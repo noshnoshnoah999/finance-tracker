@@ -347,8 +347,15 @@ struct Calc {
     // otherwise it defaults to that month's General Savings figure. Intentionally
     // NOT additive — typing your own number replaces the auto amount, not stacks on it.
     func savingsTotal(_ mk: String) -> Double {
+        // Budget "not saving" toggle wins: an opted-out month contributes ¥0 regardless
+        // of any manual amount left in "savings". Keeps Budget & Savings tabs in sync.
+        guard showGenSav, month(mk)["saveGen"]?.bool == true else { return 0 }
         let manual = month(mk).d("savings")
         return manual > 0 ? manual : genSav(mk)
+    }
+    /// True when the month is opted out of General Savings on the Budget tab.
+    func savingsOptedOut(_ mk: String) -> Bool {
+        return !(showGenSav && month(mk)["saveGen"]?.bool == true)
     }
     // Silver investment (¥) for a month — a budget outflow; syncs to the Silver page as USD.
     // saveSilver mirrors saveGen's toggle, but defaults ON (undefined != false) for

@@ -488,7 +488,11 @@
       // Effective saved amount for a month: a manual entry always wins; otherwise it
       // defaults to that month's General Savings figure. Intentionally NOT additive —
       // typing your own number replaces the auto amount rather than stacking on it.
-      const savEff=mk=>{const s=da[mk]?.savings||0;return s>0?s:genSavM(mk);};
+      // Budget "not saving" toggle wins: if the month is opted out (saveGen=false or
+      // General Savings hidden), the Savings tab shows ¥0 regardless of any manual
+      // amount left in da[mk].savings. When opted in, a manual entry wins, else default
+      // to the planned General Savings figure. Keeps Budget & Savings tabs in sync.
+      const savEff=mk=>{const d=da[mk];if(!(se.showGenSav!==false)||!d||!d.saveGen)return 0;const s=d.savings||0;return s>0?s:genSavM(mk);};
       const tS=MONTHS.reduce((s,mo)=>s+savEff(mo.key),0);
       const tSd=useCountUp(tS);
       const sA=cMN>0?tS/cMN:0;
@@ -1445,20 +1449,24 @@
                   {(()=>{
                     const maxS=Math.max(...MONTHS.map(mo=>savEff(mo.key)),1);
                     return MONTHS.map(mo=>{
+                      const optedOut=!(se.showGenSav!==false)||!(da[mo.key]?.saveGen);
                       const s=da[mo.key].savings||0;
                       const gs=genSavM(mo.key);
-                      const t=s>0?s:gs;
+                      // Toggle wins: opted-out month contributes ¥0 no matter what's typed.
+                      const t=optedOut?0:(s>0?s:gs);
                       const isFut=mo.key>(MONTHS[cMN-1]?.key||"");
                       return(
                         <div key={mo.key} style={{marginBottom:16,opacity:isFut?0.5:1}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                             <span style={{fontSize:13,fontWeight:600,color:t>0?c.text:c.muted}}>{mo.label}</span>
-                            {t>0&&<span style={{fontSize:13,fontWeight:700,color:c.blueD}}>{yn(t)}</span>}
+                            {optedOut?<span style={{fontSize:11,fontWeight:600,color:c.muted}}>not saving</span>:t>0&&<span style={{fontSize:13,fontWeight:700,color:c.blueD}}>{yn(t)}</span>}
                           </div>
-                          <NI prefix="¥" value={t} onChange={v=>sM(mo.key,"savings",v)} placeholder={isFut?"Future…":"Enter amount…"}/>
-                          {s===0&&gs>0&&<div style={{fontSize:11,color:c.sub,marginTop:4}}>Defaulted from General Savings — edit to override</div>}
-                          {s>0&&gs>0&&s!==gs&&<div style={{fontSize:11,color:c.sub,marginTop:4}}>General Savings is {yn(gs)} · <span onClick={()=>sM(mo.key,"savings",0)} style={{cursor:"pointer",textDecoration:"underline"}}>reset to default</span></div>}
-                          {t>0&&<div style={{height:4,borderRadius:4,background:c.cardAlt,overflow:"hidden",marginTop:6}}><div style={{height:"100%",borderRadius:4,width:`${(t/maxS)*100}%`,background:c.blueD,transition:"width 0.3s"}}/></div>}
+                          {optedOut
+                            ?<div style={{fontSize:12,color:c.muted,padding:"10px 14px",borderRadius:12,background:c.cardAlt,border:`1px solid ${c.border}`}}>Set to “not saving” on the Budget tab. Turn it on there to log savings for {mo.label}.</div>
+                            :<><NI prefix="¥" value={t} onChange={v=>sM(mo.key,"savings",v)} placeholder={isFut?"Future…":"Enter amount…"}/>
+                              {s===0&&gs>0&&<div style={{fontSize:11,color:c.sub,marginTop:4}}>Defaulted from General Savings — edit to override</div>}
+                              {s>0&&gs>0&&s!==gs&&<div style={{fontSize:11,color:c.sub,marginTop:4}}>General Savings is {yn(gs)} · <span onClick={()=>sM(mo.key,"savings",0)} style={{cursor:"pointer",textDecoration:"underline"}}>reset to default</span></div>}
+                              {t>0&&<div style={{height:4,borderRadius:4,background:c.cardAlt,overflow:"hidden",marginTop:6}}><div style={{height:"100%",borderRadius:4,width:`${(t/maxS)*100}%`,background:c.blueD,transition:"width 0.3s"}}/></div>}</>}
                         </div>
                       );
                     });
@@ -1900,6 +1908,44 @@
     }
 
     ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+
+    // --- Keyboard "Done" bar (web) ---
+    // Numeric keypads on iOS/Android have no Return key, so a focused number field can
+    // be impossible to dismiss. This floating bar appears above the keyboard whenever a
+    // numeric input is focused and blurs it on tap. Framework-agnostic (survives React
+    // re-renders) since it listens on document focus events, not on specific nodes.
+    (function(){
+      var bar=document.createElement('div');
+      bar.setAttribute('id','kbDoneBar');
+      bar.style.cssText='position:fixed;left:0;right:0;bottom:0;display:none;justify-content:flex-end;'+
+        'padding:8px 14px;background:rgba(245,240,230,0.98);border-top:1px solid rgba(0,0,0,0.08);'+
+        'z-index:99999;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);'+
+        'padding-bottom:calc(8px + env(safe-area-inset-bottom));';
+      var btn=document.createElement('button');
+      btn.textContent='Done';
+      btn.style.cssText='border:none;background:#5f7a5f;color:#fff;border-radius:10px;'+
+        'padding:9px 20px;font-size:14px;font-weight:600;cursor:pointer;'+
+        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
+      bar.appendChild(btn);
+      document.body.appendChild(bar);
+      var active=null;
+      function isNumeric(el){
+        if(!el||el.tagName!=='INPUT')return false;
+        var im=(el.getAttribute('inputmode')||'').toLowerCase();
+        return el.type==='number'||im==='numeric'||im==='decimal';
+      }
+      // mousedown/touchstart so the blur fires before the button steals focus
+      btn.addEventListener('mousedown',function(e){e.preventDefault();if(active)active.blur();});
+      document.addEventListener('focusin',function(e){
+        if(isNumeric(e.target)){active=e.target;bar.style.display='flex';}
+      });
+      document.addEventListener('focusout',function(e){
+        // small delay so moving between two numeric fields doesn't flicker the bar
+        setTimeout(function(){
+          if(!isNumeric(document.activeElement)){active=null;bar.style.display='none';}
+        },80);
+      });
+    })();
   </script>
 </body>
 </html>

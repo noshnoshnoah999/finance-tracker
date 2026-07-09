@@ -76,24 +76,38 @@ struct SavingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("Monthly Savings", T.blueD)
             ForEach(MONTHS) { mo in
+                let optedOut = c.savingsOptedOut(mo.key)
                 let s = c.month(mo.key).d("savings")
                 let gs = c.genSav(mo.key)
-                let t = s > 0 ? s : gs
+                // Toggle wins: opted-out month contributes ¥0 no matter what's typed.
+                let t = optedOut ? 0 : (s > 0 ? s : gs)
                 let isFut = mo.key > (MONTHS[safe: cMN - 1]?.key ?? "")
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(mo.label).font(.footnote).fontWeight(.semibold).foregroundStyle(t > 0 ? T.text : T.muted)
                         Spacer()
-                        if t > 0 { Text(yen(t)).font(.footnote).fontWeight(.bold).foregroundStyle(T.blueD) }
+                        if optedOut {
+                            Text("not saving").font(.caption2).fontWeight(.semibold).foregroundStyle(T.muted)
+                        } else if t > 0 {
+                            Text(yen(t)).font(.footnote).fontWeight(.bold).foregroundStyle(T.blueD)
+                        }
                     }
-                    savingsField(mo.key, effective: t, placeholder: isFut ? "Future…" : "Enter amount…")
-                    if s == 0 && gs > 0 {
-                        Text("Defaulted from General Savings — edit to override").font(.caption2).foregroundStyle(T.sub)
-                    } else if s > 0 && gs > 0 && s != gs {
-                        HStack(spacing: 4) {
-                            Text("General Savings is \(yen(gs)) ·").font(.caption2).foregroundStyle(T.sub)
-                            Button("reset to default") { store.setMonth(mo.key, "savings", .number(0)) }
-                                .font(.caption2).foregroundStyle(T.sub).underline().buttonStyle(.plain)
+                    if optedOut {
+                        Text("Set to “not saving” on the Budget tab. Turn it on there to log savings for \(mo.label).")
+                            .font(.caption2).foregroundStyle(T.muted)
+                            .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(T.border, lineWidth: 1))
+                    } else {
+                        savingsField(mo.key, effective: t, placeholder: isFut ? "Future…" : "Enter amount…")
+                        if s == 0 && gs > 0 {
+                            Text("Defaulted from General Savings — edit to override").font(.caption2).foregroundStyle(T.sub)
+                        } else if s > 0 && gs > 0 && s != gs {
+                            HStack(spacing: 4) {
+                                Text("General Savings is \(yen(gs)) ·").font(.caption2).foregroundStyle(T.sub)
+                                Button("reset to default") { store.setMonth(mo.key, "savings", .number(0)) }
+                                    .font(.caption2).foregroundStyle(T.sub).underline().buttonStyle(.plain)
+                            }
                         }
                     }
                 }
