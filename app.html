@@ -411,6 +411,9 @@
         // ── Money ──
         if(d>=pd-3&&d<=pd-1) fire('suica','🚇 Top up your SUICA',`Payday is in ${pd-d} day${pd-d>1?'s':''} (${pd}th) — load up your SUICA for the new pay period`);
         if(d>=pd&&d<=pd+2&&(se.mumItems||[]).length>0) fire('mum','👩 Send to Mum?',`Don't forget to send Mum her money for this pay period!`);
+        const paidyPD=(se.paidyPlans&&se.paidyPlans[0]&&se.paidyPlans[0].paymentDay)||27;
+        const paidyAmt=paidyMonthlyForMonth(se.paidyPlans,mk);
+        if(d===paidyPD&&paidyAmt>0) fire('paidy-'+mk,'💳 Paidy Monthly Instalments Paid',`¥${paidyAmt.toLocaleString()} paid`);
         // ── Budget prep reminders ──
         const currBudget=da[mk]||{};
         const hasOneOffs=(currBudget.oneOffs||[]).length>0;

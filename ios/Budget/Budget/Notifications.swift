@@ -129,6 +129,29 @@ enum Notifs {
             if count >= 3 { break }
         }
 
+        // ── Date-based: Paidy monthly instalment paid, next 3 payment dates ──
+        // Amount is read from c.paidyMonthly(mk) at schedule time (launch/foreground), so it
+        // always reflects whatever's currently set in the Paidy tab — including future
+        // increases — rather than a hardcoded figure.
+        if let payDay = c.paidyPlans.first?.i("paymentDay", 27) {
+            var scheduled = 0
+            var probe = now
+            var tries = 0
+            while scheduled < 3 && tries < 48 {   // cap: stop looking after 4 years of no active plan
+                tries += 1
+                let y = cal.component(.year, from: probe), mo = cal.component(.month, from: probe)
+                guard let payDate = cal.date(from: DateComponents(year: y, month: mo, day: payDay, hour: 9)),
+                      let next = cal.date(byAdding: .month, value: 1, to: probe) else { break }
+                probe = next
+                guard payDate > now else { continue }
+                let mk = String(format: "%04d-%02d", y, mo)
+                let amt = c.paidyMonthly(mk)
+                guard amt > 0 else { continue }
+                add(center, "paidy-\(mk)", payDate, "💳 Paidy Monthly Instalments Paid", "\(yen(amt)) paid")
+                scheduled += 1
+            }
+        }
+
         // ── Date-based: upcoming paid-leave — warn a few days ahead and on the day ──
         for ds in PAID_LEAVE {
             let p = ds.split(separator: "-").compactMap { Int($0) }
