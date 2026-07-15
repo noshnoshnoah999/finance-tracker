@@ -193,9 +193,15 @@ struct BudgetTabView: View {
         let wage = c.wage(bm), tr = c.transport(bm), pl = c.paidLeaveYen(bm), dad = c.dadFree(bm)
         let extra = c.extraIncome(bm)
         let total = c.monthlyPay(bm) + dad + extra
+        // Display-only projection — never feeds Free to Spend or any real total, same as web.
+        let showBdEst = wage == 0 && c.month(bm).d("wageOverride") <= 0
+        let bdEst = showBdEst ? c.estimatedPay(bm) : Calc.EstPay()
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("Income", color: T.greenD)
             row("Wage", yen(wage))
+            if showBdEst && bdEst.wage > 0 {
+                row("Estimated Pay (if hours match schedule)", "~\(yen(bdEst.wage))", color: T.blueD)
+            }
             if pl > 0 { row("Paid leave", yen(pl), color: T.blueD) }
             row("Transport received", yen(tr))
             if dad > 0 { row("Dad (free spend)", yen(dad), color: T.greenD) }

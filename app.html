@@ -1004,7 +1004,7 @@
                       <div style={{width:10,height:10,borderRadius:5,background:hD?c.greenD:(showEst&&est.total>0?c.blueD:c.border)}}/>
                       <span style={{fontWeight:600,color:c.text,fontSize:15}}>{mo.label} {gPD(mo.key)}th</span>
                     </div>
-                    <span style={{fontSize:14,fontWeight:600,color:hD?c.text:c.muted}}>{hD?yn(tx+tr):(showEst&&est.total>0?`~${yn(est.total)}`:"—")}</span>
+                    <span style={{fontSize:14,fontWeight:600,color:hD?c.text:c.muted,display:"flex",alignItems:"baseline",gap:6}}>{hD?yn(tx+tr):(showEst&&est.total>0?(<><span style={{fontSize:11,fontWeight:600,color:c.blueD}}>Estimated Pay</span>{yn(est.total)}</>):"—")}</span>
                   </button>
                   {op&&(
                     <div style={{padding:"0 18px 18px",borderTop:`1px solid ${c.border}`,animation:"slideDown 0.2s ease-out"}}>
@@ -1033,6 +1033,7 @@
                       <div style={{marginTop:12}}><label style={lbl}>Actual pay — override</label><NI prefix="¥" value={d.wageOverride} onChange={v=>sM(mo.key,"wageOverride",v)}/><div style={{fontSize:11,color:c.sub,marginTop:6}}>{d.wageOverride>0?`This is the TOTAL you received — transport is included, not added on top.`:"Optional — enter the real total from your payslip to override the hours calc."}{d.wageOverride>0&&<button onClick={()=>{sM(mo.key,"wageOverride",0);sM(mo.key,"transportOverride",0);}} style={{marginLeft:8,border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer",fontFamily:mn,textDecoration:"underline"}}>reset</button>}</div>
                       {d.wageOverride>0&&<div style={{marginTop:10}}><label style={lbl}>…of which transport</label><NI prefix="¥" value={d.transportOverride||0} onChange={v=>sM(mo.key,"transportOverride",v)}/><div style={{fontSize:11,color:c.sub,marginTop:6}}>How much of the {yn(d.wageOverride)} was transport (for the breakdown — doesn't change the total). Base pay = {yn(Math.max(0,d.wageOverride-(d.transportOverride||0)))}.</div></div>}</div>
                       <div style={{marginTop:12}}><label style={lbl}>Days Worked</label><div style={{padding:"10px 14px",borderRadius:12,background:c.cardAlt,color:c.text,fontWeight:600}}>{d.wageOverride>0?d.days:trDays} days</div><div style={{fontSize:11,color:c.sub,marginTop:6}}>From your calendar (tap days in the Budget tab to change). Drives transport &amp; SUICA.</div></div>
+                      {!showEst&&(<>
                       <div style={{marginTop:14,padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
                         <div style={rw}><span style={{color:c.sub}}>Wage {hH?`(${d.hours}h × ${yn(se.hourlyWage)})`:"(manual)"}</span><span style={{fontWeight:600}}>{yn(wage)}</span></div>
                         {plH>0&&<div style={rw}><span style={{color:c.sub}}>Paid leave ({plH.toFixed(1)}h × {yn(se.hourlyWage)})</span><span style={{fontWeight:600,color:c.blueD}}>{yn(plWage)}</span></div>}
@@ -1043,6 +1044,7 @@
                         <div style={rw}><span style={{color:c.sub}}>Commute ({suicaDays}d × {yn(rt)})</span><span style={{fontWeight:500}}>{yn(cm)}</span></div>
                         <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:10}}><span style={{fontWeight:700,fontSize:14}}>Taxable (wage only)</span><span style={{fontWeight:700,fontSize:16}}>{yn(tx)}</span></div>
                       </div>
+                      </>)}
                       {hD&&(
                         <div style={{marginTop:10,padding:14,borderRadius:14,fontSize:13,background:oT?c.greenD:c.roseD,color:c.white}}>
                           <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{opacity:0.8}}>Earned so far</span><span style={{fontWeight:700}}>{yn(cT)} / {yn(se.annualLimit)}</span></div>
@@ -1135,6 +1137,9 @@
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Income</span></div>
                   <div style={{fontSize:13}}>
                     <div style={rw}><span style={{color:c.sub}}>Wage</span><span style={{fontWeight:500}}>{yn(bdW)}</span></div>
+                    {bdW===0&&bd.wageOverride<=0&&(()=>{const bdEst=gEstPay(bm);return bdEst.wage>0?(
+                      <div style={rw}><span style={{color:c.blueD}}>Estimated Pay (if hours match schedule)</span><span style={{fontWeight:500,color:c.blueD}}>~{yn(bdEst.wage)}</span></div>
+                    ):null;})()}
                     {bdPLH>0&&<div style={rw}><span style={{color:c.sub}}>Paid leave ({bdPLH.toFixed(1)}h)</span><span style={{fontWeight:500,color:c.blueD}}>{yn(bdPLW)}</span></div>}
                     <div style={rw}><span style={{color:c.sub}}>Transport Received</span><span style={{fontWeight:500}}>{yn(bdTr)}</span></div>
                     {bdDJFree>0&&<div style={rw}><span style={{color:c.sub}}>Dad (free spend)</span><span style={{fontWeight:500,color:c.greenD}}>{yn(bdDJFree)}</span></div>}

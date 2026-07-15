@@ -68,7 +68,10 @@ struct WageView: View {
                     Circle().fill(wage > 0 || d.d("wageOverride") > 0 ? T.greenD : (showEst && est.total > 0 ? T.blueD : T.border)).frame(width: 10, height: 10)
                     Text("\(mo.label) \(c.payday(mo.key))th").fontWeight(.semibold).foregroundStyle(T.text)
                     Spacer()
-                    Text(total > 0 ? yen(total) : (showEst && est.total > 0 ? "~\(yen(est.total))" : "—")).fontWeight(.semibold)
+                    if total <= 0 && showEst && est.total > 0 {
+                        Text("Estimated Pay").font(.caption2).fontWeight(.semibold).foregroundStyle(T.blueD)
+                    }
+                    Text(total > 0 ? yen(total) : (showEst && est.total > 0 ? yen(est.total) : "—")).fontWeight(.semibold)
                         .foregroundStyle(total > 0 ? T.text : T.muted)
                     Image(systemName: isOpen ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(T.muted)
                 }
@@ -123,23 +126,27 @@ struct WageView: View {
                         .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     Text("From your calendar (Budget tab). Drives transport & SUICA.").font(.caption2).foregroundStyle(T.sub)
 
-                    // Breakdown
-                    VStack(spacing: 8) {
-                        breakdownRow("Wage", yen(wage), bold: false)
-                        if d.d("wageOverride") <= 0 && c.paidLeaveYen(mo.key) > 0 {
-                            breakdownRow("Paid leave", yen(c.paidLeaveYen(mo.key)), color: T.blueD)
+                    // Breakdown (hidden while we're only showing an estimate — the estimate
+                    // card above already covers this, and showing both is confusing since
+                    // this one displays the real ¥0 wage until hours are actually logged)
+                    if !showEst {
+                        VStack(spacing: 8) {
+                            breakdownRow("Wage", yen(wage), bold: false)
+                            if d.d("wageOverride") <= 0 && c.paidLeaveYen(mo.key) > 0 {
+                                breakdownRow("Paid leave", yen(c.paidLeaveYen(mo.key)), color: T.blueD)
+                            }
+                            breakdownRow(d.d("wageOverride") > 0 ? "Transport" : "Transport (\(c.workDaysInMonth(c.prevMK(mo.key) ?? mo.key))d)", yen(tr), bold: false)
+                            Divider().overlay(T.border)
+                            breakdownRow("Total pay", yen(total), bold: true)
                         }
-                        breakdownRow(d.d("wageOverride") > 0 ? "Transport" : "Transport (\(c.workDaysInMonth(c.prevMK(mo.key) ?? mo.key))d)", yen(tr), bold: false)
-                        Divider().overlay(T.border)
-                        breakdownRow("Total pay", yen(total), bold: true)
-                    }
-                    .padding(14).background(T.cardAlt)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                    // Commute
-                    breakdownRow("Commute (\(c.suicaDays(mo.key))d × \(yen(c.rt)))", yen(c.commute(mo.key)), bold: false)
                         .padding(14).background(T.cardAlt)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                        // Commute
+                        breakdownRow("Commute (\(c.suicaDays(mo.key))d × \(yen(c.rt)))", yen(c.commute(mo.key)), bold: false)
+                            .padding(14).background(T.cardAlt)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
 
                     // Cumulative vs limit
                     if wage > 0 || d.d("wageOverride") > 0 {
