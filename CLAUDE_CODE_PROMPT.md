@@ -1,9 +1,11 @@
-# Claude Code — Commit & Push Prompt (2026-07-15)
+# Claude Code — Commit & Push Prompt (2026-07-15, updated)
 
 Cowork could NOT commit this session — `.git/index.lock` exists and is not
 removable from the Cowork sandbox (permission-restricted on that mount), and a
 stray `node_modules/` (from a babel syntax check) is similarly stuck there.
-Nothing has been committed yet. Please stage, commit, and push from your side.
+Two separate pieces of work are staged and waiting: the Estimated Pay feature,
+and a small payday-notification wording tweak made just after. Please stage,
+commit, and push from your side.
 
 ## Steps
 
@@ -22,12 +24,15 @@ Nothing has been committed yet. Please stage, commit, and push from your side.
    git diff --stat
    ```
    Expect changes in: `app.html`, `index.html`, `ios/Budget/Shared/Finance.swift`,
-   `ios/Budget/Budget/WageView.swift`, `CLAUDE_CODE_PROMPT.md`. Xcode
-   `xcuserdata`/`xcshareddata` noise can be ignored/staged as usual.
-4. Stage and commit:
+   `ios/Budget/Budget/WageView.swift`, `ios/Budget/Budget/Notifications.swift`,
+   `CLAUDE_CODE_PROMPT.md`. Xcode `xcuserdata`/`xcshareddata` noise can be
+   ignored/staged as usual.
+4. Stage and commit as TWO separate commits (cleaner history — these are
+   unrelated changes):
+
+   **Commit 1 — Estimated Pay feature:**
    ```
-   git add app.html index.html ios/Budget/Shared/Finance.swift ios/Budget/Budget/WageView.swift CLAUDE_CODE_PROMPT.md
-   git add ios/Budget/Budget.xcodeproj  # xcuserdata/xcshareddata noise, same as prior commits
+   git add app.html index.html ios/Budget/Shared/Finance.swift ios/Budget/Budget/WageView.swift
    git commit -m "Add Estimated Pay to Wage tab (web + iOS)
 
 Computes a rolling estimate for any month with no logged hours/override yet,
@@ -41,6 +46,22 @@ whose weekday has no shift time set, instead of silently showing 0h.
 Estimate disappears once real hours or a payslip override are entered for
 that month."
    ```
+
+   **Commit 2 — Payday notification wording:**
+   ```
+   git add app.html index.html ios/Budget/Budget/Notifications.swift
+   git commit -m "Payday notification: swap 'log your hours' for expense-check reminder
+
+Web reminder banner and iOS push notification on payday now say
+'check your fixed and one-off expenses' instead of 'log your hours'."
+   ```
+
+   **Then stage the prompt file itself and any Xcode noise:**
+   ```
+   git add CLAUDE_CODE_PROMPT.md
+   git add ios/Budget/Budget.xcodeproj  # xcuserdata/xcshareddata noise, same as prior commits
+   git commit -m "Update push prompt"
+   ```
 5. Push:
    ```
    git push origin main
@@ -50,18 +71,17 @@ that month."
    rm -f .git/*.lock .git/refs/**/*.lock 2>/dev/null; true
    ```
 
-## What's in this change
-- **Web (app.html/index.html):** new `gEstHours`/`gEstPay` helpers near the
-  existing `gWorkDaysCD`/`gWorkDays`. Wage tab now shows an "Estimated Pay"
-  card (wage + transport breakdown) for any month with `hours===0` and
-  `wageOverride===0`. Collapsed header shows `~¥X` instead of `—` for those
-  months.
-- **iOS (Finance.swift/WageView.swift):** mirrors the web logic exactly —
-  `Calc.EstPay` struct + `estimatedPay(mk)` in Finance.swift, matching card
-  UI in WageView.swift (blue card, same breakdown, same no-shift warning).
-- **No new stored fields** — everything is derived live from
-  `se.workDays`/`se.shifts`/`da[mk].customDays`, so there's nothing to keep
-  in sync manually.
+## What's in these changes
+- **Estimated Pay (web + iOS):** new `gEstHours`/`gEstPay` (web) and
+  `Calc.EstPay`/`estimatedPay` (iOS). Wage tab shows an "Estimated Pay" card
+  (wage + transport breakdown) for any month with `hours===0` and
+  `wageOverride===0`. No new stored fields — everything derives live from
+  `se.workDays`/`se.shifts`/`da[mk].customDays`.
+- **Payday notification wording (web + iOS):** the payday-today
+  reminder/notification no longer says "log your hours" — it now says
+  "check your fixed and one-off expenses!" Web: `app.html`/`index.html` line
+  ~482 (`reminders` array). iOS: `Notifications.swift` line ~95 (scheduled
+  local push, title unchanged "💰 Pay Day!").
 
 ## After push — rebuild on your Mac and TEST on device
 (No Xcode in Cowork, so the Swift is logic-reviewed and pattern-matched
@@ -74,3 +94,7 @@ against existing code only, not compiled.)
   card should disappear and the real breakdown should show instead.
 - If a scheduled work day's weekday has no shift time set in Settings, the
   card should show a ⚠ warning line instead of silently under-counting.
+- Payday notification: on payday, confirm the push says "Today is your
+  payday! Check your fixed and one-off expenses!" (no mention of hours).
+  Web Wage tab banner should read "Payday is today — check your fixed and
+  one-off expenses!"
