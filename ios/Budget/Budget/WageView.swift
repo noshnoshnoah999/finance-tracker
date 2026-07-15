@@ -59,20 +59,24 @@ struct WageView: View {
         let hasHours = d.d("hours") > 0
         let showEst = !hasData && !hasHours
         let est = showEst ? c.estimatedPay(mo.key) : Calc.EstPay()
+        // When estimating, the estimate (wage + transport) takes precedence over the
+        // transport-only `total` — otherwise a non-zero transport hides the wage estimate.
+        let useEst = showEst && est.total > 0
+        let displayAmount = useEst ? est.total : total
 
         VStack(spacing: 0) {
             Button {
                 if isOpen { expanded.remove(mo.key) } else { expanded.insert(mo.key) }
             } label: {
                 HStack {
-                    Circle().fill(wage > 0 || d.d("wageOverride") > 0 ? T.greenD : (showEst && est.total > 0 ? T.blueD : T.border)).frame(width: 10, height: 10)
+                    Circle().fill(wage > 0 || d.d("wageOverride") > 0 ? T.greenD : (useEst ? T.blueD : T.border)).frame(width: 10, height: 10)
                     Text("\(mo.label) \(c.payday(mo.key))th").fontWeight(.semibold).foregroundStyle(T.text)
                     Spacer()
-                    if total <= 0 && showEst && est.total > 0 {
+                    if useEst {
                         Text("Estimated Pay").font(.caption2).fontWeight(.semibold).foregroundStyle(T.blueD)
                     }
-                    Text(total > 0 ? yen(total) : (showEst && est.total > 0 ? yen(est.total) : "—")).fontWeight(.semibold)
-                        .foregroundStyle(total > 0 ? T.text : T.muted)
+                    Text(displayAmount > 0 ? yen(displayAmount) : "—").fontWeight(.semibold)
+                        .foregroundStyle(displayAmount > 0 ? T.text : T.muted)
                     Image(systemName: isOpen ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(T.muted)
                 }
                 .padding(.vertical, 16).padding(.horizontal, 18)
