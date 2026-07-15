@@ -59,6 +59,7 @@ struct BudgetTabView: View {
         case "oneoff":    oneOffCard(c)
         case "mum":       mumCard(c)
         case "free":      freeCard(c)
+        case "totals":    totalsCard(c)
         default:          EmptyView()
         }
     }
@@ -551,6 +552,43 @@ struct BudgetTabView: View {
                 .buttonStyle(.plain)
             }
             .padding(.top, 4)
+            let ooTotal = c.oneOffTotal(bm)
+            if ooTotal > 0 {
+                Divider().overlay(T.border)
+                row("Total One-off", yen(ooTotal), bold: true, color: T.peachD)
+                let ooLeft = c.oneOffLeft(bm)
+                HStack {
+                    Text("Left to pay").font(.footnote).fontWeight(.semibold).foregroundStyle(ooLeft == 0 ? .white : T.peachD)
+                    Spacer()
+                    Text(ooLeft == 0 ? "All paid ✓" : yen(ooLeft)).fontWeight(.bold).foregroundStyle(ooLeft == 0 ? .white : T.peachD)
+                }
+                .padding(14).frame(maxWidth: .infinity)
+                .background(ooLeft == 0 ? T.greenD : T.peachBg)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+        }
+        .card()
+    }
+
+    // MARK: Combined totals (Fixed + One-off)
+    @ViewBuilder private func totalsCard(_ c: Calc) -> some View {
+        let fixedT = totalFixed(c)
+        let ooT = c.oneOffTotal(bm)
+        let leftTotal = c.leftToPay(bm) + c.oneOffLeft(bm)
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader("Total Expenses", color: T.lavD)
+            row("Fixed", yen(fixedT), color: T.sub)
+            row("One-off", yen(ooT), color: T.sub)
+            Divider().overlay(T.border)
+            row("Total expenses", yen(fixedT + ooT), bold: true, color: T.lavD)
+            HStack {
+                Text("Total left to pay").font(.footnote).fontWeight(.semibold).foregroundStyle(leftTotal == 0 ? .white : T.lavD)
+                Spacer()
+                Text(leftTotal == 0 ? "All paid ✓" : yen(leftTotal)).fontWeight(.bold).foregroundStyle(leftTotal == 0 ? .white : T.lavD)
+            }
+            .padding(16).frame(maxWidth: .infinity)
+            .background(leftTotal == 0 ? T.greenD : T.lavBg)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .card()
     }

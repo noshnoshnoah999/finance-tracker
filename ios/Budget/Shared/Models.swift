@@ -150,10 +150,11 @@ enum DS {
 let PAID_LEAVE: Set<String> = ["2026-05-24", "2026-05-25", "2026-05-31", "2026-06-01", "2026-06-07"]
 
 /// Budget-tab card ids in default order (mirror BUDGET_CARDS in app.html).
-let BUDGET_CARDS: [String] = ["work", "income", "dad", "extra", "fixed", "subscribe", "oneoff", "mum", "free"]
+let BUDGET_CARDS: [String] = ["work", "income", "dad", "extra", "fixed", "subscribe", "oneoff", "mum", "free", "totals"]
 /// Display names for the reorder screen.
 let BUDGET_CARD_NAMES: [String: String] = [
     "work": "Work Schedule", "income": "Income", "dad": "Dad's Contributions",
     "extra": "Extra money", "fixed": "Fixed Expenses", "subscribe": "Subscribe & Save",
     "oneoff": "One-off Expenses", "mum": "Send to Mum", "free": "Free to Spend",
+    "totals": "Total Expenses",
 ]

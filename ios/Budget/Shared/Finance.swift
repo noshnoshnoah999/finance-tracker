@@ -493,6 +493,21 @@ struct Calc {
         if pf["silverInvest"]?.bool != true { u += silverInvest(mk) }
         return u
     }
+    /// Total one-off expenses you pay (excludes Mum-pays) — mirrors web bdOY.
+    func oneOffTotal(_ mk: String) -> Double {
+        var s = 0.0
+        for o in month(mk).arr("oneOffs") where o["mumPays"]?.bool != true { s += o.d("amount") }
+        return s
+    }
+    /// One-off left to pay: your items not yet ticked as paid — mirrors web one-off left pill.
+    func oneOffLeft(_ mk: String) -> Double {
+        let poo = month(mk)["paidOneOffs"]?.object ?? [:]
+        var s = 0.0
+        for o in month(mk).arr("oneOffs") where o["mumPays"]?.bool != true {
+            if poo[idStr(o["id"])]?.bool != true { s += o.d("amount") }
+        }
+        return s
+    }
 
     // MARK: Annual limit
     /// Current month number 1…12 for 2026 (0 before, 12 after) — mirrors cMN.

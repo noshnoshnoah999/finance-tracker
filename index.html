@@ -82,7 +82,7 @@
       hourlyWage:1400,annualLimit:1030000,commuteOneWay:178,
       trBefore:1040,trAfter:1100,food4wk:20000,food5wk:25000,
       gbpToJpy:215,usdToJpy:155,silverSpot:0,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,themeMigrated:false,subItems:[],showSkin:true,showGenSav:true,genSavAmount:0,showSilver:true,
-      cardOrder:["work","income","dad","extra","fixed","subscribe","oneoff","mum","free"],
+      cardOrder:["work","income","dad","extra","fixed","subscribe","oneoff","mum","free","totals"],
       shifts:{
         1:{start:"09:00",end:"16:00",breakMin:60,label:"Mon"},
         2:{start:"09:00",end:"12:00",breakMin:0,label:"Tue"},
@@ -100,7 +100,7 @@
         {id:2,name:"MacBook Air 13\" Midnight",financedAmount:162800,installments:24,monthlyPayment:6783,startMonth:2,startYear:2026,paymentDay:27,paidCountOverride:null},
       ],
     };
-    const BUDGET_CARDS = ["work","income","dad","extra","fixed","subscribe","oneoff","mum","free"];
+    const BUDGET_CARDS = ["work","income","dad","extra","fixed","subscribe","oneoff","mum","free","totals"];
     const PAID_LEAVE = ["2026-05-24","2026-05-25","2026-05-31","2026-06-01","2026-06-07"];
     // Returns: "work" | "hol" | "pl" | "off" | "none"
     const getDayState=(ds,dt,customDays,wd)=>{const ov=(customDays||{})[ds];if(ov)return ov;const isSched=wd.includes(dt.getDay());if(PAID_LEAVE.includes(ds))return"pl";if(isSched)return"work";return"none";};
@@ -1215,7 +1215,7 @@
                       </div>}</div>
                     );})()}
                     <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total Fixed</span><span style={{fontWeight:700,fontSize:16,color:c.lavD}}>{yn(bdFT)}</span></div>
-                    {(()=>{let unpaid=0;se.fixed.forEach(f=>{if(!bdSF[f.id]&&!bdPF[f.id])unpaid+=fxAmt(f);});if(!bdPF["suica"])unpaid+=bdCm;if(!bdPF["food"])unpaid+=bdFd;if(!bdPF["skinTreatment"])unpaid+=bdSkin;if(!bdPF["generalSavings"])unpaid+=bdGenSav;const allPaid=unpaid===0;return(<div style={{marginTop:8,padding:14,borderRadius:14,background:allPaid?c.greenD:c.lavBg,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,fontWeight:600,color:allPaid?c.white:c.lavD}}>Left to pay</span><span style={{fontSize:18,fontWeight:800,color:allPaid?c.white:c.lavD}}>{allPaid?"All paid ✓":yn(unpaid)}</span></div>);})()}
+                    {(()=>{let unpaid=0;se.fixed.forEach(f=>{if(!bdSF[f.id]&&!bdPF[f.id])unpaid+=fxAmt(f);});if(!bdPF["suica"])unpaid+=bdCm;if(!bdPF["food"])unpaid+=bdFd;if(!bdPF["skinTreatment"])unpaid+=bdSkin;if(!bdPF["generalSavings"])unpaid+=bdGenSav;if(!bdPF["silverInvest"])unpaid+=bdSilver;const allPaid=unpaid===0;return(<div style={{marginTop:8,padding:14,borderRadius:14,background:allPaid?c.greenD:c.lavBg,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,fontWeight:600,color:allPaid?c.white:c.lavD}}>Left to pay</span><span style={{fontSize:18,fontWeight:800,color:allPaid?c.white:c.lavD}}>{allPaid?"All paid ✓":yn(unpaid)}</span></div>);})()}
                   </div>
                 </div>
 
@@ -1243,6 +1243,8 @@
                     <input placeholder="¥" type="number" inputMode="numeric" value={nE.amount} onChange={e=>setNE(p=>({...p,amount:e.target.value}))} style={{...inp,flex:1}}/>
                     <button onClick={()=>aOO(bm)} style={{border:"none",background:c.peachD,color:c.white,borderRadius:12,padding:"10px 16px",cursor:"pointer",fontFamily:ft,fontWeight:700,fontSize:16}}>+</button>
                   </div>
+                  {bdOY>0&&<div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12,marginTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total One-off</span><span style={{fontWeight:700,fontSize:16,color:c.peachD}}>{yn(bdOY)}</span></div>}
+                  {bdOY>0&&(()=>{const unpaid=bd.oneOffs.filter(o=>!o.mumPays&&!bdPOO[o.id]).reduce((s,o)=>s+o.amount,0);const allPaid=unpaid===0;return(<div style={{marginTop:8,padding:14,borderRadius:14,background:allPaid?c.greenD:c.peachBg,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,fontWeight:600,color:allPaid?c.white:c.peachD}}>Left to pay</span><span style={{fontSize:18,fontWeight:800,color:allPaid?c.white:c.peachD}}>{allPaid?"All paid ✓":yn(unpaid)}</span></div>);})()}
                 </div>
 
                 </div>
@@ -1268,6 +1270,15 @@
                     <span style={{fontWeight:700,fontSize:15,color:c.white}}>Free to Spend</span>
                     <span style={{fontSize:26,fontWeight:800,color:c.white}}>{yn(bdFr)}</span>
                   </div>
+                </div>
+                </div>
+                <div data-cardid="totals" style={cwStyle("totals")}>{cwHandle("totals")}
+                <div style={crd}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><div style={{width:3,height:18,borderRadius:2,background:c.lavD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Total Expenses</span></div>
+                  <div style={rw}><span style={{color:c.sub}}>Fixed</span><span style={{fontWeight:500}}>{yn(bdFT)}</span></div>
+                  <div style={rw}><span style={{color:c.sub}}>One-off</span><span style={{fontWeight:500}}>{yn(bdOY)}</span></div>
+                  <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total expenses</span><span style={{fontWeight:800,fontSize:18,color:c.lavD}}>{yn(bdFT+bdOY)}</span></div>
+                  {(()=>{let fx=0;se.fixed.forEach(f=>{if(!bdSF[f.id]&&!bdPF[f.id])fx+=fxAmt(f);});if(!bdPF["suica"])fx+=bdCm;if(!bdPF["food"])fx+=bdFd;if(!bdPF["skinTreatment"])fx+=bdSkin;if(!bdPF["generalSavings"])fx+=bdGenSav;if(!bdPF["silverInvest"])fx+=bdSilver;const oo=bd.oneOffs.filter(o=>!o.mumPays&&!bdPOO[o.id]).reduce((s,o)=>s+o.amount,0);const left=fx+oo;const allPaid=left===0;return(<div style={{marginTop:10,padding:16,borderRadius:14,background:allPaid?c.greenD:c.lavBg,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:13,fontWeight:600,color:allPaid?c.white:c.lavD}}>Total left to pay</span><span style={{fontSize:20,fontWeight:800,color:allPaid?c.white:c.lavD}}>{allPaid?"All paid ✓":yn(left)}</span></div>);})()}
                 </div>
                 </div>
                 </div>
