@@ -1,99 +1,110 @@
-# Claude Code — Commit & Push Prompt (2026-07-15, Estimated Pay fixes)
+# Claude Code — Commit, Build & Push Prompt (2026-07-15, Free to Spend + rebuild)
 
-New Cowork session, new uncommitted work — the Limit-chat feature from the
-previous prompt is already committed (`4f932ee` etc.), that's done. This is a
-follow-up fixing bugs in the Estimated Pay feature (from `e06708d`) that
-Noah spotted after using it. Cowork could NOT commit — `.git/index.lock`
-exists and isn't removable from the Cowork sandbox (permission-restricted on
-that mount), and a stray `node_modules/` (temporary babel syntax-check
-install) is stuck there too.
+New Cowork session, new uncommitted work on top of `5e371f4` (chat truncation
+fix, already committed/pushed). Two things happened:
+
+1. Noah reversed an earlier decision: the Budget tab's "Estimated Pay" line
+   should now feed into Free to Spend / Total for unlogged months (not just
+   be a display-only line like before).
+2. Noah reported the Wage tab card-duplication fix from `8bc0a70` still
+   wasn't showing — turns out he's testing on the **native iOS/macOS app**,
+   which needs an actual Xcode rebuild to pick up Swift changes (no
+   hot-reload). That fix is correctly in the code, it just was never built
+   onto his device. **This prompt's build/reinstall step is not optional —
+   it's the actual fix for that half of his report.**
+
+Cowork could NOT commit — `.git/index.lock` exists and isn't removable from
+the Cowork sandbox (permission-restricted on that mount). There's also a
+stray `node_modules/` in the repo root (temporary babel syntax-check
+install) that couldn't be removed for the same reason — please delete it.
 
 ## Steps
 
-1. From the repo root (`~/Claude/finance-tracker`), clear any stale lock first:
+1. From the repo root (`~/Claude/finance-tracker`), clear the stale lock:
    ```
    rm -f .git/index.lock .git/HEAD.lock
    ```
-2. Remove the leftover `node_modules/` (temporary babel install used only to
-   syntax-check app.html's JS — never part of the app, don't commit it):
+2. Remove the leftover `node_modules/` (not part of the app):
    ```
    rm -rf node_modules package.json package-lock.json
    ```
-3. Review the diff before staging:
+3. Review the diff:
    ```
    git status
    git diff --stat
    ```
-   Expect changes in exactly: `app.html`, `index.html`,
-   `ios/Budget/Budget/WageView.swift`, `ios/Budget/Budget/BudgetTabView.swift`.
-   Also an untracked `HANDOFF_2026-07-15_limit-chat.md` from the prior
-   session — stage that too, it's a real handoff doc, not scratch.
-4. Stage and commit:
+   Expect exactly: `app.html`, `index.html`, `ios/Budget/Shared/Finance.swift`,
+   `ios/Budget/Budget/BudgetTabView.swift`.
+
+4. Commit:
    ```
-   git add app.html index.html ios/Budget/Budget/WageView.swift ios/Budget/Budget/BudgetTabView.swift HANDOFF_2026-07-15_limit-chat.md CLAUDE_CODE_PROMPT.md
-   git commit -m "Fix Estimated Pay: remove duplicate card, add Budget tab line
+   git add app.html index.html ios/Budget/Shared/Finance.swift ios/Budget/Budget/BudgetTabView.swift CLAUDE_CODE_PROMPT.md
+   git commit -m "Estimated Pay now feeds Free to Spend / Budget Total for unlogged months
 
-Noah reported 3 issues after using the new Estimated Pay feature:
+Reverses the earlier 'display-only' decision (8bc0a70) after Noah saw it in
+practice and wanted the projection to actually count toward his budget
+planning, not just be informational.
 
-1. Wage tab collapsed row didn't say 'Estimated Pay', just showed a number.
-2. Number shown looked like transport-only, not wage+transport.
-3. Budget tab (Income card) didn't show any estimate at all.
+Web (app.html/index.html): new bdEstForTotals — when this month's wage is
+¥0 and there's no payslip override, bdI (Budget tab income total) swaps in
+gEstPay(bm).wage instead of the real ¥0. bdFr (Free to Spend) inherits this
+automatically since it's derived from bdI. The Estimated Pay line item
+itself (added in 8bc0a70) is unchanged — it was already showing the right
+number, only the Total/Free to Spend math needed updating.
 
-Root causes:
-- #1/#2 were actually a stale cache on Noah's device — the committed code
-  already computed the full wage+transport total correctly (confirmed via
-  his screenshot: the new Estimated Pay card itself showed the right
-  numbers, ¥72,800 wage + ¥11,000 transport = ¥83,800, but the OLD
-  always-on 'Wage/Transport/Total Pay' breakdown card was ALSO still
-  rendering underneath it, showing the real ¥0 wage + real ¥11,000
-  transport — which is what his screenshot of the collapsed row/header
-  actually reflected before a fresh reload picked up the new card).
-- The real bug: that old breakdown card (Wage/Transport/Total Pay +
-  Commute/Taxable) was never hidden when the new Estimated Pay card
-  appears, so both showed at once for unlogged months — confusing.
-- #3: Budget tab's Income card was never touched by the original Estimated
-  Pay work — it only ever showed real wage (¥0 until hours logged).
+iOS (Finance.swift): new Calc.projectedMonthlyPay(mk) — same fallback
+logic as web, wraps monthlyPay(mk) but substitutes estimatedPay(mk).wage +
+transport(mk) when wage(mk)==0 and no override. income(mk)/freeToSpend(mk)
+now call this instead of monthlyPay(mk) directly.
+BudgetTabView.incomeCard's Total also switched to projectedMonthlyPay.
 
-Fixes (web + iOS):
-- Wage tab: old Wage/Transport/Total Pay + Commute/Taxable cards now hidden
-  (!showEst) whenever the Estimated Pay card is showing. Collapsed header
-  now explicitly labeled 'Estimated Pay' next to the total instead of just
-  a '~' prefix.
-- Budget tab (Income card): new 'Estimated Pay (if hours match schedule)'
-  line, shown only when wage=0 and no override — DISPLAY ONLY, confirmed
-  with Noah not to feed into Free to Spend or any real total, so actual
-  budget math stays untouched until real hours are logged.
-- All estimate displays still disappear immediately once real hours or a
-  payslip override are entered for that month (confirmed this is correct,
-  intentional behavior, not a bug)."
+Deliberately did NOT touch the Home tab's 'Next Paycheck' widget
+(ContentView.swift / BudgetWidgets.swift) — still shows the real,
+unprojected figure. Different context (upcoming paycheck vs budget
+planning), Noah didn't ask for that one, left as a scope decision.
+
+Reverts to real numbers automatically the instant hours/override are
+logged for that month — same mechanism as the Wage tab estimate card."
    ```
-5. Push:
+
+5. **Build and install on device — this is required, not optional:**
+   ```
+   ./reinstall_budget.sh
+   ```
+   (or open `ios/Budget/Budget.xcodeproj` in Xcode and run to Noah's iPhone
+   + Mac directly if the script has issues). This is the actual fix for the
+   Wage tab bug Noah reported as "still broken" — that fix (`8bc0a70`) was
+   already correct in the committed Swift, it just was never compiled onto
+   his device. Confirm the build succeeds before reporting back.
+
+6. Push:
    ```
    git push origin main
    ```
-6. After push, clear any leftover locks so the next session is smooth:
+7. After push, clear any leftover locks:
    ```
    rm -f .git/*.lock .git/refs/**/*.lock 2>/dev/null; true
    ```
+8. Report back: commit hash, build result (success/failure), push result.
 
-## After push — rebuild on your Mac and TEST on device
-(No Xcode in Cowork, so the Swift is logic-reviewed and brace/paren-balance
-checked only, not compiled.)
+## After push/build — verify on device
 
-- **Web:** hard-refresh (Cmd+Shift+R) or reopen the tab first — the
-  duplicate-card bug may partly have been a stale load. Open Wage tab on a
-  future unlogged month: should see ONE blue "Estimated Pay" card only (no
-  second beige Wage/Transport card underneath). Collapsed row should read
-  "Estimated Pay ¥83,800" (or similar) not just a bare number.
-- **iOS:** rebuild fresh install (or force-quit + reopen) since native apps
-  don't have a browser-cache equivalent, but the two cards need the new
-  `!showEst` gate compiled in. Same check: only the blue estimate card shows
-  for unlogged months.
-- **Budget tab (both):** select a future unlogged month — Income card should
-  show "Wage ¥0" then a blue "Estimated Pay (if hours match schedule)
-  ~¥72,800" line right below it, then Transport Received as before. "Free to
-  Spend" at the bottom should be unaffected by this line (still based on
-  real ¥0 wage).
-- Log real hours for that month — everywhere the estimate showed, it should
-  disappear and the real breakdown should take over (confirm this still
-  works correctly, it's existing `showEst`/`hD` gating logic, unchanged).
+- **iOS/macOS app** (the thing Noah's actually been screenshotting): open
+  Wage tab on a future unlogged month — should now show ONE blue "Estimated
+  Pay" card only, header says "Estimated Pay ¥X", no duplicate beige card
+  underneath. This was already fixed in code; today's build is what makes
+  it visible.
+- **Budget tab, same month:** Income card shows Wage ¥0, then blue
+  "Estimated Pay (if hours match schedule) ~¥72,800" line, Transport
+  Received, then **Total should now be ¥83,800** (72,800+11,000), not
+  ¥11,000.
+- **Free to Spend:** should now be a realistic (possibly positive) number
+  for that month instead of a large negative like -¥68,723, reflecting
+  projected income minus expenses.
+- Log real hours for that month on the Wage tab — Estimated Pay
+  everywhere (Wage tab card, Budget tab line, Total, Free to Spend) should
+  disappear/revert to the real numbers.
+- **Web app:** same checks — hard refresh first since the web app deploys
+  faster (Cmd+Shift+R or reopen tab). Should already reflect all fixes
+  including the earlier `8bc0a70` card-merge, since it doesn't need a build
+  step like iOS does.

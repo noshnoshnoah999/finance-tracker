@@ -371,6 +371,20 @@ struct Calc {
     // MARK: Month roll-ups (mirror the Home/Budget computeds)
     var monthlyPay: (String) -> Double { { self.taxable($0) + self.transport($0) } }
 
+    /// monthlyPay, but for a month with no hours/override logged yet, the wage portion is
+    /// projected from the set schedule + calendar (estimatedPay) instead of ¥0 — used by
+    /// income()/freeToSpend() so Free to Spend reflects a realistic budget for future months.
+    /// Reverts to the real monthlyPay the instant hours or an override are entered (mirrors
+    /// the Wage tab's Estimated Pay card behavior exactly).
+    func projectedMonthlyPay(_ mk: String) -> Double {
+        let d = month(mk)
+        if wage(mk) == 0 && d.d("wageOverride") <= 0 {
+            let est = estimatedPay(mk)
+            if est.wage > 0 { return est.wage + transport(mk) }
+        }
+        return monthlyPay(mk)
+    }
+
     func dadFree(_ mk: String) -> Double {
         let free = se["dadFreeSpend"]?.object ?? [:]
         return month(mk).arr("dadItems")
@@ -445,7 +459,7 @@ struct Calc {
         return spending(mk)
     }
 
-    func income(_ mk: String) -> Double { monthlyPay(mk) + dadFree(mk) + extraIncome(mk) }
+    func income(_ mk: String) -> Double { projectedMonthlyPay(mk) + dadFree(mk) + extraIncome(mk) }
     func freeToSpend(_ mk: String) -> Double { income(mk) - monthOut(mk) }
 
     /// Bills (ids) shown on the Home progress, excluding skipped and zero skin/savings.

@@ -192,8 +192,10 @@ struct BudgetTabView: View {
     @ViewBuilder private func incomeCard(_ c: Calc) -> some View {
         let wage = c.wage(bm), tr = c.transport(bm), pl = c.paidLeaveYen(bm), dad = c.dadFree(bm)
         let extra = c.extraIncome(bm)
-        let total = c.monthlyPay(bm) + dad + extra
-        // Display-only projection — never feeds Free to Spend or any real total, same as web.
+        // Total (and Free to Spend, computed elsewhere from the same projection) uses the
+        // estimate in place of ¥0 wage for unlogged months — reverts automatically once real
+        // hours/override are entered, same as projectedMonthlyPay/income().
+        let total = c.projectedMonthlyPay(bm) + dad + extra
         let showBdEst = wage == 0 && c.month(bm).d("wageOverride") <= 0
         let bdEst = showBdEst ? c.estimatedPay(bm) : Calc.EstPay()
         VStack(alignment: .leading, spacing: 8) {

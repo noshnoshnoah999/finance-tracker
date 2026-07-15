@@ -576,7 +576,11 @@
       const bd=da[bm]||eM();
       const bdW=gW(bd),bdTr=gTr(bd,bm),bdCm=bd.suicaOverride!=null?bd.suicaOverride:gCm(bd,bm);const bdSI=gSuicaInfo(bm);
       const bdPrevMK=gPrevMK(bm);const bdPLH=(bd.wageOverride>0)?0:(bdPrevMK?gPLHours(bdPrevMK,da[bdPrevMK]?.customDays,gShifts(bdPrevMK),se.workDays):0);const bdPLW=Math.round(bdPLH*se.hourlyWage);
-      const bdDJ=dTJ(bd),bdDJFree=(bd.dadItems||[]).filter(x=>(se.dadFreeSpend||{})[x.id]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0),bdI=bdW+bdTr,bdFd=bd.foodOverride!=null?bd.foodOverride:fF(bm),bdSkin=(se.showSkin!==false)?(bd.skinTreatment||0):0,bdGenSav=genSavM(bm);
+      // Once real hours/override are logged this month, bdW/bdTr are the real numbers and this is a no-op.
+      // Until then, the estimate (schedule + calendar) stands in as projected income so Free to Spend/Total
+      // reflect a realistic budget instead of ¥0 — reverts automatically the moment real hours are entered.
+      const bdEstForTotals=(bdW===0&&bd.wageOverride<=0)?gEstPay(bm):null;
+      const bdDJ=dTJ(bd),bdDJFree=(bd.dadItems||[]).filter(x=>(se.dadFreeSpend||{})[x.id]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0),bdI=bdEstForTotals?bdEstForTotals.wage+bdTr:bdW+bdTr,bdFd=bd.foodOverride!=null?bd.foodOverride:fF(bm),bdSkin=(se.showSkin!==false)?(bd.skinTreatment||0):0,bdGenSav=genSavM(bm);
       const bdMC=bd.mumChecked||[],bdPF=bd.paidFixed||{},bdPOO=bd.paidOneOffs||{},bdSF=bd.skippedFixed||{},bdFA=bd.fixedAmounts||{};
       const mIdx=mk=>MONTHS.findIndex(x=>x.key===mk);
       const subScheduled=(it,mk)=>{const ev=it.everyN||1;if(ev<=1)return true;const a=mIdx(mk),b=mIdx(it.startMK||MONTHS[0].key);return a>=0&&b>=0&&a>=b&&((a-b)%ev===0);};
