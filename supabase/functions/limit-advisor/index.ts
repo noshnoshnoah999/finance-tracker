@@ -68,7 +68,7 @@ You already gave them an initial verdict on the shifts below. Now they're asking
 
 ${SITUATION(ctx)}
 
-Reply in plain, warm, brief conversational text (2-5 sentences typically, longer only if the question needs it). No JSON, no markdown headers — just a natural chat reply.`;
+Reply in plain, warm conversational text — 2-5 sentences for simple questions, up to ~8 sentences if the question genuinely needs multiple numbers or options compared. Always finish your thought completely; never trail off mid-sentence. No JSON, no markdown headers — just a natural chat reply.`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -96,7 +96,7 @@ Deno.serve(async (req: Request) => {
       }));
       const stream = client.messages.stream({
         model: "claude-haiku-4-5",
-        max_tokens: 600,
+        max_tokens: 1000,
         thinking: { type: "disabled" },
         system: CHAT_SYSTEM(body),
         messages: [...trimmedHistory, { role: "user", content: message }],
