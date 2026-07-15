@@ -92,7 +92,7 @@ enum Notifs {
             func dayBefore(_ n: Int) -> Date? { cal.date(byAdding: .day, value: -n, to: payDate) }
 
             // Payday + eve (always).
-            add(center, "pay-\(mo.key)", payDate, "💰 Pay Day!", "Today is your payday — log your hours!")
+            add(center, "pay-\(mo.key)", payDate, "💰 Pay Day!", "Today is your payday! Check your fixed and one-off expenses!")
             if let d = dayBefore(1) { add(center, "payeve-\(mo.key)", d, "💰 Pay Day Tomorrow", "Payday is tomorrow (\(pd)th). Get ready!") }
 
             // SUICA top-up window: pd-3, pd-2, pd-1 (web #5 fires each day).

@@ -479,7 +479,7 @@
       const pct=Math.min(100,(aT/se.annualLimit)*100);
       const o85=pct>85;
       const reminders=(()=>{const r=[];const nowD=new Date();const tmk=`${nowD.getFullYear()}-${String(nowD.getMonth()+1).padStart(2,"0")}`;const tmd=da[tmk];const pdT=gPD(tmk);const dleft=pdT-nowD.getDate();const tmPF=(tmd&&tmd.paidFixed)||{};const tmMC=(tmd&&tmd.mumChecked)||[];
-        if(dleft===0)r.push({i:"💰",t:"Payday is today — log your hours"});else if(dleft>0&&dleft<=7)r.push({i:"💰",t:`Payday in ${dleft} day${dleft>1?"s":""} (the ${pdT}th)`});
+        if(dleft===0)r.push({i:"💰",t:"Payday is today — check your fixed and one-off expenses!"});else if(dleft>0&&dleft<=7)r.push({i:"💰",t:`Payday in ${dleft} day${dleft>1?"s":""} (the ${pdT}th)`});
         if(dleft>=0&&dleft<=3&&!tmPF["suica"])r.push({i:"🚇",t:"Top up your SUICA for the new pay period"});
         if(dleft>=0&&dleft<=7){const sorted=Object.values(tmPF).some(Boolean);if(!sorted)r.push({i:"📋",t:"Sort this month's bills before payday"});}
         if(dleft<=0&&dleft>=-3&&tmMC.length===0&&(se.mumItems||[]).length>0)r.push({i:"👩",t:"Send Mum her money this payday"});
