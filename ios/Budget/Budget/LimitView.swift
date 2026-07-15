@@ -19,6 +19,16 @@ struct LimitView: View {
     // Which month the simulator plans for (nil = default to the current month).
     @State private var planMK: String? = nil
 
+    // Follow-up chat with Claude — persisted locally (UserDefaults) for 1 day only, per-device,
+    // no Supabase sync. This is a scratchpad for thinking out loud, not a financial record.
+    @State private var chatMsgs: [LimitChatMessage] = LimitChatStore.load()
+    @State private var chatInput = ""
+    @State private var chatLoading = false
+    @State private var chatErr = ""
+    // The exact context dict used for the last verdict — reused for chat follow-ups so Claude
+    // answers against the same numbers.
+    @State private var limitCtx: [String: JSONValue]? = nil
+
     private let dayOptions = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
     // The current calendar month's key, clamped into the MONTHS array.
@@ -262,6 +272,59 @@ struct LimitView: View {
                             .padding(14).frame(maxWidth: .infinity, alignment: .leading)
                             .background(T.greenBg).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
+
+                        // Follow-up chat — appears once the first verdict has come back.
+                        if let a = advice, !(a.headline.isEmpty && a.reasoning.isEmpty) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Ask a follow-up").font(.caption).fontWeight(.bold).foregroundStyle(T.sub)
+                                    Spacer()
+                                    if !chatMsgs.isEmpty {
+                                        Button("Clear chat") { clearChat() }
+                                            .font(.caption2).foregroundStyle(T.muted)
+                                    }
+                                }
+                                if !chatMsgs.isEmpty {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        ForEach(chatMsgs) { m in
+                                            Text(m.content)
+                                                .font(.footnote)
+                                                .foregroundStyle(m.role == "user" ? .white : T.text)
+                                                .padding(.horizontal, 12).padding(.vertical, 9)
+                                                .background(m.role == "user" ? T.blueD : T.cardAlt)
+                                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                                .frame(maxWidth: .infinity, alignment: m.role == "user" ? .trailing : .leading)
+                                        }
+                                        if chatLoading {
+                                            Text("Claude is thinking…").font(.footnote).foregroundStyle(T.muted)
+                                                .padding(.horizontal, 12).padding(.vertical, 9)
+                                                .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                    }
+                                    .frame(maxHeight: 320)
+                                }
+                                HStack(spacing: 8) {
+                                    TextField("e.g. what if I drop the Saturday shift?", text: $chatInput)
+                                        .font(.footnote)
+                                        .padding(.horizontal, 12).padding(.vertical, 10)
+                                        .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        .disabled(chatLoading)
+                                        .onSubmit { sendChat() }
+                                    Button { sendChat() } label: {
+                                        Text("Send").font(.footnote).fontWeight(.bold).foregroundStyle(.white)
+                                            .padding(.horizontal, 16).padding(.vertical, 10)
+                                            .background(T.blueD).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    }.buttonStyle(.plain).disabled(chatLoading || chatInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                                }
+                                if !chatErr.isEmpty {
+                                    Text(chatErr).font(.caption2).foregroundStyle(T.roseD).padding(10)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(T.roseBg).clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
+                            }
+                            .padding(.top, 4)
+                        }
                     }
                 }
                 .card()
@@ -328,6 +391,19 @@ struct LimitView: View {
     }
     private func fmt1(_ v: Double) -> String { String(format: "%.1f", v) }
 
+    // Estimated pay for upcoming unlogged months (arrears convention, same as Wage tab) — passed
+    // to Claude so it can reason about "what if" questions for months not yet logged.
+    private func buildEstimateLines() -> String {
+        let c = store.calc
+        let start = max(0, c.currentMonthNumber - 1)
+        let futureMonths = Array(MONTHS[start...])
+        return futureMonths.compactMap { mo -> String? in
+            let est = c.estimatedPay(mo.key)
+            guard est.total > 0 else { return nil }
+            return "- \(mo.label): ~\(yen(est.total)) (\(fmt1(est.hours))h)"
+        }.joined(separator: "\n")
+    }
+
     private func runAdvisor(earned: Double, limit: Double, remaining: Double, nFM: Int, safe: Double, hoursPerMonth: Double) {
         let c = store.calc
         let plannedH = shifts.reduce(0.0) { $0 + shiftHours($1) * Double(occurrences($1)) }
@@ -343,12 +419,41 @@ struct LimitView: View {
             "safePerMonthYen": .number(safe), "safePerMonthHours": .number(Double(Int(hoursPerMonth.rounded()))),
             "plannedHours": .string(fmt1(plannedH)), "plannedPay": .number(plannedPay),
             "projectedYearEnd": .number(projYear), "shiftLines": .string(lines),
+            "estimateLines": .string(buildEstimateLines()),
         ]
+        limitCtx = ctx
+        // A fresh verdict means a fresh shift plan — clear any old chat thread so follow-up
+        // questions aren't answered against stale numbers.
+        chatMsgs = []; LimitChatStore.clear(); chatErr = ""
         adviceErr = ""; advice = nil; adviceLoading = true
         Task {
             do { let a = try await store.limitAdvice(ctx); await MainActor.run { advice = a; adviceLoading = false } }
             catch { await MainActor.run { adviceErr = "Couldn't get advice: \(error.localizedDescription)"; adviceLoading = false } }
         }
+    }
+
+    private func sendChat() {
+        let text = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !chatLoading, let ctx = limitCtx else { return }
+        let history = chatMsgs.map { (role: $0.role, content: $0.content) }
+        chatMsgs.append(LimitChatMessage(role: "user", content: text))
+        chatInput = ""; chatErr = ""; chatLoading = true
+        Task {
+            do {
+                let reply = try await store.limitChatReply(ctx: ctx, history: history, message: text)
+                await MainActor.run {
+                    chatMsgs.append(LimitChatMessage(role: "assistant", content: reply))
+                    LimitChatStore.save(chatMsgs)
+                    chatLoading = false
+                }
+            } catch {
+                await MainActor.run { chatErr = "Couldn't send: \(error.localizedDescription)"; chatLoading = false }
+            }
+        }
+    }
+
+    private func clearChat() {
+        chatMsgs = []; LimitChatStore.clear(); chatErr = ""
     }
 
     private func limCell(_ label: String, _ value: String, _ valueColor: Color, _ sub: String, _ subColor: Color) -> some View {
@@ -380,5 +485,47 @@ struct LimitView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16).padding(.horizontal, 14)
         .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+// MARK: - Limit-page chat persistence
+// Follow-up chat with Claude is a local scratchpad, not a financial record: stored in
+// UserDefaults, kept for 1 day only, per-device (no Supabase sync, no server storage).
+
+struct LimitChatMessage: Identifiable, Codable {
+    var id = UUID()
+    var role: String    // "user" | "assistant"
+    var content: String
+}
+
+private struct LimitChatSnapshot: Codable {
+    var savedAt: Date
+    var messages: [LimitChatMessage]
+}
+
+enum LimitChatStore {
+    private static let key = "limitChat_v1"
+    private static let ttl: TimeInterval = 24 * 60 * 60 // 1 day
+
+    static func load() -> [LimitChatMessage] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let snap = try? JSONDecoder().decode(LimitChatSnapshot.self, from: data) else { return [] }
+        if Date().timeIntervalSince(snap.savedAt) > ttl {
+            UserDefaults.standard.removeObject(forKey: key)
+            return []
+        }
+        return snap.messages
+    }
+
+    static func save(_ messages: [LimitChatMessage]) {
+        guard !messages.isEmpty else { clear(); return }
+        let snap = LimitChatSnapshot(savedAt: Date(), messages: messages)
+        if let data = try? JSONEncoder().encode(snap) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: key)
     }
 }

@@ -164,6 +164,27 @@
     // Combined monthly Paidy cost active in month mk ("YYYY-MM"). A plan counts if mk is within [start, start+installments-1].
     const paidyMonthlyForMonth=(plans,mk)=>{if(!plans||!plans.length)return 0;const[y,mo]=mk.split("-").map(Number);const mkIdx=y*12+(mo-1);let s=0;plans.forEach(p=>{const inst=Number(p.installments)||0;const startIdx=(Number(p.startYear)||y)*12+((Number(p.startMonth)||1)-1);const endIdx=startIdx+Math.max(0,inst-1);if(mkIdx>=startIdx&&mkIdx<=endIdx)s+=Number(p.monthlyPayment)||0;});return s;};
 
+    // Limit-page chat with Claude: persisted to localStorage for 1 day only, per-device (no
+    // Supabase sync — this is a scratchpad for thinking out loud, not a financial record).
+    const LIMIT_CHAT_KEY="limitChat_v1";
+    const LIMIT_CHAT_TTL_MS=24*60*60*1000; // 1 day
+    const loadLimitChat=()=>{
+      try{
+        const raw=localStorage.getItem(LIMIT_CHAT_KEY);
+        if(!raw)return[];
+        const parsed=JSON.parse(raw);
+        if(!parsed||typeof parsed.ts!=="number"||!Array.isArray(parsed.messages))return[];
+        if(Date.now()-parsed.ts>LIMIT_CHAT_TTL_MS){localStorage.removeItem(LIMIT_CHAT_KEY);return[];}
+        return parsed.messages;
+      }catch{return[];}
+    };
+    const saveLimitChat=msgs=>{
+      try{
+        if(!msgs||!msgs.length){localStorage.removeItem(LIMIT_CHAT_KEY);return;}
+        localStorage.setItem(LIMIT_CHAT_KEY,JSON.stringify({ts:Date.now(),messages:msgs}));
+      }catch{}
+    };
+
     const yn=n=>"¥"+Math.round(n).toLocaleString();
     const gf=n=>"£"+n.toFixed(2);
     const ud=n=>"$"+Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -265,6 +286,16 @@
       const [simAdvice,setSimAdvice]=useState(null);
       const [simLoading,setSimLoading]=useState(false);
       const [simErr,setSimErr]=useState("");
+      // Limit-page follow-up chat with Claude: {role:"user"|"assistant",content}[]. Persisted to
+      // localStorage for 1 day (per-device, not synced) so a refresh doesn't lose the thread —
+      // see loadLimitChat/saveLimitChat below.
+      const [chatMsgs,setChatMsgs]=useState(()=>loadLimitChat());
+      const [chatInput,setChatInput]=useState("");
+      const [chatLoading,setChatLoading]=useState(false);
+      const [chatErr,setChatErr]=useState("");
+      // The exact context object sent for the last verdict — reused as the financial context
+      // for any follow-up chat message so Claude reasons from the same numbers.
+      const [limitCtx,setLimitCtx]=useState(null);
       const [th,setTh]=useState("coffee");
       const [nM,setNM]=useState({name:"",amount:"",startMonth:"",startYear:"",endMonth:"",endYear:""});
       const [eMI,setEMI]=useState(null);
@@ -636,15 +667,24 @@
       const aMI=()=>{if(!nM.name||!nM.amount)return;setSe(p=>({...p,mumItems:[...p.mumItems,{id:Date.now(),name:nM.name,amount:Number(nM.amount)||0,startMonth:Number(nM.startMonth)||null,startYear:Number(nM.startYear)||null,endMonth:Number(nM.endMonth)||null,endYear:Number(nM.endYear)||null}]}));setNM({name:"",amount:"",startMonth:"",startYear:"",endMonth:"",endYear:""});};
       const rMI=id=>setSe(p=>({...p,mumItems:p.mumItems.filter(x=>x.id!==id)}));
       const hR=()=>{setSe({...DS,fixed:DS.fixed.map(f=>({...f})),mumItems:DS.mumItems.map(x=>({...x})),paidyPlans:DS.paidyPlans.map(x=>({...x}))});setDa(gDef());setConfirmReset(false);};
+      // Estimated pay for upcoming unlogged months (arrears convention, same as Wage tab) — passed
+      // to Claude so it can reason about "what if" questions for months not yet logged.
+      const buildEstimateLines=()=>fMs.map(mo=>{const est=gEstPay(mo.key);return est.total>0?`- ${mo.label}: ~${yn(est.total)} (${est.hours.toFixed(1)}h)`:null;}).filter(Boolean).join("\n");
+
       // Limit page — ask Claude whether the planned shifts are wise this month.
       const askLimitAdvisor=async(plannedH,plannedPay,shiftLines)=>{
         setSimErr("");setSimAdvice(null);setSimLoading(true);
+        // A fresh verdict means a fresh shift plan — clear any old chat thread so follow-up
+        // questions aren't answered against stale numbers.
+        setChatMsgs([]);saveLimitChat([]);setChatErr("");
         try{
           const projectedYearEnd=Math.round(eT+plannedPay*nFM);
+          const ctx={annualLimit:se.annualLimit,earnedSoFar:eT,roomLeft:rL,monthsLeft:nFM,hourlyWage:se.hourlyWage,safePerMonthYen:eS,safePerMonthHours:Math.round(mHP),plannedHours:plannedH.toFixed(1),plannedPay,projectedYearEnd,shiftLines,estimateLines:buildEstimateLines()};
+          setLimitCtx(ctx);
           const r=await fetch(`${SUPABASE_URL}/functions/v1/limit-advisor`,{
             method:"POST",
             headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
-            body:JSON.stringify({annualLimit:se.annualLimit,earnedSoFar:eT,roomLeft:rL,monthsLeft:nFM,hourlyWage:se.hourlyWage,safePerMonthYen:eS,safePerMonthHours:Math.round(mHP),plannedHours:plannedH.toFixed(1),plannedPay,projectedYearEnd,shiftLines}),
+            body:JSON.stringify(ctx),
           });
           const j=await r.json();
           if(!r.ok||j.error)throw new Error(j.error||("HTTP "+r.status));
@@ -652,6 +692,28 @@
         }catch(e){setSimErr("Couldn't get advice: "+String(e&&e.message||e));}
         setSimLoading(false);
       };
+
+      // Follow-up chat: send the user's message + prior turns + the same financial context
+      // used for the verdict, get a plain-text reply back.
+      const sendLimitChat=async()=>{
+        const text=chatInput.trim();
+        if(!text||chatLoading||!limitCtx)return;
+        const nextMsgs=[...chatMsgs,{role:"user",content:text}];
+        setChatMsgs(nextMsgs);setChatInput("");setChatErr("");setChatLoading(true);
+        try{
+          const r=await fetch(`${SUPABASE_URL}/functions/v1/limit-advisor`,{
+            method:"POST",
+            headers:{"Content-Type":"application/json",apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`},
+            body:JSON.stringify({...limitCtx,history:chatMsgs,message:text}),
+          });
+          const j=await r.json();
+          if(!r.ok||j.error)throw new Error(j.error||("HTTP "+r.status));
+          const withReply=[...nextMsgs,{role:"assistant",content:j.reply||""}];
+          setChatMsgs(withReply);saveLimitChat(withReply);
+        }catch(e){setChatErr("Couldn't send: "+String(e&&e.message||e));}
+        setChatLoading(false);
+      };
+      const clearLimitChat=()=>{setChatMsgs([]);saveLimitChat([]);setChatErr("");};
       const tPF=(k,id)=>sM(k,"paidFixed",{...(da[k].paidFixed||{}),[id]:!(da[k].paidFixed||{})[id]});
       const tPOO=(k,id)=>sM(k,"paidOneOffs",{...(da[k].paidOneOffs||{}),[id]:!(da[k].paidOneOffs||{})[id]});
       const tSF=(k,id)=>sM(k,"skippedFixed",{...(da[k].skippedFixed||{}),[id]:!(da[k].skippedFixed||{})[id]});
@@ -1412,6 +1474,36 @@
                               <div style={{fontSize:14,fontWeight:700,color:c.text,marginBottom:6}}>{simAdvice.headline}</div>
                               <div style={{fontSize:13,color:c.sub,marginBottom:(simAdvice.suggestions||[]).length?10:0}}>{simAdvice.reasoning}</div>
                               {(simAdvice.suggestions||[]).map((s,i)=>(<div key={i} style={{fontSize:13,color:c.text,marginBottom:6,display:"flex",gap:6}}><span style={{color:c.peachD}}>•</span><span>{s}</span></div>))}
+                            </div>
+                          )}
+
+                          {/* Follow-up chat — appears once the first verdict has come back. */}
+                          {simAdvice&&(simAdvice.headline||simAdvice.reasoning)&&(
+                            <div style={{marginTop:14}}>
+                              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                                <span style={{fontSize:12,fontWeight:700,color:c.sub}}>Ask a follow-up</span>
+                                {chatMsgs.length>0&&<button onClick={clearLimitChat} style={{border:"none",background:"transparent",color:c.muted,fontSize:11,cursor:"pointer",textDecoration:"underline"}}>Clear chat</button>}
+                              </div>
+                              {chatMsgs.length>0&&(
+                                <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10,maxHeight:320,overflowY:"auto"}}>
+                                  {chatMsgs.map((m,i)=>(
+                                    <div key={i} style={{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"85%",padding:"9px 12px",borderRadius:14,fontSize:13,lineHeight:1.4,background:m.role==="user"?c.blueD:c.cardAlt,color:m.role==="user"?c.white:c.text,whiteSpace:"pre-wrap"}}>{m.content}</div>
+                                  ))}
+                                  {chatLoading&&<div style={{alignSelf:"flex-start",padding:"9px 12px",borderRadius:14,fontSize:13,background:c.cardAlt,color:c.muted}}>Claude is thinking…</div>}
+                                </div>
+                              )}
+                              <div style={{display:"flex",gap:8}}>
+                                <input
+                                  value={chatInput}
+                                  onChange={e=>setChatInput(e.target.value)}
+                                  onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendLimitChat();}}}
+                                  placeholder="e.g. what if I drop the Saturday shift?"
+                                  disabled={chatLoading}
+                                  style={{...inp,flex:1,padding:"10px 12px",fontSize:13}}
+                                />
+                                <button onClick={sendLimitChat} disabled={chatLoading||!chatInput.trim()} style={{padding:"10px 16px",borderRadius:12,border:"none",background:c.blueD,color:c.white,fontWeight:700,fontSize:13,fontFamily:ft,cursor:(chatLoading||!chatInput.trim())?"default":"pointer",opacity:(chatLoading||!chatInput.trim())?0.5:1,flexShrink:0}}>Send</button>
+                              </div>
+                              {chatErr&&<div style={{marginTop:8,padding:10,borderRadius:12,background:c.roseBg,color:c.roseD,fontSize:12,fontWeight:600}}>{chatErr}</div>}
                             </div>
                           )}
                         </React.Fragment>)}

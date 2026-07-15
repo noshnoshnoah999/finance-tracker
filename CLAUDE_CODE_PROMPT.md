@@ -1,100 +1,145 @@
-# Claude Code — Commit & Push Prompt (2026-07-15, updated)
+# Claude Code — Commit, Deploy & Push Prompt (2026-07-15)
 
 Cowork could NOT commit this session — `.git/index.lock` exists and is not
-removable from the Cowork sandbox (permission-restricted on that mount), and a
-stray `node_modules/` (from a babel syntax check) is similarly stuck there.
-Two separate pieces of work are staged and waiting: the Estimated Pay feature,
-and a small payday-notification wording tweak made just after. Please stage,
-commit, and push from your side.
+removable from the Cowork sandbox (permission-restricted on that mount). One
+piece of work is staged and waiting: a follow-up chat on the Limit page's
+Claude shift advisor. Please commit, deploy, and push from your side.
 
 ## Steps
 
-1. From the repo root (`~/Claude/finance-tracker`), clear any stale locks first:
+1. From the repo root (`~/Claude/finance-tracker`), clear any stale lock first:
    ```
-   rm -f .git/index.lock .git/HEAD.lock
+   rm -f .git/index.lock
    ```
-2. Remove the leftover `node_modules/` (a temporary babel install used only to
-   syntax-check app.html's JS — not part of the app, never should be committed):
-   ```
-   rm -rf node_modules package.json package-lock.json
-   ```
-3. Review the diff before staging:
+2. Review the diff before committing:
    ```
    git status
    git diff --stat
    ```
-   Expect changes in: `app.html`, `index.html`, `ios/Budget/Shared/Finance.swift`,
-   `ios/Budget/Budget/WageView.swift`, `ios/Budget/Budget/Notifications.swift`,
-   `CLAUDE_CODE_PROMPT.md`. Xcode `xcuserdata`/`xcshareddata` noise can be
-   ignored/staged as usual.
-4. Stage and commit as TWO separate commits (cleaner history — these are
-   unrelated changes):
+   Expect changes in exactly these 4 files (already staged from the Cowork
+   session, but verify):
+   - `app.html`
+   - `ios/Budget/Budget/BudgetStore.swift`
+   - `ios/Budget/Budget/LimitView.swift`
+   - `supabase/functions/limit-advisor/index.ts`
 
-   **Commit 1 — Estimated Pay feature:**
+3. Commit:
    ```
-   git add app.html index.html ios/Budget/Shared/Finance.swift ios/Budget/Budget/WageView.swift
-   git commit -m "Add Estimated Pay to Wage tab (web + iOS)
+   git add app.html ios/Budget/Budget/BudgetStore.swift ios/Budget/Budget/LimitView.swift supabase/functions/limit-advisor/index.ts CLAUDE_CODE_PROMPT.md
+   git commit -m "Add follow-up chat to Limit page shift advisor (web + iOS)
 
-Computes a rolling estimate for any month with no logged hours/override yet,
-using the set weekly schedule (se.shifts) + Budget tab calendar (customDays)
-+ paid leave (flat 7h/day). Live-computed every render from workDays/shifts/
-customDays, so toggling a day on the Budget tab re-syncs the estimate
-automatically — no cached/stale state. Follows the existing arrears
-convention (month mk's estimate reflects prevMK's schedule, same as
-wage/transport/paid-leave elsewhere on this tab). Flags scheduled work days
-whose weekday has no shift time set, instead of silently showing 0h.
-Estimate disappears once real hours or a payslip override are entered for
-that month."
+After the first structured verdict (yes/caution/over), a chat thread now
+appears below it so you can ask follow-up questions ('what if I drop the
+Saturday shift?') and get contextual replies from Claude, instead of only
+one-shot advice.
+
+limit-advisor edge function: now accepts optional history[]/message params.
+When present, skips the JSON-schema output and replies in free-form text,
+using the same financial context (limit, earned, shifts, wage) plus
+Estimated Pay for upcoming unlogged months (reuses the Wage tab's
+gEstPay/estimatedPay logic, arrears convention). History capped at last 20
+turns to bound token cost. No history/message present = unchanged behavior
+(structured verdict card).
+
+Web (app.html): chat thread + input below the verdict card. Messages
+persisted to localStorage for 1 day only, per-device, cleared automatically
+on expiry or when a new shift plan is submitted. 'Clear chat' button.
+
+iOS (LimitView.swift + BudgetStore.swift): same UX in SwiftUI. New
+BudgetStore.limitChatReply() calls the same edge function with history.
+Messages persisted via new LimitChatStore (UserDefaults, 1-day TTL).
+
+No new Supabase tables — chat history is a local scratchpad only, not
+synced across devices or stored server-side, matching the low-stakes nature
+of 'thinking out loud about shifts' vs. actual financial records."
    ```
 
-   **Commit 2 — Payday notification wording:**
+4. Deploy the edge function:
    ```
-   git add app.html index.html ios/Budget/Budget/Notifications.swift
-   git commit -m "Payday notification: swap 'log your hours' for expense-check reminder
+   supabase functions deploy limit-advisor
+   ```
+   Confirm the `ANTHROPIC_API_KEY` secret is still set — this change doesn't
+   touch secrets, but worth a sanity check:
+   ```
+   supabase secrets list
+   ```
 
-Web reminder banner and iOS push notification on payday now say
-'check your fixed and one-off expenses' instead of 'log your hours'."
-   ```
-
-   **Then stage the prompt file itself and any Xcode noise:**
-   ```
-   git add CLAUDE_CODE_PROMPT.md
-   git add ios/Budget/Budget.xcodeproj  # xcuserdata/xcshareddata noise, same as prior commits
-   git commit -m "Update push prompt"
-   ```
 5. Push:
    ```
    git push origin main
    ```
+
 6. After push, clear any leftover locks so the next session is smooth:
    ```
    rm -f .git/*.lock .git/refs/**/*.lock 2>/dev/null; true
    ```
 
-## What's in these changes
-- **Estimated Pay (web + iOS):** new `gEstHours`/`gEstPay` (web) and
-  `Calc.EstPay`/`estimatedPay` (iOS). Wage tab shows an "Estimated Pay" card
-  (wage + transport breakdown) for any month with `hours===0` and
-  `wageOverride===0`. No new stored fields — everything derives live from
-  `se.workDays`/`se.shifts`/`da[mk].customDays`.
-- **Payday notification wording (web + iOS):** the payday-today
-  reminder/notification no longer says "log your hours" — it now says
-  "check your fixed and one-off expenses!" Web: `app.html`/`index.html` line
-  ~482 (`reminders` array). iOS: `Notifications.swift` line ~95 (scheduled
-  local push, title unchanged "💰 Pay Day!").
+7. Report back: commit hash, deploy result, push result.
 
-## After push — rebuild on your Mac and TEST on device
-(No Xcode in Cowork, so the Swift is logic-reviewed and pattern-matched
-against existing code only, not compiled.)
-- Open Wage tab on a future month with no hours logged — should show blue
-  "Estimated Pay" card with wage + transport breakdown.
-- Go to Budget tab, flip a day from off → work (or vice versa) in that same
-  month's arrears period, come back to Wage tab — estimate should update.
-- Log real hours (or a payslip override) for a month — its Estimated Pay
-  card should disappear and the real breakdown should show instead.
-- If a scheduled work day's weekday has no shift time set in Settings, the
-  card should show a ⚠ warning line instead of silently under-counting.
-- Payday notification: on payday, confirm the push says "Today is your
-  payday! Check your fixed and one-off expenses!" (no mention of hours).
-  Web Wage tab banner should read "Payday is today — check your fixed and
-  one-off expenses!"
+## What changed, in more detail
+
+**Edge function (`supabase/functions/limit-advisor/index.ts`):**
+Backward compatible. A request with no `history`/`message` behaves exactly
+as before — returns the structured `{verdict, headline, reasoning,
+suggestions}` JSON. A request with `history` (prior `{role, content}` turns)
+and `message` (the new user message) switches to a plain-text conversational
+reply (`{reply: "..."}`), using the same situation block (limit, earned,
+room left, shifts, plus a new optional `estimateLines` block for upcoming
+months' estimated pay). History is trimmed to the last 20 turns and each
+message capped at 4000 chars to keep token usage predictable.
+
+**Web (`app.html`):**
+- New state: `chatMsgs`, `chatInput`, `chatLoading`, `chatErr`, `limitCtx`.
+- New module-level helpers: `loadLimitChat`/`saveLimitChat` — localStorage
+  key `limitChat_v1`, 1-day TTL, per-device only.
+- New `buildEstimateLines()` — pulls `gEstPay(mo.key)` for each future month
+  (same function already powering the Wage tab's Estimated Pay card).
+- `askLimitAdvisor` now also stores the full `ctx` object (as `limitCtx`) and
+  clears any existing chat thread (new shift plan = new numbers, don't let
+  Claude answer follow-ups against stale context).
+- New `sendLimitChat()` — posts `{...limitCtx, history: chatMsgs, message}`
+  to the edge function, appends the reply, persists to localStorage.
+- New `clearLimitChat()` — wired to a "Clear chat" link in the UI.
+- New chat UI block renders below the existing verdict card, gated on
+  `simAdvice` already having a headline/reasoning (i.e., chat only shows
+  after the first verdict).
+
+**iOS (`ios/Budget/Budget/LimitView.swift` + `BudgetStore.swift`):**
+- `BudgetStore.swift`: new `limitChatReply(ctx:history:message:)` — same
+  edge function, same request shape as web, decodes `reply` from the
+  response.
+- `LimitView.swift`: new `@State` for `chatMsgs`, `chatInput`, `chatLoading`,
+  `chatErr`, `limitCtx`. New `buildEstimateLines()` mirroring web's version
+  via `store.calc.estimatedPay(mo.key)`. `runAdvisor` now stores `limitCtx`
+  and clears any prior chat. New `sendChat()`/`clearChat()`. New chat UI
+  (message bubbles + TextField + Send button) below the existing advice
+  card, same gating as web.
+- New file-scope types: `LimitChatMessage` (Codable, `{role, content}`) and
+  `LimitChatStore` enum — UserDefaults-backed persistence, key
+  `limitChat_v1`, 1-day TTL, mirroring the web localStorage behavior.
+
+## Things I could not verify in the Cowork sandbox
+
+- No Supabase CLI available there, so the edge function has NOT been
+  deployed yet — it only exists in the local file, not live. Deploying it
+  (step 4 above) is required before the chat feature will actually work in
+  the app; until then, tapping "Ask Claude for advice" still works as before
+  (unchanged first-call behavior), but the chat box's follow-up messages
+  will fail against the old deployed version of the function.
+- No Xcode/swift build available there either — `LimitView.swift` and
+  `BudgetStore.swift` are logic-reviewed and brace/paren-balance-checked
+  only, not compiled. Worth a build check before considering this verified.
+
+## After push — test on both platforms
+
+- **Web:** Limit tab → add a shift → "Ask Claude for advice" → verdict card
+  appears → a chat box should appear below it → type a follow-up ("what if I
+  drop this shift?") → should get a plain-text reply in a few seconds →
+  refresh the page within the same day → chat history should still be there
+  → "Clear chat" should wipe it.
+- **iOS:** same flow in the Limit tab. Force-quit and reopen the app within
+  the same day → chat history should persist. Wait past 1 day (or manually
+  clear UserDefaults for testing) → history should be gone on next load.
+- **Cost sanity check:** each chat message is a new Anthropic API call
+  (Haiku 4.5, max 600 tokens) against the existing `ANTHROPIC_API_KEY`
+  secret — not unbounded, but confirm nothing loops or double-sends.

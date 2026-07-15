@@ -564,6 +564,26 @@ final class BudgetStore: ObservableObject {
             suggestions: (d["suggestions"]?.array ?? []).compactMap { $0.string }
         )
     }
+
+    /// Follow-up chat on the Limit page — same edge function, but with `history` + `message` set,
+    /// which switches the function into free-form conversational mode (see limit-advisor/index.ts).
+    /// `ctx` should be the exact context dict used for the original `limitAdvice` call, so Claude
+    /// answers against the same numbers. `history` is prior {role, content} turns.
+    func limitChatReply(ctx: [String: JSONValue], history: [(role: String, content: String)], message: String) async throws -> String {
+        guard let u = URL(string: "\(baseURL)/functions/v1/limit-advisor") else { throw URLError(.badURL) }
+        var req = URLRequest(url: u); req.httpMethod = "POST"; req.timeoutInterval = 60
+        req.setValue(anon, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(anon)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body = ctx
+        body["history"] = .array(history.map { .object(["role": .string($0.role), "content": .string($0.content)]) })
+        body["message"] = .string(message)
+        req.httpBody = try JSONEncoder().encode(JSONValue.object(body))
+        let (data, _) = try await URLSession.shared.data(for: req)
+        let resp = try JSONDecoder().decode(JSONValue.self, from: data)
+        if let e = resp["error"]?.string { throw NSError(domain: "fn", code: 1, userInfo: [NSLocalizedDescriptionKey: e]) }
+        return resp["reply"]?.string ?? ""
+    }
     /// Import up to 5 passbook files: analyse each, bucket transactions into their months
     /// (de-duped), and stash the latest AI insights.
     func analyzePassbooks(_ files: [(data: Data, type: String)]) async {
