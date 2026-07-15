@@ -285,21 +285,23 @@ struct LimitView: View {
                                     }
                                 }
                                 if !chatMsgs.isEmpty {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        ForEach(chatMsgs) { m in
-                                            Text(m.content)
-                                                .font(.footnote)
-                                                .foregroundStyle(m.role == "user" ? .white : T.text)
-                                                .padding(.horizontal, 12).padding(.vertical, 9)
-                                                .background(m.role == "user" ? T.blueD : T.cardAlt)
-                                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                                .frame(maxWidth: .infinity, alignment: m.role == "user" ? .trailing : .leading)
-                                        }
-                                        if chatLoading {
-                                            Text("Claude is thinking…").font(.footnote).foregroundStyle(T.muted)
-                                                .padding(.horizontal, 12).padding(.vertical, 9)
-                                                .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                    ScrollView {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            ForEach(chatMsgs) { m in
+                                                Text(m.content)
+                                                    .font(.footnote)
+                                                    .foregroundStyle(m.role == "user" ? .white : T.text)
+                                                    .padding(.horizontal, 12).padding(.vertical, 9)
+                                                    .background(m.role == "user" ? T.blueD : T.cardAlt)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                                    .frame(maxWidth: .infinity, alignment: m.role == "user" ? .trailing : .leading)
+                                            }
+                                            if chatLoading {
+                                                Text("Claude is thinking…").font(.footnote).foregroundStyle(T.muted)
+                                                    .padding(.horizontal, 12).padding(.vertical, 9)
+                                                    .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                            }
                                         }
                                     }
                                     .frame(maxHeight: 320)
