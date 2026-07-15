@@ -54,16 +54,21 @@ struct WageView: View {
         let tr = c.transport(mo.key)
         let total = c.taxable(mo.key) + tr
         let isOpen = expanded.contains(mo.key)
+        // Show an estimate only while nothing real has been entered for this month yet.
+        let hasData = wage > 0 || d.d("wageOverride") > 0
+        let hasHours = d.d("hours") > 0
+        let showEst = !hasData && !hasHours
+        let est = showEst ? c.estimatedPay(mo.key) : Calc.EstPay()
 
         VStack(spacing: 0) {
             Button {
                 if isOpen { expanded.remove(mo.key) } else { expanded.insert(mo.key) }
             } label: {
                 HStack {
-                    Circle().fill(wage > 0 || d.d("wageOverride") > 0 ? T.greenD : T.border).frame(width: 10, height: 10)
+                    Circle().fill(wage > 0 || d.d("wageOverride") > 0 ? T.greenD : (showEst && est.total > 0 ? T.blueD : T.border)).frame(width: 10, height: 10)
                     Text("\(mo.label) \(c.payday(mo.key))th").fontWeight(.semibold).foregroundStyle(T.text)
                     Spacer()
-                    Text(total > 0 ? yen(total) : "—").fontWeight(.semibold)
+                    Text(total > 0 ? yen(total) : (showEst && est.total > 0 ? "~\(yen(est.total))" : "—")).fontWeight(.semibold)
                         .foregroundStyle(total > 0 ? T.text : T.muted)
                     Image(systemName: isOpen ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(T.muted)
                 }
@@ -75,6 +80,10 @@ struct WageView: View {
             if isOpen {
                 VStack(alignment: .leading, spacing: 14) {
                     Divider().overlay(T.border)
+
+                    if showEst {
+                        estimatedPayCard(c, mo, est)
+                    }
 
                     // Hours worked (previous month label, like the web)
                     fieldLabel("Hours worked in \(prevLabel(mo.key))")
@@ -143,6 +152,34 @@ struct WageView: View {
         .background(T.card)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(T.border, lineWidth: 1))
+    }
+
+    @ViewBuilder private func estimatedPayCard(_ c: Calc, _ mo: MonthMeta, _ est: Calc.EstPay) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Estimated Pay").font(.subheadline).fontWeight(.bold).foregroundStyle(.white)
+            if est.total > 0 {
+                HStack { Text("Wage (\(fmtHours(est.hours))h × \(yen(c.hourlyWage)))").foregroundStyle(.white.opacity(0.85)); Spacer()
+                    Text(yen(est.wage)).fontWeight(.semibold).foregroundStyle(.white) }
+                HStack { Text("Transport (\(est.days)d × \(yen(c.transportRate(mo.key))))").foregroundStyle(.white.opacity(0.85)); Spacer()
+                    Text(yen(est.transport)).fontWeight(.semibold).foregroundStyle(.white) }
+                Divider().overlay(.white.opacity(0.3))
+                HStack { Text("Estimated Total").fontWeight(.bold).foregroundStyle(.white); Spacer()
+                    Text(yen(est.total)).fontWeight(.bold).foregroundStyle(.white) }
+                if est.noShiftDays > 0 {
+                    Text("⚠ \(est.noShiftDays) scheduled work day\(est.noShiftDays > 1 ? "s" : "") in \(prevLabel(mo.key)) \(est.noShiftDays > 1 ? "have" : "has") no shift time set — add one in Settings for a fuller estimate.")
+                        .font(.caption2).foregroundStyle(.white.opacity(0.9))
+                }
+                Text("Based on your set schedule & calendar for \(prevLabel(mo.key)). Updates automatically if you change working days on the Budget tab.")
+                    .font(.caption2).foregroundStyle(.white.opacity(0.85))
+            } else {
+                Text("No working days set for \(prevLabel(mo.key)) yet — mark work days on the Budget tab or set a schedule in Settings to see an estimate.")
+                    .font(.caption).foregroundStyle(.white.opacity(0.9))
+            }
+        }
+        .font(.footnote)
+        .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+        .background(T.blueD)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     @ViewBuilder private func cumulative(_ c: Calc, _ mo: MonthMeta) -> some View {

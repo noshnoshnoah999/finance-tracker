@@ -204,6 +204,46 @@ struct Calc {
         return n
     }
 
+    // MARK: Estimated Pay (future/unlogged months)
+    struct EstPay { var hours: Double = 0; var wage: Double = 0; var days: Int = 0; var transport: Double = 0; var total: Double = 0; var noShiftDays: Int = 0 }
+
+    /// Estimated hours for a month, computed live from the calendar (customDays) + set schedule (shifts).
+    /// "work" days use that weekday's actual shift length (shiftHours already subtracts the break);
+    /// "pl" days use the flat plHoursPerDay, same convention as plHours(). Days marked "work" whose
+    /// weekday has no shift defined contribute 0h and are counted in noShiftDays.
+    private func estHours(_ mk: String, _ shifts: [String: JSONValue]) -> (hours: Double, noShiftDays: Int) {
+        let (y, m) = ym(mk)
+        let cd = month(mk)["customDays"] ?? .object([:])
+        var h = 0.0, noShift = 0
+        for d in 1...daysInMonth(y, m) {
+            let ds = dstr(y, m, d)
+            let st = dayState(ds, y, m, d, cd)
+            if st == "work" {
+                let dow = jsDay(y, m, d)
+                if let sh = shifts[String(dow)] { h += shiftHours(sh) } else { noShift += 1 }
+            } else if st == "pl" {
+                h += Calc.plHoursPerDay
+            }
+        }
+        return (h, noShift)
+    }
+
+    /// Estimated Pay for a future/unlogged month: mirrors the arrears convention used elsewhere
+    /// (wage+transport shown for month mk are actually earned working prevMK). Live-computed from
+    /// shifts/workDays/customDays every call, so flipping a calendar day re-syncs automatically.
+    func estimatedPay(_ mk: String) -> EstPay {
+        guard let pmk = prevMK(mk) else { return EstPay() }
+        let sh = shifts(pmk)
+        let (hours, noShift) = estHours(pmk, sh)
+        let wageEst = (hours * hourlyWage).rounded()
+        let cd = month(pmk)["customDays"] ?? .object([:])
+        let (y, m) = ym(pmk)
+        var days = 0
+        for d in 1...daysInMonth(y, m) where dayState(dstr(y, m, d), y, m, d, cd) == "work" { days += 1 }
+        let transportEst = Double(days) * transportRate(mk)
+        return EstPay(hours: hours, wage: wageEst, days: days, transport: transportEst, total: wageEst + transportEst, noShiftDays: noShift)
+    }
+
     // MARK: Food
     func food(_ mk: String) -> Double {
         let d = month(mk)

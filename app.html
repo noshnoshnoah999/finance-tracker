@@ -455,6 +455,15 @@
       // Count "work" days in a month from the calendar (respects customDays) — the source of truth.
       const gWorkDaysCD=(mk,cd)=>{const[yy,mm]=mk.split("-").map(Number);let n=0;const d=new Date(yy,mm-1,1),en=new Date(yy,mm,0);while(d<=en){const ds=`${yy}-${String(mm).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;if(getDayState(ds,d,cd||{},se.workDays)==="work")n++;d.setDate(d.getDate()+1);}return n;};
       const gWorkDays=mk=>gWorkDaysCD(mk,da[mk]?.customDays||{});
+      // Estimated hours for a month, computed live from the calendar (customDays) + set schedule (se.shifts).
+      // "work" days use that weekday's actual shift length (sH already subtracts the break);
+      // "pl" days use the flat PL_HOURS_PER_DAY, same convention as gPLHours. Days marked "work"
+      // whose weekday has no shift defined contribute 0h and are reported via noShiftDays.
+      const gEstHours=(mk,cd,shifts,wd)=>{const[y,mo]=mk.split("-").map(Number);let h=0,noShiftDays=0;const d=new Date(y,mo-1,1),en=new Date(y,mo,0);while(d<=en){const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;const st=getDayState(ds,d,cd||{},wd);if(st==="work"){const sh=shifts[d.getDay()];if(sh)h+=sH(sh);else noShiftDays++;}else if(st==="pl"){h+=PL_HOURS_PER_DAY;}d.setDate(d.getDate()+1);}return{hours:h,noShiftDays};};
+      // Estimated Pay for a future/unlogged month: mirrors the arrears convention used elsewhere on the
+      // Wage tab (wage+transport shown for month mk are actually earned working prevMK). Live-computed
+      // from se.shifts/se.workDays/customDays every render, so flipping a calendar day re-syncs automatically.
+      const gEstPay=mk=>{const pmk=gPrevMK(mk);if(!pmk)return{hours:0,wage:0,days:0,transport:0,total:0,noShiftDays:0};const cd=da[pmk]?.customDays||{};const shifts=gShifts(pmk);const{hours,noShiftDays}=gEstHours(pmk,cd,shifts,se.workDays);const wage=Math.round(hours*se.hourlyWage);const days=gWorkDaysCD(pmk,cd);const transport=days*trf(mk);return{hours,wage,days,transport,total:wage+transport,noShiftDays};};
       const gTx=(d,mk)=>(d.wageOverride>0)?gW(d):gW(d)+gPLW(mk);
       const dTJ=d=>(d.dadItems||[]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
       // Extra money (gifts, dad's pocket money, etc.) — non-pay income, NOT taxable.
@@ -923,17 +932,34 @@
               const tx=(d.wageOverride>0)?wage:(wage+plWage);
               const cT=MONTHS.slice(0,mI+1).reduce((s,x)=>s+gTx(da[x.key],x.key),0);
               const oT=cT<=se.annualLimit/12*(mI+1);
+              // Show an estimate only while nothing real has been entered for this month yet.
+              const showEst=!hD&&!hH;
+              const est=showEst?gEstPay(mo.key):null;
               return(
                 <div key={mo.key} style={{...crd,padding:0,overflow:"hidden"}}>
                   <button onClick={()=>setXp(p=>({...p,[mo.key]:!p[mo.key]}))} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"16px 18px",border:"none",background:"transparent",cursor:"pointer",fontFamily:ft}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <div style={{width:10,height:10,borderRadius:5,background:hD?c.greenD:c.border}}/>
+                      <div style={{width:10,height:10,borderRadius:5,background:hD?c.greenD:(showEst&&est.total>0?c.blueD:c.border)}}/>
                       <span style={{fontWeight:600,color:c.text,fontSize:15}}>{mo.label} {gPD(mo.key)}th</span>
                     </div>
-                    <span style={{fontSize:14,fontWeight:600,color:hD?c.text:c.muted}}>{hD?yn(tx+tr):"—"}</span>
+                    <span style={{fontSize:14,fontWeight:600,color:hD?c.text:c.muted}}>{hD?yn(tx+tr):(showEst&&est.total>0?`~${yn(est.total)}`:"—")}</span>
                   </button>
                   {op&&(
                     <div style={{padding:"0 18px 18px",borderTop:`1px solid ${c.border}`,animation:"slideDown 0.2s ease-out"}}>
+                      {showEst&&(
+                        <div style={{marginTop:14,padding:14,borderRadius:14,fontSize:13,background:c.blueD,color:c.white}}>
+                          <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>Estimated Pay</div>
+                          {est.total>0?(<>
+                            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{opacity:0.85}}>Wage ({est.hours.toFixed(1)}h × {yn(se.hourlyWage)})</span><span style={{fontWeight:600}}>{yn(est.wage)}</span></div>
+                            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{opacity:0.85}}>Transport ({est.days}d × {yn(trf(mo.key))})</span><span style={{fontWeight:600}}>{yn(est.transport)}</span></div>
+                            <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid rgba(255,255,255,0.3)",paddingTop:8,marginTop:4}}><span style={{fontWeight:700}}>Estimated Total</span><span style={{fontWeight:700,fontSize:15}}>{yn(est.total)}</span></div>
+                            {est.noShiftDays>0&&<div style={{marginTop:8,fontSize:11,opacity:0.9}}>⚠ {est.noShiftDays} scheduled work day{est.noShiftDays>1?"s":""} in {pMN(mo.key)} {est.noShiftDays>1?"have":"has"} no shift time set — add one in Settings for a fuller estimate.</div>}
+                            <div style={{marginTop:8,fontSize:11,opacity:0.85}}>Based on your set schedule &amp; calendar for {pMN(mo.key)}. Updates automatically if you change working days on the Budget tab.</div>
+                          </>):(
+                            <div style={{fontSize:12,opacity:0.9}}>No working days set for {pMN(mo.key)} yet — mark work days on the Budget tab or set a schedule in Settings to see an estimate.</div>
+                          )}
+                        </div>
+                      )}
                       <div style={{paddingTop:14}}>
                         <label style={lbl}>Hours Worked in {pMN(mo.key)}</label>
                         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
