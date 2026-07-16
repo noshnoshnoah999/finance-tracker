@@ -644,7 +644,13 @@
       const _payDate=(()=>{const[y,mo]=payMK.split("-").map(Number);return new Date(y,mo-1,payPD);})();
       const daysToPay=Math.max(0,Math.round((_payDate-new Date(_today.getFullYear(),_today.getMonth(),_today.getDate()))/86400000));
       const _pcD=da[payMK]||eM();
-      const _pcWage=gW(_pcD),_pcTr=gTr(_pcD,payMK);
+      const _pcWRaw=gW(_pcD),_pcTr=gTr(_pcD,payMK);
+      // No hours/override logged yet for the pay month → project wage from schedule + calendar
+      // (same estimate the Budget tab uses) instead of showing ¥0. Reverts automatically once
+      // real KOT hours or a wage override are entered.
+      const _pcEst=(_pcWRaw===0&&_pcD.wageOverride<=0)?gEstPay(payMK):null;
+      const _pcWage=_pcEst?_pcEst.wage:_pcWRaw;
+      const _pcIsEst=!!(_pcEst&&_pcEst.wage>0);
       const _pcPmk=gPrevMK(payMK);
       const _pcPLH=_pcD.hours>0&&_pcPmk?gPLHours(_pcPmk,da[_pcPmk]?.customDays,gShifts(_pcPmk),se.workDays):0;
       const _pcPL=Math.round(_pcPLH*se.hourlyWage);
@@ -841,7 +847,7 @@
                   <div style={{fontSize:13,color:"rgba(255,255,255,0.82)",marginTop:6}}>{payIsLast?`Paid on the ${payPD}th ✓ · next payday in January`:daysToPay===0?"Payday is today 🎉":`in ${daysToPay} day${daysToPay===1?"":"s"} · the ${payPD}th`}</div>
                   {payTotal>0?(
                     <div style={{marginTop:14,display:"flex",flexDirection:"column",gap:7}}>
-                      <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"rgba(255,255,255,0.9)"}}><span>Wage</span><span style={{fontWeight:700}}>{yn(_pcWage)}</span></div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"rgba(255,255,255,0.9)"}}><span>Wage{_pcIsEst?" (est.)":""}</span><span style={{fontWeight:700}}>{yn(_pcWage)}</span></div>
                       <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"rgba(255,255,255,0.9)"}}><span>Transport</span><span style={{fontWeight:700}}>{yn(_pcTr)}</span></div>
                       {_pcPL>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"rgba(255,255,255,0.9)"}}><span>Paid leave</span><span style={{fontWeight:700}}>{yn(_pcPL)}</span></div>}
                     </div>

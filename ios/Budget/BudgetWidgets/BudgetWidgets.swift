@@ -51,7 +51,14 @@ private func computeEntry() async -> BudgetEntry {
     let parts = payMK.split(separator: "-").compactMap { Int($0) }
     let payDate = cal.date(from: DateComponents(year: parts.first ?? 2026, month: parts.count > 1 ? parts[1] : 1, day: payPD)) ?? now
     let days = max(0, cal.dateComponents([.day], from: cal.startOfDay(for: now), to: cal.startOfDay(for: payDate)).day ?? 0)
-    return BudgetEntry(date: now, payLabel: monthMeta(payMK)?.label ?? "", payTotal: c.monthlyPay(payMK),
+    // No hours/override logged yet for the pay month → project wage from schedule + calendar
+    // (same estimate the Wage tab / homepage card use) instead of showing ¥0 wage baked into
+    // monthlyPay. Reverts automatically once real KOT hours or a wage override are entered.
+    let wageRaw = c.wage(payMK)
+    let monthD = c.month(payMK)
+    let est: Calc.EstPay? = (wageRaw == 0 && monthD.d("wageOverride") <= 0) ? c.estimatedPay(payMK) : nil
+    let payTotal = (est?.wage ?? 0) > 0 ? (est!.wage + c.transport(payMK)) : c.monthlyPay(payMK)
+    return BudgetEntry(date: now, payLabel: monthMeta(payMK)?.label ?? "", payTotal: payTotal,
                        daysToPay: days, payPD: payPD, roomLeft: c.roomLeft, freeToSpend: c.freeToSpend(curMK), placeholder: false)
 }
 

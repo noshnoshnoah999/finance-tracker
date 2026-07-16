@@ -174,9 +174,16 @@ struct HomeView: View {
         let payMK = (day <= curPD) ? curMK : (miCur < MONTHS.count - 1 ? MONTHS[miCur + 1].key : curMK)
         let payPD = c.payday(payMK)
         let payLabel = monthMeta(payMK)?.label ?? ""
-        let total = c.monthlyPay(payMK) + 0   // monthlyPay = taxable + transport
         let plY = c.paidLeaveYen(payMK)
-        let wage = c.wage(payMK), tr = c.transport(payMK)
+        let wageRaw = c.wage(payMK), tr = c.transport(payMK)
+        // No hours/override logged yet for the pay month → project wage from schedule + calendar
+        // (same estimate the Wage tab uses) instead of showing ¥0. Reverts automatically once
+        // real KOT hours or a wage override are entered.
+        let monthD = c.month(payMK)
+        let est: Calc.EstPay? = (wageRaw == 0 && monthD.d("wageOverride") <= 0) ? c.estimatedPay(payMK) : nil
+        let wage = (est?.wage ?? 0) > 0 ? est!.wage : wageRaw
+        let isEst = (est?.wage ?? 0) > 0
+        let total = wage + tr + plY
         // days until payday
         let payComps = payMK.split(separator: "-")
         let pdate = cal.date(from: DateComponents(year: Int(payComps[0]), month: Int(payComps[1]), day: payPD)) ?? now
@@ -194,7 +201,7 @@ struct HomeView: View {
                 .font(.footnote).foregroundStyle(.white.opacity(0.82))
             if total > 0 {
                 VStack(spacing: 7) {
-                    payRow("Wage", wage)
+                    payRow(isEst ? "Wage (est.)" : "Wage", wage)
                     payRow("Transport", tr)
                     if plY > 0 { payRow("Paid leave", plY) }
                 }.padding(.top, 6)
