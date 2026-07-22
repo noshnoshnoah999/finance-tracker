@@ -220,7 +220,8 @@ struct BudgetTabView: View {
         let items = c.month(bm).arr("dadItems")
         let rate = c.gbpToJpy
         let free = store.blob.settings["dadFreeSpend"]?.object ?? [:]
-        let total = items.reduce(0.0) { $0 + $1.d("gbp") } * rate
+        let amazonDadYen = c.subTotalDad(bm)
+        let total = items.reduce(0.0) { $0 + $1.d("gbp") } * rate + amazonDadYen
         VStack(alignment: .leading, spacing: 8) {
             HStack { sectionHeader("Dad's Contributions", color: T.greenD); Spacer(); Text("£1 = ¥\(Int(rate))").font(.caption2).foregroundStyle(T.sub) }
             Text("What Dad sends each month. Tap \u{201C}Free\u{201D} for money that's yours to spend (counts as income).").font(.caption2).foregroundStyle(T.sub)
@@ -239,7 +240,17 @@ struct BudgetTabView: View {
                     Button { store.removeDadItem(bm, id) } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.roseD)
                 }
             }
-            if !items.isEmpty { Divider().overlay(T.border); row("Total", yen(total.rounded()), bold: true, color: T.greenD) }
+            if amazonDadYen > 0 {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Amazon (Subscribe & Save)").font(.footnote)
+                        Text("£" + String(format: "%.2f", amazonDadYen / rate)).font(.caption2).foregroundStyle(T.sub)
+                    }
+                    Spacer()
+                    Text(yen(amazonDadYen)).font(.footnote).fontWeight(.semibold).foregroundStyle(T.greenD)
+                }
+            }
+            if !items.isEmpty || amazonDadYen > 0 { Divider().overlay(T.border); row("Total", yen(total.rounded()), bold: true, color: T.greenD) }
             HStack(spacing: 8) {
                 TextField("Note (e.g. Pocket money)", text: $ndNote).modifier(FieldStyle())
                 HStack(spacing: 4) { Text("£").foregroundStyle(T.sub); TextField("0", text: $ndGbp).keyboardType(.numberPad) }.modifier(FieldStyle()).frame(width: 80)

@@ -280,6 +280,11 @@ struct Calc {
         subItems.filter { subIncluded($0, mk) && $0.s("payer", "me") != "dad" }
             .reduce(0) { $0 + $1.d("price") }
     }
+    /// What Dad pays in Subscribe & Save this month (¥) — items tagged payer "dad" that are ticked/included.
+    func subTotalDad(_ mk: String) -> Double {
+        subItems.filter { subIncluded($0, mk) && $0.s("payer", "me") == "dad" }
+            .reduce(0) { $0 + $1.d("price") }
+    }
 
     // MARK: Fixed expenses
     func fixedAmount(_ f: JSONValue, _ mk: String) -> Double {
