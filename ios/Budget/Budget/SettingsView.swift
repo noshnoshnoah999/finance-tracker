@@ -17,6 +17,10 @@ struct SettingsView: View {
     @State private var nmEndMonth = 0; @State private var nmEndYear = ""
     @State private var nsName = ""; @State private var nsPrice = ""; @State private var nsEveryN = 1
     @State private var notifsOn = Notifs.isEnabled
+    // Work Schedule: weekday chosen in the "add a day" picker (-1 = none chosen), and the
+    // weekday awaiting removal confirmation.
+    @State private var newShiftDow = -1
+    @State private var pendingRemove: Int? = nil
     @AppStorage(Notifs.deniedKey) private var notifDenied = false
 
     var body: some View {
@@ -140,11 +144,22 @@ struct SettingsView: View {
     }
     @ViewBuilder private func schedule(_ c: Calc) -> some View {
         card("Work Schedule", T.blueD) {
-            Text("Your default shift times.").font(.caption2).foregroundStyle(T.sub)
-            ForEach(["1", "2", "0"], id: \.self) { day in
+            Text("Your default shift times. The days listed here are the days the calendar counts as work days.")
+                .font(.caption2).foregroundStyle(T.sub)
+            let setDays = DOW_ORDER.filter { store.blob.settings["shifts"]?[String($0)] != nil }
+            ForEach(setDays, id: \.self) { dow in
+                let day = String(dow)
                 let sh = store.blob.settings["shifts"]?[day]
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(sh?.s("label") ?? day).font(.footnote).fontWeight(.semibold)
+                    HStack {
+                        Text(sh?.s("label") ?? DOW_LABELS[dow]).font(.footnote).fontWeight(.semibold)
+                        Spacer()
+                        Button(role: .destructive) { pendingRemove = dow } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(T.roseD)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove \(DOW_FULL[dow]) shift")
+                    }
                     HStack(spacing: 8) {
                         TextField("09:00", text: shiftText(day, "start")).modifier(FieldStyle())
                         Text("to").foregroundStyle(T.muted)
@@ -160,6 +175,46 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 4).overlay(Divider().overlay(T.border), alignment: .bottom)
             }
+            if setDays.isEmpty {
+                Text("No shifts set — add a day below.").font(.footnote).foregroundStyle(T.muted)
+            }
+            let freeDays = DOW_ORDER.filter { store.blob.settings["shifts"]?[String($0)] == nil }
+            if !freeDays.isEmpty {
+                HStack(spacing: 8) {
+                    Picker("Add a day", selection: $newShiftDow) {
+                        Text("Add a day…").tag(-1)
+                        ForEach(freeDays, id: \.self) { Text(DOW_FULL[$0]).tag($0) }
+                    }
+                    .pickerStyle(.menu).tint(T.blueD)
+                    Spacer()
+                    Button("+ Add shift") {
+                        guard newShiftDow >= 0 else { return }
+                        store.addShift(newShiftDow)
+                        newShiftDow = -1
+                    }
+                    .buttonStyle(.borderedProminent).tint(T.blueD)
+                    .disabled(newShiftDow < 0)
+                }
+                .padding(.top, 6)
+            }
+            HStack {
+                Text("Weekly total").fontWeight(.semibold)
+                Spacer()
+                Text("\(setDays.reduce(0.0) { $0 + c.shiftHours(store.blob.settings["shifts"]?[String($1)]) }.clean)h")
+                    .fontWeight(.bold).foregroundStyle(T.blueD)
+            }
+            .padding(.top, 8)
+        }
+        .alert("Remove the \(pendingRemove.map { DOW_FULL[$0] } ?? "") shift?",
+               isPresented: Binding(get: { pendingRemove != nil }, set: { if !$0 { pendingRemove = nil } })) {
+            Button("Cancel", role: .cancel) { pendingRemove = nil }
+            Button("Remove", role: .destructive) {
+                if let d = pendingRemove { store.removeShift(d) }
+                pendingRemove = nil
+            }
+        } message: {
+            let nm = pendingRemove.map { DOW_FULL[$0] } ?? ""
+            Text("Past \(nm)s up to today stay counted as work days, so your logged hours and transport for previous months don't change. Future \(nm)s stop counting as work days.")
         }
     }
     @ViewBuilder private func fixedExpenses(_ c: Calc) -> some View {

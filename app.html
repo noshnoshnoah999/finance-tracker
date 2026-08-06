@@ -104,6 +104,12 @@
     const PAID_LEAVE = ["2026-05-24","2026-05-25","2026-05-31","2026-06-01","2026-06-07"];
     // Returns: "work" | "hol" | "pl" | "off" | "none"
     const getDayState=(ds,dt,customDays,wd)=>{const ov=(customDays||{})[ds];if(ov)return ov;const isSched=wd.includes(dt.getDay());if(PAID_LEAVE.includes(ds))return"pl";if(isSched)return"work";return"none";};
+    // Day-of-week helpers for the flexible Work Schedule. Keys of se.shifts are JS
+    // getDay() numbers (0=Sun … 6=Sat); DOW_ORDER is just the display order (Mon first).
+    const DOW_LABELS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const DOW_FULL=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+    const DOW_ORDER=[1,2,3,4,5,6,0];
+    const dstr=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
     const DEF_DAD = () => [
       {id:"d1",note:"Pocket money",gbp:50},{id:"d2",note:"Haircut",gbp:25},
       {id:"d3",note:"Lunch money",gbp:25},{id:"d4",note:"Student loan",gbp:150},
@@ -279,6 +285,8 @@
       const [pF,setPF2]=useState("");
       const [pT,setPT]=useState("");
       const [pH,setPH]=useState({pMon:0,pTue:0,pSun:0});
+      // Weekday chosen in the "add a shift day" picker on the Settings → Work Schedule card.
+      const [nSD,setNSD]=useState("");
       // Limit-page shift simulator: a list of shifts you're thinking of working.
       const [simShifts,setSimShifts]=useState([]);
       // Which month the simulator plans for (null = default to the current month).
@@ -479,7 +487,11 @@
       // Transport is paid alongside wage for the PREVIOUS calendar month's work (same
       // arrears convention as gPLW) — so it must count work-days from gPrevMK(k), not k itself.
       const gTr=(d,k)=>(d.wageOverride>0)?(d.transportOverride||0):gWorkDays(gPrevMK(k)||k)*trf(k);
-      const gShifts=mk=>{const ov=da[mk]?.shiftOverrides||{};const r={};Object.keys(se.shifts||{}).forEach(d=>{r[d]=ov[d]?{...se.shifts[d],...ov[d]}:se.shifts[d];});return r;};
+      // Union of the base schedule and the month's per-day overrides. The union (rather
+      // than just iterating the base) matters because freezeDOW writes an override for a
+      // weekday it is about to remove from the base schedule — past months must keep that
+      // shift's hours even though the day is gone from Settings.
+      const gShifts=mk=>{const ov=(da[mk]||{}).shiftOverrides||{};const base=se.shifts||{};const r={};new Set([...Object.keys(base),...Object.keys(ov)]).forEach(d=>{const b=base[d],o=ov[d];if(b&&o)r[d]={...b,...o};else if(b)r[d]=b;else if(o&&o.start&&o.end)r[d]=o;});return r;};
       // Paid leave is paid in the NEXT month's payslip — so it shows regardless of whether
       // this month's hours are logged yet. Override months already include it, so skip them.
       const gPLW=mk=>{const d=da[mk]||eM();if(d.wageOverride>0)return 0;const pmk=gPrevMK(mk);if(!pmk)return 0;return Math.round(gPLHours(pmk,da[pmk]?.customDays,gShifts(pmk),se.workDays)*se.hourlyWage);};
@@ -667,6 +679,30 @@
 
       const aOO=k=>{if(!nE.name||!nE.amount)return;setDa(p=>({...p,[k]:{...p[k],oneOffs:[...p[k].oneOffs,{id:Date.now(),name:nE.name,amount:Number(nE.amount)||0,mumPays:false}]}}));setNE({name:"",amount:""});};
       const rOO=(k,id)=>setDa(p=>({...p,[k]:{...p[k],oneOffs:p[k].oneOffs.filter(x=>x.id!==id)}}));
+      // ── Flexible work schedule (add / remove shift days) ──
+      // se.shifts is keyed by day-of-week; se.workDays is the list of weekdays the
+      // calendar treats as work days by default. The two are kept in lockstep here so
+      // deleting a shift also stops that weekday billing transport / counting hours.
+      //
+      // freezeDOW: history guard, run just BEFORE a weekday joins or leaves workDays.
+      // getDayState resolves customDays → PAID_LEAVE → workDays, so any past date whose
+      // state came only from workDays membership would silently flip the moment that
+      // membership changes — rewriting old months' work-day count, transport and hours.
+      // It flips both ways:
+      //   • removing a day → past dates would drop from "work" to "none"  (pass "work")
+      //   • adding a day   → past dates would jump from "none" to "work"  (pass "none")
+      // So we pin every past date of that weekday (through today) to the state it has
+      // right now, skipping dates that already carry an explicit customDays entry and
+      // PAID_LEAVE dates.
+      //
+      // On removal there is a second leak: the pinned "work" days would credit 0 hours
+      // once the times are gone from se.shifts, and would trip the "no shift time set"
+      // warning. So we also copy the shift into that month's shiftOverrides, which
+      // gShifts still resolves. Net result: every date on or before today renders
+      // exactly as it did before the change; only future dates move.
+      const freezeDOW=(dow,val)=>{const today=new Date();today.setHours(0,0,0,0);const keep=val==="work"?(se.shifts||{})[dow]:null;setDa(p=>{const x={...p};MONTHS.forEach(mo=>{const[y,m]=mo.key.split("-").map(Number);const cur={...((x[mo.key]||{}).customDays||{})};const ovr={...((x[mo.key]||{}).shiftOverrides||{})};let changed=false,hasPast=false;const d=new Date(y,m-1,1),en=new Date(y,m,0);while(d<=en){if(d.getDay()===dow&&d<=today){hasPast=true;const ds=dstr(d);if(!cur[ds]&&!PAID_LEAVE.includes(ds)){cur[ds]=val;changed=true;}}d.setDate(d.getDate()+1);}if(hasPast&&keep&&!ovr[dow]){ovr[dow]={...keep};changed=true;}if(changed)x[mo.key]={...eM(),...(x[mo.key]||{}),customDays:cur,shiftOverrides:ovr};});return x;});};
+      const rmShift=dow=>{const nm=DOW_FULL[dow];if(!window.confirm(`Remove the ${nm} shift?\n\nPast ${nm}s up to today stay counted as work days, so your logged hours and transport for previous months don't change. Future ${nm}s stop counting as work days.`))return;freezeDOW(dow,"work");setSe(p=>{const s={...(p.shifts||{})};delete s[dow];return{...p,shifts:s,workDays:(p.workDays||[]).filter(d=>Number(d)!==dow)};});};
+      const addShift=dow=>{if((se.shifts||{})[dow])return;freezeDOW(dow,"none");setSe(p=>{if((p.shifts||{})[dow])return p;const s={...(p.shifts||{}),[dow]:{start:"09:00",end:"17:00",breakMin:60,label:DOW_LABELS[dow]}};const wd=(p.workDays||[]).map(Number);return{...p,shifts:s,workDays:wd.includes(dow)?wd:[...wd,dow].sort((a,b)=>a-b)};});};
       const tMu=(k,id)=>setDa(p=>({...p,[k]:{...p[k],oneOffs:p[k].oneOffs.map(x=>x.id===id?{...x,mumPays:!x.mumPays}:x)}}));
       const aDI=k=>{if(!nD.gbp)return;setDa(p=>({...p,[k]:{...p[k],dadItems:[...(p[k].dadItems||[]),{id:Date.now(),note:nD.note||"Dad",gbp:Number(nD.gbp)||0}]}}));setND({note:"",gbp:""});};
       const rDI=(k,id)=>setDa(p=>({...p,[k]:{...p[k],dadItems:(p[k].dadItems||[]).filter(x=>x.id!==id)}}));
@@ -1083,11 +1119,11 @@
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Work Schedule</span></div>
-                    <span style={{fontSize:12,fontWeight:600,color:c.blueD,background:c.blueBg,padding:"4px 10px",borderRadius:8}}>{[1,2,0].map(d=>DN[d]).join(", ")}</span>
+                    <span style={{fontSize:12,fontWeight:600,color:c.blueD,background:c.blueBg,padding:"4px 10px",borderRadius:8}}>{DOW_ORDER.filter(d=>(se.shifts||{})[d]).map(d=>DN[d]).join(", ")||"No shifts set"}</span>
                   </div>
                   {(()=>{const bmShifts=gShifts(bm);const bmOv=da[bm]?.shiftOverrides||{};return(
                   <div style={{padding:14,background:c.cardAlt,borderRadius:14,fontSize:13}}>
-                    {[1,2,0].map(dow=>{const sh=bmShifts[dow];if(!sh)return null;const editing=eF===`shift-${dow}`;const hasOv=!!bmOv[dow];return(
+                    {DOW_ORDER.filter(dow=>bmShifts[dow]).map(dow=>{const sh=bmShifts[dow];const editing=eF===`shift-${dow}`;const hasOv=!!bmOv[dow];return(
                       <div key={dow} style={{padding:"8px 0",borderBottom:`1px solid ${c.border}`}}>
                         {editing?(
                           <div>
@@ -1918,8 +1954,10 @@
                 </div>
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Work Schedule</span></div>
-                  <div style={{fontSize:11,color:c.sub,marginBottom:12}}>Your default shift times. Change them for a single month from that month's Budget tab.</div>
-                  {[1,2,0].map(dow=>{const sh=(se.shifts||{})[dow];if(!sh)return null;return(<div key={dow} style={{padding:"8px 0",borderBottom:`1px solid ${c.border}`}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{fontWeight:600,width:42,flexShrink:0}}>{sh.label}</span><input type="time" value={sh.start} onChange={e=>setSe(p=>({...p,shifts:{...p.shifts,[dow]:{...p.shifts[dow],start:e.target.value}}}))} style={{...inp,flex:1,padding:"6px 10px"}}/><span style={{color:c.muted}}>to</span><input type="time" value={sh.end} onChange={e=>setSe(p=>({...p,shifts:{...p.shifts,[dow]:{...p.shifts[dow],end:e.target.value}}}))} style={{...inp,flex:1,padding:"6px 10px"}}/></div><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:11,color:c.sub,width:42,flexShrink:0}}>Break</span><NI value={sh.breakMin} onChange={v=>setSe(p=>({...p,shifts:{...p.shifts,[dow]:{...p.shifts[dow],breakMin:v}}}))} style={{flex:1}}/><span style={{fontSize:11,color:c.muted}}>min</span><span style={{fontWeight:700,color:c.blueD,marginLeft:"auto"}}>{sH(sh)}h</span></div></div>);})}
+                  <div style={{fontSize:11,color:c.sub,marginBottom:12}}>Your default shift times. The days listed here are the days the calendar counts as work days. Change them for a single month from that month's Budget tab.</div>
+                  {DOW_ORDER.filter(dow=>(se.shifts||{})[dow]).map(dow=>{const sh=se.shifts[dow];return(<div key={dow} style={{padding:"8px 0",borderBottom:`1px solid ${c.border}`}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}><span style={{fontWeight:600,width:42,flexShrink:0}}>{sh.label||DOW_LABELS[dow]}</span><input type="time" value={sh.start} onChange={e=>setSe(p=>({...p,shifts:{...p.shifts,[dow]:{...p.shifts[dow],start:e.target.value}}}))} style={{...inp,flex:1,padding:"6px 10px"}}/><span style={{color:c.muted}}>to</span><input type="time" value={sh.end} onChange={e=>setSe(p=>({...p,shifts:{...p.shifts,[dow]:{...p.shifts[dow],end:e.target.value}}}))} style={{...inp,flex:1,padding:"6px 10px"}}/><button onClick={()=>rmShift(dow)} title={`Remove ${DOW_FULL[dow]} shift`} aria-label={`Remove ${DOW_FULL[dow]} shift`} style={{border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:18,lineHeight:1,padding:"0 2px",flexShrink:0}}>×</button></div><div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:11,color:c.sub,width:42,flexShrink:0}}>Break</span><NI value={sh.breakMin} onChange={v=>setSe(p=>({...p,shifts:{...p.shifts,[dow]:{...p.shifts[dow],breakMin:v}}}))} style={{flex:1}}/><span style={{fontSize:11,color:c.muted}}>min</span><span style={{fontWeight:700,color:c.blueD,marginLeft:"auto"}}>{sH(sh)}h</span></div></div>);})}
+                  {Object.keys(se.shifts||{}).length===0&&<div style={{fontSize:13,color:c.muted,padding:"6px 0 2px"}}>No shifts set — add a day below.</div>}
+                  {DOW_ORDER.some(d=>!(se.shifts||{})[d])&&<div style={{display:"flex",alignItems:"center",gap:8,paddingTop:12}}><select value={nSD} onChange={e=>setNSD(e.target.value)} style={{...inp,flex:1,padding:"8px 10px"}}><option value="">Add a day…</option>{DOW_ORDER.filter(d=>!(se.shifts||{})[d]).map(d=>(<option key={d} value={d}>{DOW_FULL[d]}</option>))}</select><button onClick={()=>{if(nSD==="")return;addShift(Number(nSD));setNSD("");}} disabled={nSD===""} style={{border:"none",borderRadius:12,padding:"9px 14px",fontSize:13,fontWeight:600,cursor:nSD===""?"default":"pointer",background:nSD===""?c.cardAlt:c.blueD,color:nSD===""?c.muted:"#fff",flexShrink:0}}>+ Add shift</button></div>}
                   <div style={{...rw,paddingTop:10}}><span style={{fontWeight:600}}>Weekly total</span><span style={{fontWeight:700,color:c.blueD}}>{Object.keys(se.shifts||{}).reduce((s,d)=>s+sH(se.shifts[d]),0)}h</span></div>
                 </div>
                 <div style={crd}>

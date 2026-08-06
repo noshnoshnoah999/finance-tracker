@@ -149,6 +149,13 @@ enum DS {
 /// Paid-leave dates (mirror PAID_LEAVE in app.html).
 let PAID_LEAVE: Set<String> = ["2026-05-24", "2026-05-25", "2026-05-31", "2026-06-01", "2026-06-07"]
 
+/// Day-of-week helpers for the flexible Work Schedule (mirror app.html).
+/// Keys of settings.shifts are JS getDay() numbers: 0 = Sunday … 6 = Saturday.
+/// DOW_ORDER is display order only (Monday first).
+let DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+let DOW_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+let DOW_ORDER = [1, 2, 3, 4, 5, 6, 0]
+
 /// Budget-tab card ids in default order (mirror BUDGET_CARDS in app.html).
 let BUDGET_CARDS: [String] = ["work", "income", "dad", "extra", "fixed", "subscribe", "oneoff", "mum", "free", "totals"]
 /// Display names for the reorder screen.

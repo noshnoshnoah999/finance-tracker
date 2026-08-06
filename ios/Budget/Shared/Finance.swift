@@ -102,16 +102,26 @@ struct Calc {
         return (Int(p.first ?? "0") ?? 0, Int(p.count > 1 ? p[1] : "0") ?? 0)
     }
     /// Base shifts merged with the month's per-day overrides.
+    /// Mirrors gShifts in app.html: this is the UNION of the base schedule and the
+    /// month's overrides, not just a walk of the base. The union matters because
+    /// BudgetStore.freezeDOW writes an override for a weekday it is about to delete from
+    /// the base schedule — past months must keep that shift's hours even though the day
+    /// no longer appears in Settings.
     func shifts(_ mk: String) -> [String: JSONValue] {
         let base = se["shifts"]?.object ?? [:]
         let ov = month(mk)["shiftOverrides"]?.object ?? [:]
         var r: [String: JSONValue] = [:]
-        for (k, v) in base {
-            if let o = ov[k]?.object {
-                var merged = v.object ?? [:]
+        for k in Set(base.keys).union(ov.keys) {
+            let b = base[k], o = ov[k]?.object
+            if let b, let o {
+                var merged = b.object ?? [:]
                 for (kk, vv) in o { merged[kk] = vv }
                 r[k] = .object(merged)
-            } else { r[k] = v }
+            } else if let b {
+                r[k] = b
+            } else if let o, o["start"]?.string != nil, o["end"]?.string != nil {
+                r[k] = .object(o)   // override for a weekday removed from the base schedule
+            }
         }
         return r
     }

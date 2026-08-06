@@ -169,6 +169,85 @@ final class BudgetStore: ObservableObject {
         persist()
     }
 
+    // MARK: Flexible work schedule (add / remove shift days)
+    // settings.shifts is keyed by day-of-week ("0"=Sun … "6"=Sat); settings.workDays is
+    // the list of weekdays the calendar treats as work days by default. The two are kept
+    // in lockstep here, so deleting a shift also stops that weekday counting hours and
+    // billing transport. Mirrors rmShift / addShift / freezeDOW in app.html — keep the
+    // two implementations in step.
+
+    /// History guard, run just BEFORE a weekday joins or leaves workDays.
+    /// dayState resolves customDays → PAID_LEAVE → workDays, so any past date whose state
+    /// came only from workDays membership would silently flip when that membership
+    /// changes, rewriting old months' work-day count, transport and hours. It flips both
+    /// ways: removing a day would drop past dates "work"→"none" (pass "work"), adding one
+    /// would jump them "none"→"work" (pass "none"). So pin every past date of that
+    /// weekday — through today — to the state it has right now, skipping dates that
+    /// already carry an explicit customDays entry and PAID_LEAVE dates.
+    ///
+    /// On removal there is a second leak: the pinned "work" days would credit 0 hours once
+    /// the times are gone from settings.shifts, and would trip the "no shift time set"
+    /// warning. So also copy the shift into that month's shiftOverrides, which
+    /// Calc.shifts still resolves. Net result: every date on or before today renders
+    /// exactly as it did before the change; only future dates move.
+    private func freezeDOW(_ dow: Int, _ val: String) {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let keep = val == "work" ? blob.settings["shifts"]?[String(dow)]?.object : nil
+        for meta in MONTHS {
+            let mk = meta.key
+            let p = mk.split(separator: "-")
+            guard let y = Int(p[0]), let m = Int(p.count > 1 ? p[1] : "1"),
+                  let first = cal.date(from: DateComponents(year: y, month: m, day: 1)),
+                  let dim = cal.range(of: .day, in: .month, for: first)?.count else { continue }
+            var monthVal = blob.data[mk] ?? .object([:])
+            var cd = monthVal["customDays"]?.object ?? [:]
+            var ovr = monthVal["shiftOverrides"]?.object ?? [:]
+            var changed = false, hasPast = false
+            for d in 1...dim {
+                guard let dt = cal.date(from: DateComponents(year: y, month: m, day: d)) else { continue }
+                guard cal.component(.weekday, from: dt) - 1 == dow, dt <= today else { continue }
+                hasPast = true
+                let ds = String(format: "%04d-%02d-%02d", y, m, d)
+                if cd[ds] == nil && !PAID_LEAVE.contains(ds) { cd[ds] = .string(val); changed = true }
+            }
+            if hasPast, let keep, ovr[String(dow)] == nil {
+                ovr[String(dow)] = .object(keep); changed = true
+            }
+            guard changed else { continue }
+            monthVal["customDays"] = .object(cd)
+            monthVal["shiftOverrides"] = .object(ovr)
+            blob.data[mk] = monthVal
+        }
+    }
+
+    /// Delete a weekday's shift and stop that weekday counting as a work day from today on.
+    /// Past dates are pinned first (see freezeDOW) so previous months don't change.
+    func removeShift(_ dow: Int) {
+        freezeDOW(dow, "work")
+        var shifts = blob.settings["shifts"]?.object ?? [:]
+        shifts.removeValue(forKey: String(dow))
+        blob.settings["shifts"] = .object(shifts)
+        let wd = (blob.settings["workDays"]?.array ?? []).compactMap { $0.int }.filter { $0 != dow }
+        blob.settings["workDays"] = .array(wd.map { .number(Double($0)) })
+        persist()
+    }
+
+    /// Add a weekday to the schedule with default 09:00–17:00 / 60 min break, and start
+    /// counting it as a work day from today on. Past dates are pinned first.
+    func addShift(_ dow: Int) {
+        guard blob.settings["shifts"]?[String(dow)] == nil else { return }
+        freezeDOW(dow, "none")
+        var shifts = blob.settings["shifts"]?.object ?? [:]
+        shifts[String(dow)] = .object(["start": .string("09:00"), "end": .string("17:00"),
+                                       "breakMin": .number(60), "label": .string(DOW_LABELS[dow])])
+        blob.settings["shifts"] = .object(shifts)
+        var wd = (blob.settings["workDays"]?.array ?? []).compactMap { $0.int }
+        if !wd.contains(dow) { wd.append(dow); wd.sort() }
+        blob.settings["workDays"] = .array(wd.map { .number(Double($0)) })
+        persist()
+    }
+
     // Live GBP→JPY rate (Settings).
     @Published var fxLoading = false
     func fetchRate() async {
