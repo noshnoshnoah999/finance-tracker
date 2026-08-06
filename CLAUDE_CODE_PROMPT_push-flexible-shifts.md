@@ -34,6 +34,7 @@ Expect exactly these modified files (plus the two new .md files, untracked):
   ios/Budget/Shared/Finance.swift
   ios/Budget/Budget/BudgetStore.swift
   ios/Budget/Budget/SettingsView.swift
+  ios/Budget/Budget/LimitView.swift
   HANDOFF_2026-08-06_flexible-shifts.md            (new)
   CLAUDE_CODE_PROMPT_push-flexible-shifts.md       (new)
   test_backfill.js                                 (new, regression test)
@@ -58,11 +59,21 @@ Swift was never compiled (the Cowork sandbox has no swiftc), so this is the firs
     -destination 'platform=iOS Simulator,name=iPhone 16' build 2>&1 | tail -40
 
 If it fails, fix the compile errors before committing. The new native code is:
-  - Models.swift: DOW_LABELS / DOW_FULL / DOW_ORDER globals
-  - Finance.swift: shifts(_:) now unions base keys with shiftOverrides keys
-  - BudgetStore.swift: freezeDOW(_:_:), removeShift(_:), addShift(_:)
+  - Models.swift: DOW_LABELS / DOW_FULL / DOW_ORDER globals, DS.defaultBreak
+  - Finance.swift: shifts(_:) now unions base keys with shiftOverrides keys;
+    new Calc.defaultBreak (clamped 0–480, falls back to DS.defaultBreak)
+  - BudgetStore.swift: freezeDOW(_:_:), removeShift(_:), addShift(_:) — addShift reads
+    settings.defaultBreak
   - SettingsView.swift: dynamic schedule card, @State newShiftDow / pendingRemove,
-    delete button + confirmation alert, add-day Picker, Weekly total row
+    delete button + confirmation alert, add-day Picker, Weekly total row,
+    "Default break for new shifts" field + defaultBreakBinding
+  - LimitView.swift: sim-shift "+ Add a shift" and the help text read c.defaultBreak
+
+Most likely compile snags, check these first:
+  - Calc.defaultBreak is a computed var on Calc — confirm `c.defaultBreak` resolves in
+    LimitView's body (c = store.calc, declared at the top of body)
+  - SettingsView's schedule(_ c: Calc) uses c.defaultBreak inside the new buttons
+  - The Button(...) { } .buttonStyle(.plain) chain in the 30/60 quick buttons
 
 STEP 3 — COMMIT IN TWO COMMITS.
 
@@ -80,6 +91,7 @@ spend long on it.
 Commit B:
   git add app.html index.html ios/Budget/Shared/Models.swift ios/Budget/Shared/Finance.swift \
           ios/Budget/Budget/BudgetStore.swift ios/Budget/Budget/SettingsView.swift \
+          ios/Budget/Budget/LimitView.swift \
           HANDOFF_2026-08-06_flexible-shifts.md CLAUDE_CODE_PROMPT_push-flexible-shifts.md \
           test_backfill.js test_live_source.js
   git commit -m "Make Work Schedule flexible: add and remove shift days (web + iOS)
@@ -103,6 +115,31 @@ months drop the day with no 'no shift time set' warnings.
 
 Also de-hardcodes the Budget tab per-month shift editor, and ports the Amazon
 (Subscribe & Save) line into index.html so the two web builds match."
+
+Commit C:
+  git add app.html index.html ios/Budget/Shared/Models.swift ios/Budget/Shared/Finance.swift \
+          ios/Budget/Budget/BudgetStore.swift ios/Budget/Budget/SettingsView.swift \
+          ios/Budget/Budget/LimitView.swift
+  git commit -m "Make the default shift break configurable (se.defaultBreak)
+
+The 60-minute break was hardcoded in nine places: the new-schedule-day default,
+the Limit-page simulator's add-shift and its breakMin fallback, the AI advice
+prompt, and the help text, on both web and native. All now read a single
+se.defaultBreak setting, seeded at 60 and editable in Settings > Work Schedule
+with a numeric field and 30/60 quick buttons.
+
+Applies to newly created shifts only. Existing shifts keep their saved breakMin,
+so logged hours, pay estimates and annual-limit headroom do not move.
+
+Readers clamp to 0-480 and fall back to 60. The web reader guards null/empty
+explicitly before coercing, because Number(null) and Number('') are both 0 and
+finite, so a JSON null from sync would otherwise have silently meant no break.
+
+The DS.shifts seed keeps its literal 60: that is brand-new-install data written
+before any setting exists."
+
+If splitting Commit B and C cleanly is awkward because both touch the same files, fold
+them into one commit using both messages. Do not spend long on it.
 
 STEP 4 — PUSH.
   git push origin HEAD

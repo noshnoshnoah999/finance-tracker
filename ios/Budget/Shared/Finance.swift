@@ -22,6 +22,14 @@ struct Calc {
     var gbpToJpy: Double { se.d("gbpToJpy", DS.gbpToJpy) }
     var usdToJpy: Double { se.d("usdToJpy", DS.usdToJpy) }
     var workDays: [Int] { se["workDays"]?.array?.compactMap { $0.int } ?? DS.workDays }
+    /// Break in minutes for newly created shifts. Clamped to 0–480 and falling back to 60
+    /// if the stored value is missing or garbage, so a bad setting can never produce NaN
+    /// hours — shiftHours subtracts breakMin/60 and one NaN would poison every downstream
+    /// pay figure. Mirrors dfBrk() in app.html.
+    var defaultBreak: Double {
+        guard let v = se["defaultBreak"]?.double, v.isFinite else { return DS.defaultBreak }
+        return min(480, max(0, v))
+    }
     var showSkin: Bool { se["showSkin"]?.bool != false }
     var showGenSav: Bool { se["showGenSav"]?.bool != false }
     var genSavAmount: Double { se.d("genSavAmount") }

@@ -37,11 +37,11 @@ const window = { confirm: () => confirmed };
 
 // Real source, evaluated in this scope.
 const src = [grabTop("DOW_LABELS"), grabTop("DOW_FULL"), grabTop("DOW_ORDER"), grabTop("dstr"),
-             grab("gShifts"), grab("freezeDOW"), grab("rmShift"), grab("addShift")].join("\n");
+             grab("gShifts"), grab("dfBrk"), grab("freezeDOW"), grab("rmShift"), grab("addShift")].join("\n");
 console.log("Evaluating verbatim source from app.html:");
-[ "DOW_LABELS","DOW_FULL","DOW_ORDER","dstr","gShifts","freezeDOW","rmShift","addShift" ]
+[ "DOW_LABELS","DOW_FULL","DOW_ORDER","dstr","gShifts","dfBrk","freezeDOW","rmShift","addShift" ]
   .forEach(n => console.log("  loaded " + n));
-const ctx = eval(`(function(){ ${src}\n return {gShifts, freezeDOW, rmShift, addShift, DOW_ORDER, DOW_LABELS}; })`).call(
+const ctx = eval(`(function(){ ${src}\n return {gShifts, dfBrk, freezeDOW, rmShift, addShift, DOW_ORDER, DOW_LABELS}; })`).call(
   null);
 
 // Local copies of the pure read helpers (unchanged by this feature).
@@ -100,6 +100,41 @@ const histAfterAdd = walk();
 Object.keys(histBeforeAdd).forEach(ds=>{const[y,m,d]=ds.split("-").map(Number);
   if(new Date(y,m-1,d)<=TODAY && JSON.stringify(histBeforeAdd[ds])!==JSON.stringify(histAfterAdd[ds])) pastChangedByAdd++;});
 eq("adding a day does not rewrite the past", 0, pastChangedByAdd);
+
+// ── Default break setting ──
+console.log("\nDefault break (se.defaultBreak):");
+const withBreak = v => { const saved = se.defaultBreak; se.defaultBreak = v; const r = ctx.dfBrk(); se.defaultBreak = saved; return r; };
+eq("undefined falls back to 60", 60, withBreak(undefined));
+eq("null falls back to 60", 60, withBreak(null));           // Number(null) === 0 would be wrong
+eq("garbage string falls back to 60", 60, withBreak("abc"));
+eq("30 is honoured", 30, withBreak(30));
+eq("numeric string '30' is honoured", 30, withBreak("30"));
+eq("0 is allowed (no break)", 0, withBreak(0));
+eq("negative clamps to 0", 0, withBreak(-15));
+eq("absurd value clamps to 480", 480, withBreak(99999));
+eq("Infinity falls back to 60", 60, withBreak(Infinity));
+
+// Flipping the default must NOT touch existing shifts or their hours.
+// (Fixture uses the DS seed times — Mon 09:00–16:00 = 6h, Sun 10:30–17:00 = 5.5h — not
+// Noah's current saved Mon 09:00–17:00. What matters is that nothing MOVES.)
+const monBefore = JSON.stringify(se.shifts[1]), sunBefore = JSON.stringify(se.shifts[0]);
+const hoursBefore = { mon: sH(se.shifts[1]), sun: sH(se.shifts[0]) };
+se.defaultBreak = 30;
+eq("existing Mon shift untouched by defaultBreak change", monBefore, JSON.stringify(se.shifts[1]));
+eq("existing Sun shift untouched by defaultBreak change", sunBefore, JSON.stringify(se.shifts[0]));
+eq("Mon hours unchanged", hoursBefore.mon, sH(se.shifts[1]));
+eq("Sun hours unchanged", hoursBefore.sun, sH(se.shifts[0]));
+eq("existing breaks still 60", [60, 60], [se.shifts[1].breakMin, se.shifts[0].breakMin]);
+
+// A newly added day must pick up the new default.
+ctx.addShift(5);                                   // Friday
+eq("new Friday shift uses defaultBreak 30", 30, se.shifts[5].breakMin);
+eq("new Friday shift is 09:00–17:00", ["09:00","17:00"], [se.shifts[5].start, se.shifts[5].end]);
+eq("new Friday shift = 7.5h with a 30m break", 7.5, sH(se.shifts[5]));
+se.defaultBreak = 60;
+ctx.addShift(4);                                   // Thursday, back at 60
+eq("new Thursday shift uses defaultBreak 60", 60, se.shifts[4].breakMin);
+eq("Friday keeps 30 after the default changes again", 30, se.shifts[5].breakMin);
 
 console.log(`\n${fails===0?"PASS":"FAIL"} — ${checks-fails}/${checks} checks passed against live app.html source`);
 process.exit(fails===0?0:1);

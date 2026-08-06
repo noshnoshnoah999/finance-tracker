@@ -144,6 +144,10 @@ enum DS {
     static let gbpToJpy = 215.0
     static let usdToJpy = 155.0
     static let workDays = [0, 1, 2]   // Sun, Mon, Tue
+    /// Break (minutes) applied to NEWLY created shifts — a new schedule day, or a new row
+    /// in the Limit-page simulator. Existing saved shifts keep their own breakMin and are
+    /// never rewritten when this changes. Mirrors DS.defaultBreak in app.html.
+    static let defaultBreak = 60.0
 }
 
 /// Paid-leave dates (mirror PAID_LEAVE in app.html).

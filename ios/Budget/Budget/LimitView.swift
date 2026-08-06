@@ -218,12 +218,12 @@ struct LimitView: View {
                         }
                         .padding(.bottom, 6)
                     }
-                    Button { shifts.append(SimShift(day: "Mon", start: at(9, 0), end: at(16, 0), breakMin: 60, freq: "weekly")) } label: {
+                    Button { shifts.append(SimShift(day: "Mon", start: at(9, 0), end: at(16, 0), breakMin: Int(c.defaultBreak), freq: "weekly")) } label: {
                         Text("+ Add a shift").font(.footnote).fontWeight(.semibold).foregroundStyle(T.sub)
                             .frame(maxWidth: .infinity).padding(10)
                             .background(T.cardAlt).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }.buttonStyle(.plain)
-                    Text("Breaks are only deducted for shifts longer than 3 hours (defaults to 60 min); a shift of 3 hours or under keeps its full time. \"Every week\" repeats the shift for every matching weekday in the chosen month.")
+                    Text("Breaks are only deducted for shifts longer than 3 hours (defaults to \(Int(c.defaultBreak)) min — change it in Settings); a shift of 3 hours or under keeps its full time. \"Every week\" repeats the shift for every matching weekday in the chosen month.")
                         .font(.caption2).foregroundStyle(T.muted)
 
                     if !shifts.isEmpty {

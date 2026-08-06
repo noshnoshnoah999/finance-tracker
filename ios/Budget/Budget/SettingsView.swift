@@ -204,6 +204,27 @@ struct SettingsView: View {
                     .fontWeight(.bold).foregroundStyle(T.blueD)
             }
             .padding(.top, 8)
+            Divider().overlay(T.border)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Default break for new shifts").font(.caption2).fontWeight(.semibold).foregroundStyle(T.sub)
+                HStack(spacing: 6) {
+                    TextField("60", value: defaultBreakBinding, format: .number)
+                        .keyboardType(.numberPad).modifier(FieldStyle())
+                    Text("min").font(.caption2).foregroundStyle(T.muted)
+                    ForEach([30, 60], id: \.self) { m in
+                        Button("\(m)") { store.setSetting("defaultBreak", .number(Double(m))) }
+                            .font(.caption).fontWeight(.semibold)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(Int(c.defaultBreak) == m ? T.blueD : T.cardAlt)
+                            .foregroundStyle(Int(c.defaultBreak) == m ? Color.white : T.sub)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .buttonStyle(.plain)
+                    }
+                }
+                Text("Applied to any new shift day you add above, and to new rows in the Limit page's shift planner. Your existing shifts keep the break they already have — edit those individually.")
+                    .font(.caption2).foregroundStyle(T.sub)
+            }
+            .padding(.top, 4)
         }
         .alert("Remove the \(pendingRemove.map { DOW_FULL[$0] } ?? "") shift?",
                isPresented: Binding(get: { pendingRemove != nil }, set: { if !$0 { pendingRemove = nil } })) {
@@ -367,6 +388,11 @@ struct SettingsView: View {
     }
     private func set(_ field: String) -> Binding<Double> {
         Binding(get: { store.blob.settings[field]?.double ?? 0 }, set: { store.setSetting(field, .number($0)) })
+    }
+    /// Default break for new shifts. Clamped on write so a typo can't produce NaN hours.
+    private var defaultBreakBinding: Binding<Double> {
+        Binding(get: { store.blob.settings["defaultBreak"]?.double ?? DS.defaultBreak },
+                set: { store.setSetting("defaultBreak", .number($0.isFinite ? min(480, max(0, $0)) : DS.defaultBreak)) })
     }
     private func shiftText(_ day: String, _ field: String) -> Binding<String> {
         Binding(get: { store.blob.settings["shifts"]?[day]?[field]?.string ?? "" },

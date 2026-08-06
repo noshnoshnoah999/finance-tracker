@@ -239,8 +239,10 @@ final class BudgetStore: ObservableObject {
         guard blob.settings["shifts"]?[String(dow)] == nil else { return }
         freezeDOW(dow, "none")
         var shifts = blob.settings["shifts"]?.object ?? [:]
+        let br = min(480, max(0, blob.settings["defaultBreak"]?.double ?? DS.defaultBreak))
         shifts[String(dow)] = .object(["start": .string("09:00"), "end": .string("17:00"),
-                                       "breakMin": .number(60), "label": .string(DOW_LABELS[dow])])
+                                       "breakMin": .number(br.isFinite ? br : DS.defaultBreak),
+                                       "label": .string(DOW_LABELS[dow])])
         blob.settings["shifts"] = .object(shifts)
         var wd = (blob.settings["workDays"]?.array ?? []).compactMap { $0.int }
         if !wd.contains(dow) { wd.append(dow); wd.sort() }

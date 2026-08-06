@@ -82,6 +82,10 @@
       hourlyWage:1400,annualLimit:1030000,commuteOneWay:178,
       trBefore:1040,trAfter:1100,food4wk:20000,food5wk:25000,
       gbpToJpy:215,usdToJpy:155,silverSpot:0,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,themeMigrated:false,subItems:[],showSkin:true,showGenSav:true,genSavAmount:0,showSilver:true,
+      // Break (minutes) applied to NEWLY created shifts — a new schedule day, or a new row
+      // in the Limit-page simulator. Existing saved shifts keep their own breakMin and are
+      // never rewritten when this changes.
+      defaultBreak:60,
       cardOrder:["work","income","dad","extra","fixed","subscribe","oneoff","mum","free","totals"],
       shifts:{
         1:{start:"09:00",end:"16:00",breakMin:60,label:"Mon"},
@@ -679,6 +683,15 @@
 
       const aOO=k=>{if(!nE.name||!nE.amount)return;setDa(p=>({...p,[k]:{...p[k],oneOffs:[...p[k].oneOffs,{id:Date.now(),name:nE.name,amount:Number(nE.amount)||0,mumPays:false}]}}));setNE({name:"",amount:""});};
       const rOO=(k,id)=>setDa(p=>({...p,[k]:{...p[k],oneOffs:p[k].oneOffs.filter(x=>x.id!==id)}}));
+      // Break in minutes applied to NEWLY created shifts (a new schedule day, or a new row
+      // in the Limit-page simulator) and used as the fallback for any shift that somehow
+      // has no breakMin of its own. Clamped to 0–480 and falls back to 60 if the stored
+      // value is missing or garbage, so a bad setting can never produce NaN hours — sH()
+      // subtracts breakMin/60 and one NaN would poison every downstream pay figure.
+      // Existing saved shifts keep their own breakMin; changing this never rewrites them.
+      // Note the explicit null/""/undefined guard: Number(null) and Number("") are both 0,
+      // which is finite, so a JSON null arriving from sync would silently mean "no break".
+      const dfBrk=()=>{const raw=se.defaultBreak;if(raw===null||raw===undefined||raw==="")return 60;const v=Number(raw);return Number.isFinite(v)?Math.min(480,Math.max(0,v)):60;};
       // ── Flexible work schedule (add / remove shift days) ──
       // se.shifts is keyed by day-of-week; se.workDays is the list of weekdays the
       // calendar treats as work days by default. The two are kept in lockstep here so
@@ -702,7 +715,7 @@
       // exactly as it did before the change; only future dates move.
       const freezeDOW=(dow,val)=>{const today=new Date();today.setHours(0,0,0,0);const keep=val==="work"?(se.shifts||{})[dow]:null;setDa(p=>{const x={...p};MONTHS.forEach(mo=>{const[y,m]=mo.key.split("-").map(Number);const cur={...((x[mo.key]||{}).customDays||{})};const ovr={...((x[mo.key]||{}).shiftOverrides||{})};let changed=false,hasPast=false;const d=new Date(y,m-1,1),en=new Date(y,m,0);while(d<=en){if(d.getDay()===dow&&d<=today){hasPast=true;const ds=dstr(d);if(!cur[ds]&&!PAID_LEAVE.includes(ds)){cur[ds]=val;changed=true;}}d.setDate(d.getDate()+1);}if(hasPast&&keep&&!ovr[dow]){ovr[dow]={...keep};changed=true;}if(changed)x[mo.key]={...eM(),...(x[mo.key]||{}),customDays:cur,shiftOverrides:ovr};});return x;});};
       const rmShift=dow=>{const nm=DOW_FULL[dow];if(!window.confirm(`Remove the ${nm} shift?\n\nPast ${nm}s up to today stay counted as work days, so your logged hours and transport for previous months don't change. Future ${nm}s stop counting as work days.`))return;freezeDOW(dow,"work");setSe(p=>{const s={...(p.shifts||{})};delete s[dow];return{...p,shifts:s,workDays:(p.workDays||[]).filter(d=>Number(d)!==dow)};});};
-      const addShift=dow=>{if((se.shifts||{})[dow])return;freezeDOW(dow,"none");setSe(p=>{if((p.shifts||{})[dow])return p;const s={...(p.shifts||{}),[dow]:{start:"09:00",end:"17:00",breakMin:60,label:DOW_LABELS[dow]}};const wd=(p.workDays||[]).map(Number);return{...p,shifts:s,workDays:wd.includes(dow)?wd:[...wd,dow].sort((a,b)=>a-b)};});};
+      const addShift=dow=>{if((se.shifts||{})[dow])return;freezeDOW(dow,"none");const br=dfBrk();setSe(p=>{if((p.shifts||{})[dow])return p;const s={...(p.shifts||{}),[dow]:{start:"09:00",end:"17:00",breakMin:br,label:DOW_LABELS[dow]}};const wd=(p.workDays||[]).map(Number);return{...p,shifts:s,workDays:wd.includes(dow)?wd:[...wd,dow].sort((a,b)=>a-b)};});};
       const tMu=(k,id)=>setDa(p=>({...p,[k]:{...p[k],oneOffs:p[k].oneOffs.map(x=>x.id===id?{...x,mumPays:!x.mumPays}:x)}}));
       const aDI=k=>{if(!nD.gbp)return;setDa(p=>({...p,[k]:{...p[k],dadItems:[...(p[k].dadItems||[]),{id:Date.now(),note:nD.note||"Dad",gbp:Number(nD.gbp)||0}]}}));setND({note:"",gbp:""});};
       const rDI=(k,id)=>setDa(p=>({...p,[k]:{...p[k],dadItems:(p[k].dadItems||[]).filter(x=>x.id!==id)}}));
@@ -1461,7 +1474,7 @@
                   const rawH=s=>{const a=(s.start||"0:0").split(":").map(Number),b=(s.end||"0:0").split(":").map(Number);return Math.max(0,(b[0]+b[1]/60)-(a[0]+a[1]/60));};
                   // Breaks are only deducted once a shift runs MORE than 3 hours — a shift of
                   // 3 hours or under gets no break, so nothing is subtracted.
-                  const shiftH=s=>{const r=rawH(s);const brk=r>3?(s.breakMin??60)/60:0;return Math.max(0,r-brk);};
+                  const shiftH=s=>{const r=rawH(s);const brk=r>3?(s.breakMin??dfBrk())/60:0;return Math.max(0,r-brk);};
                   // Day-of-week name -> JS getDay() number, used to count occurrences in the month.
                   const DOWN={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
                   const occ=s=>s.freq==="once"?1:cDIM(planMK,DOWN[s.day]);
@@ -1472,7 +1485,7 @@
                   const overYear=projYear>se.annualLimit;
                   const verdict=plannedPay===0?"none":(plannedPay<=eS?"yes":(overYear?"over":"caution"));
                   const vColor=verdict==="yes"?c.greenD:verdict==="caution"?c.peachD:verdict==="over"?c.roseD:c.muted;
-                  const shiftLines=simShifts.map(s=>`- ${s.day} ${s.start}-${s.end}${shiftH(s)>0&&rawH(s)>3?` (${s.breakMin??60}m break)`:""}${s.freq==="once"?" (this occurrence only)":" (every week)"} = ${shiftH(s).toFixed(1)}h/occurrence × ${occ(s)} in ${planLabel}`).join("\n");
+                  const shiftLines=simShifts.map(s=>`- ${s.day} ${s.start}-${s.end}${shiftH(s)>0&&rawH(s)>3?` (${s.breakMin??dfBrk()}m break)`:""}${s.freq==="once"?" (this occurrence only)":" (every week)"} = ${shiftH(s).toFixed(1)}h/occurrence × ${occ(s)} in ${planLabel}`).join("\n");
                   return(
                     <React.Fragment>
                       {/* Monthly target — plain language */}
@@ -1515,8 +1528,8 @@
                             </div>
                           </div>
                         ))}
-                        <button onClick={()=>setSimShifts(p=>[...p,{id:Date.now(),day:"Mon",start:"09:00",end:"16:00",breakMin:60,freq:"weekly"}])} style={{width:"100%",padding:10,borderRadius:12,border:`1.5px dashed ${c.border}`,background:c.cardAlt,color:c.sub,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:ft,marginBottom:6}}>+ Add a shift</button>
-                        <div style={{fontSize:11,color:c.muted,marginBottom:14}}>Breaks are only deducted for shifts longer than 3 hours (defaults to 60 min); a shift of 3 hours or under keeps its full time. "Every week" repeats the shift for every matching weekday in the chosen month.</div>
+                        <button onClick={()=>setSimShifts(p=>[...p,{id:Date.now(),day:"Mon",start:"09:00",end:"16:00",breakMin:dfBrk(),freq:"weekly"}])} style={{width:"100%",padding:10,borderRadius:12,border:`1.5px dashed ${c.border}`,background:c.cardAlt,color:c.sub,fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:ft,marginBottom:6}}>+ Add a shift</button>
+                        <div style={{fontSize:11,color:c.muted,marginBottom:14}}>Breaks are only deducted for shifts longer than 3 hours (defaults to {dfBrk()} min — change it in Settings); a shift of 3 hours or under keeps its full time. "Every week" repeats the shift for every matching weekday in the chosen month.</div>
 
                         {simShifts.length>0&&(<React.Fragment>
                           <div style={{padding:14,background:c.cardAlt,borderRadius:14,fontSize:13,marginBottom:10}}>
@@ -1959,6 +1972,15 @@
                   {Object.keys(se.shifts||{}).length===0&&<div style={{fontSize:13,color:c.muted,padding:"6px 0 2px"}}>No shifts set — add a day below.</div>}
                   {DOW_ORDER.some(d=>!(se.shifts||{})[d])&&<div style={{display:"flex",alignItems:"center",gap:8,paddingTop:12}}><select value={nSD} onChange={e=>setNSD(e.target.value)} style={{...inp,flex:1,padding:"8px 10px"}}><option value="">Add a day…</option>{DOW_ORDER.filter(d=>!(se.shifts||{})[d]).map(d=>(<option key={d} value={d}>{DOW_FULL[d]}</option>))}</select><button onClick={()=>{if(nSD==="")return;addShift(Number(nSD));setNSD("");}} disabled={nSD===""} style={{border:"none",borderRadius:12,padding:"9px 14px",fontSize:13,fontWeight:600,cursor:nSD===""?"default":"pointer",background:nSD===""?c.cardAlt:c.blueD,color:nSD===""?c.muted:"#fff",flexShrink:0}}>+ Add shift</button></div>}
                   <div style={{...rw,paddingTop:10}}><span style={{fontWeight:600}}>Weekly total</span><span style={{fontWeight:700,color:c.blueD}}>{Object.keys(se.shifts||{}).reduce((s,d)=>s+sH(se.shifts[d]),0)}h</span></div>
+                  <div style={{paddingTop:12,borderTop:`1px solid ${c.border}`,marginTop:4}}>
+                    <label style={lbl}>Default break for new shifts</label>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <NI value={se.defaultBreak??60} onChange={v=>setSe(p=>({...p,defaultBreak:Math.min(480,Math.max(0,Number(v)||0))}))} style={{flex:1}}/>
+                      <span style={{fontSize:11,color:c.muted,flexShrink:0}}>min</span>
+                      {[30,60].map(m=>(<button key={m} onClick={()=>setSe(p=>({...p,defaultBreak:m}))} style={{border:`1px solid ${dfBrk()===m?c.blueD:c.border}`,background:dfBrk()===m?c.blueD:c.cardAlt,color:dfBrk()===m?"#fff":c.sub,borderRadius:10,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",flexShrink:0}}>{m}</button>))}
+                    </div>
+                    <div style={{fontSize:11,color:c.sub,marginTop:6}}>Applied to any new shift day you add above, and to new rows in the Limit page's shift planner. Your existing shifts keep the break they already have — edit those individually.</div>
+                  </div>
                 </div>
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}><div style={{width:3,height:18,borderRadius:2,background:c.lavD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Budget extras</span></div>

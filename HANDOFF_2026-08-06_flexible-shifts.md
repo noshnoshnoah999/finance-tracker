@@ -111,13 +111,68 @@ now identical.
 
 ---
 
+---
+
+## Part 2 — Configurable default break (`se.defaultBreak`)
+
+**Asked for:** "I want to be able to change the default break, between 60 mins and 30 mins.
+Not just here [Limit page] but in the whole app."
+
+The per-shift break box was *already* editable everywhere (Settings, Budget tab per-month
+editor, simulator rows). What was hardcoded at 60 was the **default given to newly created
+shifts**, in 9 places. All now read a single setting.
+
+**Decisions (confirmed):** a real setting, not a hardcoded flip to 30; and it applies to
+**new shifts only** — existing Mon/Sun shifts keep their saved 60 min, so logged hours,
+pay estimates and ¥1,030,000 headroom do not move.
+
+### Wiring
+
+`se.defaultBreak` seeded at `60` in `DS` (web) / `DS.defaultBreak` (Swift). Read through:
+
+- web `dfBrk()` — clamps 0–480, falls back to 60
+- native `Calc.defaultBreak` — same clamp and fallback
+
+Replaced: web `addShift` (new schedule day), simulator `shiftH` fallback, simulator
+"+ Add a shift", the Claude-advice prompt string, and the help text (now shows the live
+value + "change it in Settings"); native `BudgetStore.addShift`, `LimitView` sim-shift add,
+and the same help text.
+
+**Deliberately left at literal 60:** the `DS.shifts` seed (`app.html` L91/L93). That is
+brand-new-install data representing Noah's original Mon/Sun shifts, written before any
+setting could exist.
+
+### UI
+
+Settings → Work Schedule gains a "Default break for new shifts" row: a numeric field plus
+quick **30** / **60** buttons, with a note that existing shifts are unaffected. Same on
+both platforms.
+
+### Third bug the tests caught
+
+`Number(null) === 0` and `Number("") === 0`, both finite — so a JSON `null` arriving from
+sync would have silently meant *"no break at all"*, quietly inflating every new shift's
+hours. `dfBrk()` now guards `null` / `undefined` / `""` explicitly before the numeric
+coercion. The Swift side was already safe: `JSONValue.double` returns `nil` for `.null`.
+
+### Known cosmetic quirk (not fixed)
+
+The shared `NI` numeric input renders `value={value||""}`, so a `defaultBreak` of **0**
+shows as an empty box. Pre-existing behaviour affecting every numeric field in the app;
+fixing it means touching them all, which is not worth the risk here. The 30/60 quick
+buttons make it a non-issue in practice.
+
+---
+
 ## Testing
 
 Two Node harnesses (in the Cowork outputs folder, not committed):
 
 - `test_backfill.js` — transcribed logic, 23 checks
-- `test_live_source.js` — **extracts `freezeDOW` / `rmShift` / `addShift` / `gShifts` verbatim
-  from `app.html` and executes them**, so it tests shipped source rather than a copy. 12 checks.
+- `test_live_source.js` — **extracts `freezeDOW` / `rmShift` / `addShift` / `gShifts` /
+  `dfBrk` verbatim from `app.html` and executes them**, so it tests shipped source rather
+  than a copy. 31 checks, including the full `defaultBreak` fallback matrix
+  (`undefined` / `null` / `""` / `"abc"` / `Infinity` / negative / absurd / `0`).
 
 Both PASS. Invariant asserted: *no date on or before today changes state or credited hours.*
 
@@ -132,9 +187,10 @@ Rollups with Tuesday removed (dates ≤ today):
 
 Future months correctly drop Tuesdays and raise **zero** "no shift set" warnings.
 
-**The tests earned their keep twice** — they caught (1) the missing `shiftOverrides` copy,
-which silently zeroed past hours, and (2) the symmetric add-a-day bug that would have
-rewritten 31 past Wednesdays. Neither was visible by reading the diff.
+**The tests earned their keep three times** — they caught (1) the missing `shiftOverrides`
+copy, which silently zeroed past hours, (2) the symmetric add-a-day bug that would have
+rewritten 31 past Wednesdays, and (3) the `Number(null) === 0` hole in `dfBrk()`. None of
+the three was visible by reading the diff.
 
 **Not verified:** Swift does not compile in the Linux sandbox (no `swiftc`). Brace/paren
 balance checked on all four Swift files. **Build in Xcode before trusting the native side.**
