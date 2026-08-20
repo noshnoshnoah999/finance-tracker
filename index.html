@@ -119,7 +119,7 @@
       {id:"d3",note:"Lunch money",gbp:25},{id:"d4",note:"Student loan",gbp:150},
       {id:"d5",note:"Commuter pass",gbp:50},{id:"d6",note:"Japanese lessons",gbp:25},
     ];
-    const eM = () => ({hours:0,days:0,wageOverride:0,transportOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0,txns:[],extraIncome:[],genSavAmt:0,saveGen:false,silverInvest:0});
+    const eM = () => ({hours:0,days:0,wageOverride:0,transportOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},oneOffShifts:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0,txns:[],extraIncome:[],genSavAmt:0,saveGen:false,silverInvest:0});
     // Category display: emoji + label for transactions
     const TX_CATS={income:["💰","Income"],food:["🍜","Food"],transport:["🚇","Transport"],subscriptions:["🔁","Subscriptions"],shopping:["🛍️","Shopping"],bills:["📄","Bills"],savings:["🏦","Savings"],investment:["📈","Investment"],fees:["⚠️","Fees"],transfer:["↔️","Transfer"],cash:["💴","Cash"],other:["•","Other"]};
     // PF = manually-entered actuals for past months. wageOverride = TOTAL received (incl. transport); base pay = wageOverride − transportOverride.
@@ -282,6 +282,7 @@
       const [xp,setXp]=useState({});
       const [ld,setLd]=useState(!!CACHED);
       const [eF,setEF]=useState(null);
+      const [oosEdit,setOosEdit]=useState(null); // one-off shift being edited: {ds,start,end,breakMin} or null
       const [nE,setNE]=useState({name:"",amount:""});
       const [nD,setND]=useState({note:"",gbp:""});
       const [eD,setED]=useState(null);
@@ -504,13 +505,15 @@
       const gWorkDays=mk=>gWorkDaysCD(mk,da[mk]?.customDays||{});
       // Estimated hours for a month, computed live from the calendar (customDays) + set schedule (se.shifts).
       // "work" days use that weekday's actual shift length (sH already subtracts the break);
-      // "pl" days use the flat PL_HOURS_PER_DAY, same convention as gPLHours. Days marked "work"
-      // whose weekday has no shift defined contribute 0h and are reported via noShiftDays.
-      const gEstHours=(mk,cd,shifts,wd)=>{const[y,mo]=mk.split("-").map(Number);let h=0,noShiftDays=0;const d=new Date(y,mo-1,1),en=new Date(y,mo,0);while(d<=en){const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;const st=getDayState(ds,d,cd||{},wd);if(st==="work"){const sh=shifts[d.getDay()];if(sh)h+=sH(sh);else noShiftDays++;}else if(st==="pl"){h+=PL_HOURS_PER_DAY;}d.setDate(d.getDate()+1);}return{hours:h,noShiftDays};};
+      // "pl" days use the flat PL_HOURS_PER_DAY, same convention as gPLHours. A "work" day with an
+      // exact-date entry in oneOffShifts (a one-off shift on a day not in the weekly schedule) uses
+      // THAT date's own start/end/break instead of the weekday lookup. Only once both of those miss
+      // does the day contribute 0h and get reported via noShiftDays.
+      const gEstHours=(mk,cd,shifts,wd,oneOff)=>{const[y,mo]=mk.split("-").map(Number);let h=0,noShiftDays=0;const d=new Date(y,mo-1,1),en=new Date(y,mo,0);while(d<=en){const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;const st=getDayState(ds,d,cd||{},wd);if(st==="work"){const oo=(oneOff||{})[ds];const sh=oo||shifts[d.getDay()];if(sh)h+=sH(sh);else noShiftDays++;}else if(st==="pl"){h+=PL_HOURS_PER_DAY;}d.setDate(d.getDate()+1);}return{hours:h,noShiftDays};};
       // Estimated Pay for a future/unlogged month: mirrors the arrears convention used elsewhere on the
       // Wage tab (wage+transport shown for month mk are actually earned working prevMK). Live-computed
-      // from se.shifts/se.workDays/customDays every render, so flipping a calendar day re-syncs automatically.
-      const gEstPay=mk=>{const pmk=gPrevMK(mk);if(!pmk)return{hours:0,wage:0,days:0,transport:0,total:0,noShiftDays:0};const cd=da[pmk]?.customDays||{};const shifts=gShifts(pmk);const{hours,noShiftDays}=gEstHours(pmk,cd,shifts,se.workDays);const wage=Math.round(hours*se.hourlyWage);const days=gWorkDaysCD(pmk,cd);const transport=days*trf(mk);return{hours,wage,days,transport,total:wage+transport,noShiftDays};};
+      // from se.shifts/se.workDays/customDays/oneOffShifts every render, so flipping a calendar day re-syncs automatically.
+      const gEstPay=mk=>{const pmk=gPrevMK(mk);if(!pmk)return{hours:0,wage:0,days:0,transport:0,total:0,noShiftDays:0};const cd=da[pmk]?.customDays||{};const shifts=gShifts(pmk);const oneOff=da[pmk]?.oneOffShifts||{};const{hours,noShiftDays}=gEstHours(pmk,cd,shifts,se.workDays,oneOff);const wage=Math.round(hours*se.hourlyWage);const days=gWorkDaysCD(pmk,cd);const transport=days*trf(mk);return{hours,wage,days,transport,total:wage+transport,noShiftDays};};
       const gTx=(d,mk)=>(d.wageOverride>0)?gW(d):gW(d)+gPLW(mk);
       const dTJ=d=>(d.dadItems||[]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
       // Extra money (gifts, dad's pocket money, etc.) — non-pay income, NOT taxable.
@@ -790,12 +793,36 @@
         for(let i=0;i<ms;i++)cells.push(null);
         for(let d=1;d<=dim;d++)cells.push(d);
         const cd=da[bm]?.customDays||{};
+        const oos=da[bm]?.oneOffShifts||{};
+        const bmShiftsForDow=gShifts(bm);
         const now2=new Date();
         const todayStr=`${now2.getFullYear()}-${String(now2.getMonth()+1).padStart(2,"0")}-${String(now2.getDate()).padStart(2,"0")}`;
+        // Commits a customDays change (and keeps the stored work-day count in sync,
+        // which drives transport/SUICA). Does NOT touch oneOffShifts — callers that need
+        // to clear a one-off entry do so explicitly alongside this.
+        const commitCD=newCD=>{
+          const wd=gWorkDaysCD(bm,newCD);
+          setDa(p=>({...p,[bm]:{...p[bm],customDays:newCD,days:wd}}));
+        };
         const toggleDay=(ds,dt)=>{
           const isSched=se.workDays.includes(dt.getDay());
           const isPL=PAID_LEAVE.includes(ds);
           const state=getDayState(ds,dt,cd,se.workDays);
+          const hasResolvableShift=!!bmShiftsForDow[dt.getDay()];
+          const hasOneOff=!!oos[ds];
+          // A "work" day with no weekday shift and no saved one-off entry: opening the
+          // one-off box IS the action — don't touch customDays until the box is saved.
+          if(state==="none"&&!hasResolvableShift&&!hasOneOff){
+            setOosEdit({ds,start:"",end:"",breakMin:dfBrk()});
+            return;
+          }
+          // A "work" day that only has hours because of a saved one-off entry: tapping it
+          // reopens the box to edit those hours, rather than cycling past them (which would
+          // strand the oneOffShifts entry with no customDays "work" pointing at it).
+          if(state==="work"&&hasOneOff){
+            setOosEdit({ds,...oos[ds]});
+            return;
+          }
           let next;
           // PL days (default "pl") cycle pl→off→work→hol→pl via overrides;
           // normal days keep work→hol→pl→off→(reset) and none↔work.
@@ -807,12 +834,48 @@
           else if(state==="none")next="work";
           const newCD={...cd};
           if(next==null)delete newCD[ds]; else newCD[ds]=next;
-          // Keep the stored work-day count in sync with the calendar (drives transport/SUICA).
+          commitCD(newCD);
+        };
+        const saveOneOff=()=>{
+          if(!oosEdit)return;
+          const{ds,start,end,breakMin}=oosEdit;
+          if(!start||!end)return; // require both times before saving
+          const newCD={...cd,[ds]:"work"};
+          const newOOS={...oos,[ds]:{start,end,breakMin:Number(breakMin)||0}};
           const wd=gWorkDaysCD(bm,newCD);
-          setDa(p=>({...p,[bm]:{...p[bm],customDays:newCD,days:wd}}));
+          setDa(p=>({...p,[bm]:{...p[bm],customDays:newCD,oneOffShifts:newOOS,days:wd}}));
+          setOosEdit(null);
+        };
+        const removeOneOff=()=>{
+          if(!oosEdit)return;
+          const{ds}=oosEdit;
+          const newCD={...cd};delete newCD[ds];
+          const newOOS={...oos};delete newOOS[ds];
+          const wd=gWorkDaysCD(bm,newCD);
+          setDa(p=>({...p,[bm]:{...p[bm],customDays:newCD,oneOffShifts:newOOS,days:wd}}));
+          setOosEdit(null);
         };
         return(
           <div style={{marginTop:10}}>
+            {oosEdit&&(
+              <div style={{marginBottom:12,padding:12,borderRadius:12,background:c.blueD,color:c.white}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>Choose the hours and break duration for the shift on {oosEdit.ds}</div>
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  <input type="time" value={oosEdit.start} onChange={e=>setOosEdit(p=>({...p,start:e.target.value}))} style={{...inp,flex:1,padding:"6px 10px"}}/>
+                  <span style={{alignSelf:"center"}}>→</span>
+                  <input type="time" value={oosEdit.end} onChange={e=>setOosEdit(p=>({...p,end:e.target.value}))} style={{...inp,flex:1,padding:"6px 10px"}}/>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
+                  <span style={{fontSize:12,opacity:0.9}}>Break (min)</span>
+                  <NI value={oosEdit.breakMin} onChange={v=>setOosEdit(p=>({...p,breakMin:v}))} placeholder="0" style={{flex:1}}/>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={saveOneOff} disabled={!oosEdit.start||!oosEdit.end} style={{border:"none",background:c.white,color:c.blueD,borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:700,opacity:(!oosEdit.start||!oosEdit.end)?0.5:1}}>Save</button>
+                  <button onClick={()=>setOosEdit(null)} style={{border:"none",background:"transparent",color:c.white,borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:600}}>Cancel</button>
+                  {oos[oosEdit.ds]&&<button onClick={removeOneOff} style={{border:"none",background:"transparent",color:c.white,borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:600,opacity:0.85,marginLeft:"auto"}}>Remove shift</button>}
+                </div>
+              </div>
+            )}
             <div style={{fontSize:10,color:c.muted,marginBottom:6,textAlign:"right"}}>Tap a day to change it</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,textAlign:"center",fontSize:11}}>
               {DCL.map(d2=><div key={d2} style={{color:c.sub,fontWeight:600,padding:4}}>{d2}</div>)}
@@ -823,7 +886,7 @@
                 const state=getDayState(ds,dt,cd,se.workDays);
                 const bg=state==="work"?c.greenD:state==="pl"?c.blueD:state==="hol"?c.peachD:state==="off"?c.cardAlt:"transparent";
                 const col=(state==="work"||state==="pl"||state==="hol")?c.white:state==="off"?c.muted:c.muted;
-                const lbl2=state==="pl"?"PL":state==="hol"?"HOL":state==="off"?"OFF":null;
+                const lbl2=state==="pl"?"PL":state==="hol"?"HOL":state==="off"?"OFF":(state==="work"&&oos[ds])?"1×":null;
                 const isToday=ds===todayStr;
                 return(
                   <button key={d2} onClick={()=>toggleDay(ds,dt)} style={{padding:6,borderRadius:8,fontSize:12,fontWeight:(state==="work"||state==="pl"||state==="hol"||isToday)?700:400,background:bg,color:col,border:"none",cursor:"pointer",fontFamily:ft,lineHeight:1.3,boxShadow:isToday?`inset 0 0 0 2px ${c.lavD}`:"none"}}>

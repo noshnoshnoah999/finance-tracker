@@ -19,6 +19,13 @@ struct BudgetTabView: View {
     @State private var editingGenSav = false
     @State private var editingSilver = false
     @State private var showReorder = false
+    // One-off shift box: set when tapping a date whose weekday has no regular schedule
+    // shift (and no saved one-off entry yet), or when re-tapping a date that already has
+    // one. nil hides the box. Mirrors oosEdit in app.html.
+    @State private var oosEditDS: String? = nil
+    @State private var oosStart: String = ""
+    @State private var oosEnd: String = ""
+    @State private var oosBreak: Double = 60
 
     var body: some View {
         let c = store.calc
@@ -43,7 +50,7 @@ struct BudgetTabView: View {
         .background(T.background.ignoresSafeArea())
         .refreshable { await store.refresh() }
         .keyboardDoneBar()
-        .onChange(of: bm) { _, _ in editingFood = false; editingGenSav = false; editingSilver = false }
+        .onChange(of: bm) { _, _ in editingFood = false; editingGenSav = false; editingSilver = false; oosEditDS = nil }
         .sheet(isPresented: $showReorder) { reorderSheet }
     }
 
@@ -123,6 +130,9 @@ struct BudgetTabView: View {
 
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader("Work Schedule", color: T.blueD)
+            if let ds = oosEditDS {
+                oneOffShiftBox(ds)
+            }
             Text("Tap a day to change it").font(.caption2).foregroundStyle(T.muted)
             LazyVGrid(columns: cols, spacing: 4) {
                 ForEach(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], id: \.self) {
@@ -159,11 +169,12 @@ struct BudgetTabView: View {
         let ds = String(format: "%04d-%02d-%02d", y, mo, d)
         let cd = store.blob.data[bm]?["customDays"] ?? .object([:])
         let state = c.dayState(ds, y, mo, d, cd)
+        let hasOneOff = store.hasOneOffShift(bm, ds)
         let bg: Color = state == "work" ? T.greenD : state == "pl" ? T.blueD : state == "hol" ? T.peachD : state == "off" ? T.cardAlt : .clear
         let fg: Color = (state == "work" || state == "pl" || state == "hol") ? .white : T.muted
-        let tag = state == "pl" ? "PL" : state == "hol" ? "HOL" : state == "off" ? "OFF" : nil
+        let tag = state == "pl" ? "PL" : state == "hol" ? "HOL" : state == "off" ? "OFF" : (state == "work" && hasOneOff) ? "1×" : nil
         let isToday = today == (y, mo, d)
-        Button { store.toggleDay(bm, ds, y, mo, d) } label: {
+        Button { tapDay(c, ds, y, mo, d, state: state, hasOneOff: hasOneOff) } label: {
             VStack(spacing: 1) {
                 Text("\(d)").font(.caption).fontWeight((state == "none" && !isToday) ? .regular : .bold)
                 if let tag { Text(tag).font(.system(size: 7)).opacity(0.85) }
@@ -176,6 +187,66 @@ struct BudgetTabView: View {
                     .stroke(isToday ? T.lavD : .clear, lineWidth: 2)
             )
         }.buttonStyle(.plain)
+    }
+
+    /// Tap handler for a calendar day: opens the one-off-shift box instead of the normal
+    /// state cycle when (a) the date has no resolvable shift and no saved one-off yet, or
+    /// (b) the date is "work" only because of a saved one-off entry (re-tap to edit it).
+    /// Mirrors the toggleDay interception in app.html.
+    private func tapDay(_ c: Calc, _ ds: String, _ y: Int, _ mo: Int, _ d: Int, state: String, hasOneOff: Bool) {
+        if state == "none" && store.needsOneOffShiftPrompt(bm, ds, y, mo, d) {
+            oosEditDS = ds; oosStart = ""; oosEnd = ""; oosBreak = c.defaultBreak
+            return
+        }
+        if state == "work" && hasOneOff {
+            let sh = store.oneOffShift(bm, ds)
+            oosEditDS = ds
+            oosStart = sh?.s("start") ?? ""
+            oosEnd = sh?.s("end") ?? ""
+            oosBreak = sh?.d("breakMin") ?? c.defaultBreak
+            return
+        }
+        store.toggleDay(bm, ds, y, mo, d)
+    }
+
+    @ViewBuilder private func oneOffShiftBox(_ ds: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Choose the hours and break duration for the shift on \(ds)")
+                .font(.footnote).fontWeight(.bold).foregroundStyle(.white)
+            HStack(spacing: 8) {
+                TextField("09:00", text: $oosStart).modifier(FieldStyle())
+                Text("to").foregroundStyle(.white.opacity(0.85))
+                TextField("17:00", text: $oosEnd).modifier(FieldStyle())
+            }
+            HStack(spacing: 6) {
+                Text("Break").font(.caption2).foregroundStyle(.white.opacity(0.85))
+                TextField("0", value: $oosBreak, format: .number)
+                    .keyboardType(.numberPad).modifier(FieldStyle()).frame(width: 80)
+                Text("min").font(.caption2).foregroundStyle(.white.opacity(0.85))
+            }
+            HStack(spacing: 10) {
+                Button("Save") {
+                    store.saveOneOffShift(bm, ds, start: oosStart, end: oosEnd, breakMin: min(480, max(0, oosBreak)))
+                    oosEditDS = nil
+                }
+                .buttonStyle(.borderedProminent).tint(.white)
+                .foregroundStyle(T.blueD)
+                .disabled(oosStart.isEmpty || oosEnd.isEmpty)
+                Button("Cancel") { oosEditDS = nil }
+                    .buttonStyle(.plain).foregroundStyle(.white).font(.footnote).fontWeight(.semibold)
+                if store.hasOneOffShift(bm, ds) {
+                    Spacer()
+                    Button("Remove shift", role: .destructive) {
+                        store.removeOneOffShift(bm, ds)
+                        oosEditDS = nil
+                    }
+                    .buttonStyle(.plain).foregroundStyle(.white.opacity(0.85)).font(.footnote).fontWeight(.semibold)
+                }
+            }
+        }
+        .padding(12)
+        .background(T.blueD)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     @ViewBuilder private func legend() -> some View {

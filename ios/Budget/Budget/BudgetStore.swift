@@ -448,6 +448,80 @@ final class BudgetStore: ObservableObject {
         persist()
     }
 
+    /// True if tapping this date should open the one-off-shift box instead of toggling it
+    /// straight to "work": the date isn't currently "work", its weekday has no resolvable
+    /// shift (base ∪ override), and it doesn't already have a saved one-off entry.
+    /// Mirrors the `state==="none"&&!hasResolvableShift&&!hasOneOff` branch in app.html's toggleDay.
+    func needsOneOffShiftPrompt(_ mk: String, _ ds: String, _ y: Int, _ mo: Int, _ d: Int) -> Bool {
+        let c = calc
+        let cd = blob.data[mk]?["customDays"] ?? .object([:])
+        let state = c.dayState(ds, y, mo, d, cd)
+        if state != "none" { return false }
+        let dow = c.weekday(y, mo, d)
+        let hasShift = c.shifts(mk)[String(dow)] != nil
+        let hasOneOff = (blob.data[mk]?["oneOffShifts"]?.object ?? [:])[ds] != nil
+        return !hasShift && !hasOneOff
+    }
+
+    /// The saved one-off shift for an exact date, if any — used to pre-fill the edit box
+    /// when re-tapping a date that already has one.
+    func oneOffShift(_ mk: String, _ ds: String) -> JSONValue? {
+        (blob.data[mk]?["oneOffShifts"]?.object ?? [:])[ds]
+    }
+    /// True if this exact date currently has a saved one-off shift entry.
+    func hasOneOffShift(_ mk: String, _ ds: String) -> Bool { oneOffShift(mk, ds) != nil }
+
+    /// Saves (or edits) a one-off shift for an exact date: marks the date "work" in
+    /// customDays AND stores its own start/end/breakMin in oneOffShifts, independent of the
+    /// weekly schedule. Mirrors saveOneOff in app.html. `breakMin` is clamped 0–480 by the
+    /// caller's input control, same as the per-month shift override editor.
+    func saveOneOffShift(_ mk: String, _ ds: String, start: String, end: String, breakMin: Double) {
+        guard !start.isEmpty, !end.isEmpty else { return }
+        let c = calc
+        let comps = ds.split(separator: "-").compactMap { Int($0) }
+        guard comps.count == 3 else { return }
+        let (y, mo) = (comps[0], comps[1])
+        var m = blob.data[mk] ?? .object([:])
+        var cd = m["customDays"]?.object ?? [:]
+        cd[ds] = .string("work")
+        m["customDays"] = .object(cd)
+        var oneOff = m["oneOffShifts"]?.object ?? [:]
+        oneOff[ds] = .object(["start": .string(start), "end": .string(end), "breakMin": .number(breakMin)])
+        m["oneOffShifts"] = .object(oneOff)
+        var wd = 0
+        for dd in 1...c.daysIn(mk) {
+            let dsi = String(format: "%04d-%02d-%02d", y, mo, dd)
+            if c.dayState(dsi, y, mo, dd, .object(cd)) == "work" { wd += 1 }
+        }
+        m["days"] = .number(Double(wd))
+        blob.data[mk] = m
+        persist()
+    }
+
+    /// Removes a one-off shift entirely: clears both the customDays "work" mark and the
+    /// oneOffShifts entry for that exact date, returning it to "none". Mirrors removeOneOff.
+    func removeOneOffShift(_ mk: String, _ ds: String) {
+        let c = calc
+        let comps = ds.split(separator: "-").compactMap { Int($0) }
+        guard comps.count == 3 else { return }
+        let (y, mo) = (comps[0], comps[1])
+        var m = blob.data[mk] ?? .object([:])
+        var cd = m["customDays"]?.object ?? [:]
+        cd[ds] = nil
+        m["customDays"] = .object(cd)
+        var oneOff = m["oneOffShifts"]?.object ?? [:]
+        oneOff[ds] = nil
+        m["oneOffShifts"] = .object(oneOff)
+        var wd = 0
+        for dd in 1...c.daysIn(mk) {
+            let dsi = String(format: "%04d-%02d-%02d", y, mo, dd)
+            if c.dayState(dsi, y, mo, dd, .object(cd)) == "work" { wd += 1 }
+        }
+        m["days"] = .number(Double(wd))
+        blob.data[mk] = m
+        persist()
+    }
+
     // MARK: - Settings arrays (fixed expenses, Subscribe & Save items)
     func addFixed(name: String, amount: Double, variable: Bool) {
         var arr = blob.settings["fixed"]?.array ?? []

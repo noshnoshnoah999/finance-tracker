@@ -77,6 +77,9 @@ struct Calc {
 
     /// Is this calendar day one of the scheduled work weekdays?
     func isScheduled(_ y: Int, _ m: Int, _ d: Int) -> Bool { workDays.contains(jsDay(y, m, d)) }
+    /// Public wrapper for jsDay — lets callers outside Calc (e.g. BudgetStore's one-off-shift
+    /// prompt) look up that weekday's shift without duplicating the JS-getDay() math.
+    func weekday(_ y: Int, _ m: Int, _ d: Int) -> Int { jsDay(y, m, d) }
     /// Number of days in the month (exposed for the calendar grid).
     func daysIn(_ mk: String) -> Int { let (y, m) = ym(mk); return daysInMonth(y, m) }
     /// JS weekday (0=Sun) of the 1st of the month — for calendar leading blanks.
@@ -227,18 +230,21 @@ struct Calc {
 
     /// Estimated hours for a month, computed live from the calendar (customDays) + set schedule (shifts).
     /// "work" days use that weekday's actual shift length (shiftHours already subtracts the break);
-    /// "pl" days use the flat plHoursPerDay, same convention as plHours(). Days marked "work" whose
-    /// weekday has no shift defined contribute 0h and are counted in noShiftDays.
+    /// "pl" days use the flat plHoursPerDay, same convention as plHours(). A "work" day with an
+    /// exact-date entry in oneOffShifts (a one-off shift on a day not in the weekly schedule) uses
+    /// THAT date's own start/end/break instead of the weekday lookup — mirrors gEstHours in app.html.
+    /// Only once both miss does the day contribute 0h and get counted in noShiftDays.
     private func estHours(_ mk: String, _ shifts: [String: JSONValue]) -> (hours: Double, noShiftDays: Int) {
         let (y, m) = ym(mk)
         let cd = month(mk)["customDays"] ?? .object([:])
+        let oneOff = month(mk)["oneOffShifts"]?.object ?? [:]
         var h = 0.0, noShift = 0
         for d in 1...daysInMonth(y, m) {
             let ds = dstr(y, m, d)
             let st = dayState(ds, y, m, d, cd)
             if st == "work" {
                 let dow = jsDay(y, m, d)
-                if let sh = shifts[String(dow)] { h += shiftHours(sh) } else { noShift += 1 }
+                if let sh = oneOff[ds] ?? shifts[String(dow)] { h += shiftHours(sh) } else { noShift += 1 }
             } else if st == "pl" {
                 h += Calc.plHoursPerDay
             }
@@ -248,7 +254,7 @@ struct Calc {
 
     /// Estimated Pay for a future/unlogged month: mirrors the arrears convention used elsewhere
     /// (wage+transport shown for month mk are actually earned working prevMK). Live-computed from
-    /// shifts/workDays/customDays every call, so flipping a calendar day re-syncs automatically.
+    /// shifts/workDays/customDays/oneOffShifts every call, so flipping a calendar day re-syncs automatically.
     func estimatedPay(_ mk: String) -> EstPay {
         guard let pmk = prevMK(mk) else { return EstPay() }
         let sh = shifts(pmk)
