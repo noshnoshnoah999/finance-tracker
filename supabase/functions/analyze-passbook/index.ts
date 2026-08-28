@@ -27,34 +27,38 @@ const json = (body: unknown, status = 200) =>
     headers: { ...CORS, "Content-Type": "application/json" },
   });
 
-// Best-effort daily call cap. The app calls this function with the *public*
-// anon key (it's in the GitHub Pages source), so anyone could invoke it and
-// burn Anthropic credit. This caps total calls/day. It is FAIL-OPEN: any error
-// (e.g. the fn_usage table not existing yet) simply lets the request through,
-// so the feature never breaks — the cap just won't be enforced until the table
-// exists. One-time setup SQL (run in Supabase SQL editor):
-//   create table if not exists fn_usage (day date primary key, count int not null default 0);
+// ── Daily call cap ──────────────────────────────────────────────────────────
+// The app calls this function with the PUBLIC anon key (it is in the GitHub Pages
+// source, and in the page source of the live site), so anyone who views the site can
+// invoke this endpoint and spend Anthropic credit. This caps calls per day.
+//
+// It is deliberately FAIL-CLOSED: if the counter cannot be reached or read, the request
+// is REFUSED, not allowed through. A cap that opens on error is not a cap — that was the
+// bug in the previous version of this code.
+//
+// The counter is incremented atomically inside Postgres (a single INSERT .. ON CONFLICT
+// DO UPDATE .. RETURNING), so hammering the endpoint concurrently cannot slip past the
+// limit the way a read-then-write check could.
+//
+// REQUIRES the one-time SQL in SECURITY.md. Run that SQL BEFORE deploying this function,
+// or every request will be refused.
+const FN_NAME = "analyze-passbook";
 const DAILY_CAP = 15;
+
 async function underDailyCap(): Promise<boolean> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return false; // can't check -> refuse
   try {
-    const url = Deno.env.get("SUPABASE_URL");
-    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!url || !key) return true; // can't check → allow
-    const day = new Date().toISOString().slice(0, 10);
-    const h = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
-    const r = await fetch(`${url}/rest/v1/fn_usage?day=eq.${day}&select=count`, { headers: h });
-    if (!r.ok) return true; // table missing / error → allow
-    const rows = await r.json();
-    const count = (rows[0] && rows[0].count) || 0;
-    if (count >= DAILY_CAP) return false;
-    await fetch(`${url}/rest/v1/fn_usage`, {
+    const r = await fetch(`${url}/rest/v1/rpc/bump_fn_usage`, {
       method: "POST",
-      headers: { ...h, Prefer: "resolution=merge-duplicates" },
-      body: JSON.stringify({ day, count: count + 1 }),
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_fn: FN_NAME, p_cap: DAILY_CAP }),
     });
-    return true;
+    if (!r.ok) return false; // table/function missing, or error -> refuse
+    return (await r.json()) === true;
   } catch {
-    return true; // never block legitimate use on an internal error
+    return false; // network or internal error -> refuse
   }
 }
 

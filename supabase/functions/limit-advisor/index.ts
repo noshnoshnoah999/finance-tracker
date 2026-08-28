@@ -24,6 +24,41 @@ const CORS: Record<string, string> = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
 
+// ── Daily call cap ──────────────────────────────────────────────────────────
+// The app calls this function with the PUBLIC anon key (it is in the GitHub Pages
+// source, and in the page source of the live site), so anyone who views the site can
+// invoke this endpoint and spend Anthropic credit. This caps calls per day.
+//
+// It is deliberately FAIL-CLOSED: if the counter cannot be reached or read, the request
+// is REFUSED, not allowed through. A cap that opens on error is not a cap — that was the
+// bug in the previous version of this code.
+//
+// The counter is incremented atomically inside Postgres (a single INSERT .. ON CONFLICT
+// DO UPDATE .. RETURNING), so hammering the endpoint concurrently cannot slip past the
+// limit the way a read-then-write check could.
+//
+// REQUIRES the one-time SQL in SECURITY.md. Run that SQL BEFORE deploying this function,
+// or every request will be refused.
+const FN_NAME = "limit-advisor";
+const DAILY_CAP = 40;
+
+async function underDailyCap(): Promise<boolean> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return false; // can't check -> refuse
+  try {
+    const r = await fetch(`${url}/rest/v1/rpc/bump_fn_usage`, {
+      method: "POST",
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_fn: FN_NAME, p_cap: DAILY_CAP }),
+    });
+    if (!r.ok) return false; // table/function missing, or error -> refuse
+    return (await r.json()) === true;
+  } catch {
+    return false; // network or internal error -> refuse
+  }
+}
+
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -79,6 +114,10 @@ Deno.serve(async (req: Request) => {
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON body" }, 400); }
+
+  if (!(await underDailyCap())) {
+    return json({ error: "Daily limit reached — please try again tomorrow." }, 429);
+  }
 
   const history = Array.isArray(body.history) ? body.history as { role: string; content: string }[] : [];
   const message = typeof body.message === "string" ? body.message : "";
