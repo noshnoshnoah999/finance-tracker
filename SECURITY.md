@@ -38,10 +38,17 @@ The helper is duplicated in both function files rather than shared from `_shared
 each file must stay self-contained so it can be pasted straight into the Supabase dashboard
 editor, which is how these have been deployed before.
 
-#### Required one-time SQL — run this BEFORE deploying the functions
+**Status: live as of 2026-08-28.** The SQL below was run, both functions were deployed, and the
+counter was verified — a `limit-advisor` call produced `2026-08-28 | limit-advisor | 1` in
+`fn_usage_daily`. That proves the allow path and the atomic increment. The *deny* path (refusing
+at the cap, and refusing when the counter is unreachable) has not been exercised in production;
+it is the same code path in reverse, but it is untested. `analyze-passbook` has not been called
+since deploying either — same helper, so the same reasoning applies.
 
-If you deploy first, both AI features will refuse every request until this exists. Paste into
-Supabase → SQL Editor and run:
+#### The one-time SQL (already run — kept here for a rebuild or a second environment)
+
+If you ever redeploy these functions into a fresh project, run this FIRST. Deploy before it
+exists and both AI features refuse every request until it does. Supabase → SQL Editor:
 
 ```sql
 create table if not exists fn_usage_daily (
@@ -81,9 +88,25 @@ Then deploy: `supabase functions deploy analyze-passbook` and
 To check it works: use an AI feature once, then in the SQL editor run
 `select * from fn_usage_daily;` — you should see today's row at count 1.
 
+Note that pushing to git does **not** deploy edge functions. If an AI feature starts returning
+errors after a code change here, check the deploy status before suspecting the SQL or the client.
+
 ## Still open
 
-### 3. `finance_data` has no real access control
+### 3. `finance_data` has no real access control — accepted, not fixed
+
+**Noah's decision, 2026-08-28: do not build auth.** He was given both sides and chose to leave
+it. The reasoning he accepted: the genuinely damaging exposure was `import-bank-emails`, which is
+now deleted; what remains readable is spending figures — no account numbers, no credentials,
+nothing spendable — and a login spanning web + iOS + macOS + widget + the GitHub Action is heavy
+machinery for that level of risk.
+
+**The rule that follows from that decision:** this table is knowingly public. Do not put anything
+genuinely sensitive in it — real account numbers, statements, anything pulled from a bank feed.
+If a future feature would, raise it before building and revisit the login then.
+
+The rest of this section is the standing analysis, kept for whenever that day comes.
+
 
 **Not directly verified** — no network route from the dev sandbox to `supabase.co`, and there is
 no `supabase/migrations/` in this repo, so the policies aren't in source. But `app.html` has no
