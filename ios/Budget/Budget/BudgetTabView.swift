@@ -291,13 +291,21 @@ struct BudgetTabView: View {
         let rate = c.gbpToJpy
         let amazonDadYen = c.subTotalDad(bm)
         let total = items.reduce(0.0) { $0 + $1.d("gbp") } * rate + amazonDadYen
+        let requested = store.blob.data[bm]?["dadRequested"]?.object ?? [:]
+        let amazonRequested = requested["amazon"]?.bool ?? false
+        // Left to Request: the £ still to ask Dad for this month — every dad line, plus the
+        // derived Amazon line, that has not been marked Requested. Display only, like the flag.
+        let leftToRequest = items
+            .filter { requested[c.idStr($0["id"])]?.bool != true }
+            .reduce(0.0) { $0 + $1.d("gbp") }
+            + ((amazonDadYen > 0 && !amazonRequested && rate > 0) ? amazonDadYen / rate : 0)
         VStack(alignment: .leading, spacing: 8) {
             HStack { sectionHeader("Dad's Contributions", color: T.greenD); Spacer(); Text("£1 = ¥\(Int(rate))").font(.caption2).foregroundStyle(T.sub) }
             ForEach(Array(items.enumerated()), id: \.offset) { _, it in
                 let id = c.idStr(it["id"])
                 // Revolut-request tracker: stored PER MONTH (default dad item ids d1..d6 repeat
                 // every month, so a global map would mark every month at once). Display only.
-                let isRequested = store.blob.data[bm]?["dadRequested"]?[id]?.bool ?? false
+                let isRequested = requested[id]?.bool ?? false
                 VStack(alignment: .leading, spacing: 5) {
                     TextField("Note", text: Binding(get: { it.s("note") }, set: { store.updateDadItem(bm, id, note: $0) }))
                         .font(.footnote).frame(maxWidth: .infinity, alignment: .leading)
@@ -316,16 +324,24 @@ struct BudgetTabView: View {
                 .padding(.bottom, 2)
             }
             if amazonDadYen > 0 {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Amazon (Subscribe & Save)").font(.footnote)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("Amazon (Subscribe & Save)").font(.footnote).frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 8) {
                         Text("£" + String(format: "%.2f", amazonDadYen / rate)).font(.caption2).foregroundStyle(T.sub)
+                        Text(yen(amazonDadYen)).font(.footnote).fontWeight(.semibold).foregroundStyle(T.greenD)
+                        Spacer(minLength: 0)
+                        Button(amazonRequested ? "Requested" : "Requested?") { store.toggleBoolMap(bm, "dadRequested", "amazon") }
+                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(amazonRequested ? .white : T.muted)
+                            .padding(.horizontal, 7).padding(.vertical, 3).background(amazonRequested ? T.blueD : T.cardAlt).clipShape(Capsule()).buttonStyle(.plain)
                     }
-                    Spacer()
-                    Text(yen(amazonDadYen)).font(.footnote).fontWeight(.semibold).foregroundStyle(T.greenD)
                 }
+                .padding(.bottom, 2)
             }
-            if !items.isEmpty || amazonDadYen > 0 { Divider().overlay(T.border); row("Total", yen(total.rounded()), bold: true, color: T.greenD) }
+            if !items.isEmpty || amazonDadYen > 0 {
+                Divider().overlay(T.border)
+                row("Total", yen(total.rounded()), bold: true, color: T.greenD)
+                row("Left to Request", "£" + String(format: "%.2f", leftToRequest), color: leftToRequest > 0.005 ? T.text : T.greenD)
+            }
             HStack(spacing: 8) {
                 TextField("Note (e.g. Pocket money)", text: $ndNote).modifier(FieldStyle())
                 HStack(spacing: 4) { Text("£").foregroundStyle(T.sub); TextField("0", text: $ndGbp).keyboardType(.numberPad) }.modifier(FieldStyle()).frame(width: 80)

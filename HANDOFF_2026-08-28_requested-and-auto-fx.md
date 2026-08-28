@@ -127,3 +127,21 @@ page does not scroll sideways, and toggling `Requested?` still changes no other 
 Swift again **not compile-checked** — build in Xcode. The whole `dadCard` function was re-read
 end to end this time to check for orphaned locals, which is what caused the `dad` build break in
 `76cf7e1`.
+
+### Amazon line + "Left to Request"
+
+- **Amazon (Subscribe & Save) now has its own `Requested?` button.** It is a derived aggregate
+  (summed from `se.subItems` where `payer === "dad"`), not a dad item, so it has no item id — it
+  uses the fixed key `"amazon"` in the same per-month `data.<mk>.dadRequested` map. Same two-line
+  layout as the items. Still no `Edit`/`×` on it, since it isn't editable here.
+- **"Left to Request" row** added at the bottom of the card, under Total. It is the £ still to ask
+  Dad for this month: every dad item not marked Requested, plus the Amazon line's £ equivalent
+  (`subTotalDad / gbpToJpy`) when that isn't marked either. £ only, no yen — Revolut requests are
+  in £. Turns green at £0.00. Guarded against a zero rate.
+
+Verified at 390px with a seeded dad-payer sub item (¥2,841): 7 `Requested?` buttons (6 items +
+Amazon); Left to Request reads £338.15 with nothing marked, £288.15 after marking Pocket money
+(£50), £275.00 after also marking Amazon, and £0.00 with everything marked; the Total row is
+byte-identical before and after marking; September shows £338.15 and 7 unmarked buttons while
+August keeps £0.00, so the `"amazon"` flag is per-month like the rest; no page errors, no
+sideways scroll.

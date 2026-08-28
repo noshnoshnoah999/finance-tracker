@@ -2,14 +2,19 @@
 
 Work in `~/Claude/finance-tracker`.
 
-One new commit is waiting to be pushed. It changes `app.html`, `index.html`,
-`ios/Budget/Budget/BudgetTabView.swift`, and appends a section to
+Two new commits are waiting to be pushed. They change `app.html`, `index.html`,
+`ios/Budget/Budget/BudgetTabView.swift`, and append sections to
 `HANDOFF_2026-08-28_requested-and-auto-fx.md`.
 
-What it does:
-- Removes the description text under "Dad's Contributions" on iOS/macOS (web never had one).
-- Moves each item's name onto its own line so it can't be clipped at phone width. The
+What they do, all in the Dad's Contributions card:
+- Remove the description text under the title on iOS/macOS (web never had one).
+- Move each item's name onto its own line so it can't be clipped at phone width. The
   `£ / ¥ / Requested? / Edit / ×` controls sit on the line below.
+- Give the Amazon (Subscribe & Save) line its own `Requested?` button. It is a derived
+  aggregate with no item id, so it uses the fixed key `"amazon"` in the same per-month
+  `dadRequested` map.
+- Add a "Left to Request" row under Total: the £ still to ask Dad for this month (every
+  unmarked item plus the unmarked Amazon line's £ equivalent). Display only, £ not yen.
 
 Please do the following, in order, and stop and tell me if anything looks wrong:
 
@@ -35,4 +40,7 @@ Please do the following, in order, and stop and tell me if anything looks wrong:
 - On a phone-width screen every item name shows in full — `Commuter pass` and
   `Japanese lessons` in particular, which were previously cut off.
 - The card doesn't scroll sideways.
-- Tapping `Requested?` still changes no number anywhere.
+- The Amazon line has a `Requested?` button, and marking it is remembered per month.
+- "Left to Request" sits under Total, shows £ only, drops as you mark things, and reads
+  £0.00 in green once everything is marked.
+- Tapping `Requested?` still changes no number anywhere except "Left to Request".
