@@ -243,7 +243,6 @@ struct HomeView: View {
             Text(yen(free)).font(.system(size: 30, weight: .bold)).foregroundStyle(free < 0 ? T.roseD : T.text)
             VStack(spacing: 6) {
                 lineRow("Income", yen(pay))
-                if dad > 0 { lineRow("From Dad", "+" + yen(dad)) }
                 if extra > 0 { lineRow("Extra money", "+" + yen(extra)) }
                 lineRow("Bills & spending", "−" + yen(spend))
             }
