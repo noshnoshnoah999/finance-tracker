@@ -99,3 +99,31 @@ Xcode before trusting it.
 `device_bash` cannot delete files, so git could not clean up its own lock files. Two stale
 `index.lock` copies were moved to `_to_delete/` — delete that folder. `.git/` is verified clean
 of locks and `tmp_obj_*` files.
+
+---
+
+## Follow-up, same day — card layout
+
+Two changes on top of `5a807ca` / `76cf7e1`, after Noah saw it running:
+
+1. **Subtitle removed** from the Dad's Contributions card on iOS/macOS
+   (`"What Dad sends each month. Tap Requested..."`). The web card never had one, so this
+   brings them into parity rather than out of it.
+2. **Item names moved to their own line.** At phone width the names were being clipped
+   (`Pocket mo...`, `Commuter...`, `Japanese l...`). Each item is now two lines: the full name
+   on top, then `£ amount / ¥ value / Requested? / Edit / ×` below it, pushed apart with a
+   spacer. Chosen over wrapping or auto-shrinking text because it cannot truncate at any width
+   or name length.
+
+Web: the name div lost `whiteSpace:nowrap` + `textOverflow:ellipsis` and gained
+`overflowWrap:anywhere`; the display branch is now one full-width container with a stacked
+name and a control row. iOS: the row `HStack` became a `VStack` with the name `TextField` at
+`maxWidth: .infinity` above an `HStack` of the controls.
+
+Re-verified in headless Chromium at **390px wide** (the width that was clipping): JSX compiles,
+zero page errors, all 6 names render with `scrollWidth == clientWidth` (nothing clipped), the
+page does not scroll sideways, and toggling `Requested?` still changes no other text on the page.
+
+Swift again **not compile-checked** — build in Xcode. The whole `dadCard` function was re-read
+end to end this time to check for orphaned locals, which is what caused the `dad` build break in
+`76cf7e1`.

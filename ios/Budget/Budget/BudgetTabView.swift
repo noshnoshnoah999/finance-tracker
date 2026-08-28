@@ -293,23 +293,27 @@ struct BudgetTabView: View {
         let total = items.reduce(0.0) { $0 + $1.d("gbp") } * rate + amazonDadYen
         VStack(alignment: .leading, spacing: 8) {
             HStack { sectionHeader("Dad's Contributions", color: T.greenD); Spacer(); Text("£1 = ¥\(Int(rate))").font(.caption2).foregroundStyle(T.sub) }
-            Text("What Dad sends each month. Tap \u{201C}Requested\u{201D} once you've sent Dad the Revolut request \u{2014} it only tracks what you've asked for, it changes no totals.").font(.caption2).foregroundStyle(T.sub)
             ForEach(Array(items.enumerated()), id: \.offset) { _, it in
                 let id = c.idStr(it["id"])
                 // Revolut-request tracker: stored PER MONTH (default dad item ids d1..d6 repeat
                 // every month, so a global map would mark every month at once). Display only.
                 let isRequested = store.blob.data[bm]?["dadRequested"]?[id]?.bool ?? false
-                HStack(spacing: 8) {
-                    TextField("Note", text: Binding(get: { it.s("note") }, set: { store.updateDadItem(bm, id, note: $0) })).font(.footnote)
-                    HStack(spacing: 2) { Text("£").foregroundStyle(T.sub).font(.caption2)
-                        TextField("0", value: Binding(get: { it.d("gbp") }, set: { store.updateDadItem(bm, id, gbp: $0) }), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 44)
+                VStack(alignment: .leading, spacing: 5) {
+                    TextField("Note", text: Binding(get: { it.s("note") }, set: { store.updateDadItem(bm, id, note: $0) }))
+                        .font(.footnote).frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 8) {
+                        HStack(spacing: 2) { Text("£").foregroundStyle(T.sub).font(.caption2)
+                            TextField("0", value: Binding(get: { it.d("gbp") }, set: { store.updateDadItem(bm, id, gbp: $0) }), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 44)
+                        }
+                        Text(yen((it.d("gbp") * rate).rounded())).font(.caption2).fontWeight(.semibold)
+                        Spacer(minLength: 0)
+                        Button(isRequested ? "Requested" : "Requested?") { store.toggleBoolMap(bm, "dadRequested", id) }
+                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(isRequested ? .white : T.muted)
+                            .padding(.horizontal, 7).padding(.vertical, 3).background(isRequested ? T.blueD : T.cardAlt).clipShape(Capsule()).buttonStyle(.plain)
+                        Button { store.removeDadItem(bm, id) } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.roseD)
                     }
-                    Text(yen((it.d("gbp") * rate).rounded())).font(.caption2).fontWeight(.semibold).frame(width: 64, alignment: .trailing)
-                    Button(isRequested ? "Requested" : "Requested?") { store.toggleBoolMap(bm, "dadRequested", id) }
-                        .font(.system(size: 10, weight: .semibold)).foregroundStyle(isRequested ? .white : T.muted)
-                        .padding(.horizontal, 7).padding(.vertical, 3).background(isRequested ? T.blueD : T.cardAlt).clipShape(Capsule()).buttonStyle(.plain)
-                    Button { store.removeDadItem(bm, id) } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.roseD)
                 }
+                .padding(.bottom, 2)
             }
             if amazonDadYen > 0 {
                 HStack(spacing: 8) {
