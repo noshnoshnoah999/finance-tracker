@@ -262,12 +262,12 @@ struct BudgetTabView: View {
 
     // MARK: Income
     @ViewBuilder private func incomeCard(_ c: Calc) -> some View {
-        let wage = c.wage(bm), tr = c.transport(bm), pl = c.paidLeaveYen(bm), dad = c.dadFree(bm)
+        let wage = c.wage(bm), tr = c.transport(bm), pl = c.paidLeaveYen(bm)
         let extra = c.extraIncome(bm)
         // Total (and Free to Spend, computed elsewhere from the same projection) uses the
         // estimate in place of ¥0 wage for unlogged months — reverts automatically once real
         // hours/override are entered, same as projectedMonthlyPay/income().
-        let total = c.projectedMonthlyPay(bm) + dad + extra
+        let total = c.projectedMonthlyPay(bm) + extra
         let showBdEst = wage == 0 && c.month(bm).d("wageOverride") <= 0
         let bdEst = showBdEst ? c.estimatedPay(bm) : Calc.EstPay()
         VStack(alignment: .leading, spacing: 8) {
@@ -278,7 +278,6 @@ struct BudgetTabView: View {
             }
             if pl > 0 { row("Paid leave", yen(pl), color: T.blueD) }
             row("Transport received", yen(tr))
-            if dad > 0 { row("Dad (free spend)", yen(dad), color: T.greenD) }
             if extra > 0 { row("Extra money", yen(extra), color: T.greenD) }
             Divider().overlay(T.border)
             row("Total", yen(total), bold: true, color: T.greenD)
@@ -290,24 +289,25 @@ struct BudgetTabView: View {
     @ViewBuilder private func dadCard(_ c: Calc) -> some View {
         let items = c.month(bm).arr("dadItems")
         let rate = c.gbpToJpy
-        let free = store.blob.settings["dadFreeSpend"]?.object ?? [:]
         let amazonDadYen = c.subTotalDad(bm)
         let total = items.reduce(0.0) { $0 + $1.d("gbp") } * rate + amazonDadYen
         VStack(alignment: .leading, spacing: 8) {
             HStack { sectionHeader("Dad's Contributions", color: T.greenD); Spacer(); Text("£1 = ¥\(Int(rate))").font(.caption2).foregroundStyle(T.sub) }
-            Text("What Dad sends each month. Tap \u{201C}Free\u{201D} for money that's yours to spend (counts as income).").font(.caption2).foregroundStyle(T.sub)
+            Text("What Dad sends each month. Tap \u{201C}Requested\u{201D} once you've sent Dad the Revolut request \u{2014} it only tracks what you've asked for, it changes no totals.").font(.caption2).foregroundStyle(T.sub)
             ForEach(Array(items.enumerated()), id: \.offset) { _, it in
                 let id = c.idStr(it["id"])
-                let isFree = free[id]?.bool ?? false
+                // Revolut-request tracker: stored PER MONTH (default dad item ids d1..d6 repeat
+                // every month, so a global map would mark every month at once). Display only.
+                let isRequested = store.blob.data[bm]?["dadRequested"]?[id]?.bool ?? false
                 HStack(spacing: 8) {
                     TextField("Note", text: Binding(get: { it.s("note") }, set: { store.updateDadItem(bm, id, note: $0) })).font(.footnote)
                     HStack(spacing: 2) { Text("£").foregroundStyle(T.sub).font(.caption2)
                         TextField("0", value: Binding(get: { it.d("gbp") }, set: { store.updateDadItem(bm, id, gbp: $0) }), format: .number).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 44)
                     }
                     Text(yen((it.d("gbp") * rate).rounded())).font(.caption2).fontWeight(.semibold).frame(width: 64, alignment: .trailing)
-                    Button(isFree ? "Free" : "Free?") { store.toggleDadFree(id) }
-                        .font(.system(size: 10, weight: .semibold)).foregroundStyle(isFree ? .white : T.muted)
-                        .padding(.horizontal, 7).padding(.vertical, 3).background(isFree ? T.greenD : T.cardAlt).clipShape(Capsule()).buttonStyle(.plain)
+                    Button(isRequested ? "Requested" : "Requested?") { store.toggleBoolMap(bm, "dadRequested", id) }
+                        .font(.system(size: 10, weight: .semibold)).foregroundStyle(isRequested ? .white : T.muted)
+                        .padding(.horizontal, 7).padding(.vertical, 3).background(isRequested ? T.blueD : T.cardAlt).clipShape(Capsule()).buttonStyle(.plain)
                     Button { store.removeDadItem(bm, id) } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain).foregroundStyle(T.roseD)
                 }
             }

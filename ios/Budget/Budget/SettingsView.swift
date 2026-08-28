@@ -128,7 +128,7 @@ struct SettingsView: View {
                         .padding(.horizontal, 16).padding(.vertical, 10).background(T.blueD).clipShape(RoundedRectangle(cornerRadius: 12))
                 }.buttonStyle(.plain).disabled(store.fxLoading)
             }
-            Text("£1 = ¥\(c.gbpToJpy.clean) · tap Live rate to fetch today's rate").font(.caption2).foregroundStyle(T.sub)
+            Text("£1 = ¥\(c.gbpToJpy.clean) · updates automatically once a day when you open the app · tap Live rate to force a refresh").font(.caption2).foregroundStyle(T.sub)
         }
     }
     @ViewBuilder private func budgetExtras() -> some View {

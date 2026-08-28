@@ -81,7 +81,7 @@
     const DS = {
       hourlyWage:1400,annualLimit:1030000,commuteOneWay:178,
       trBefore:1040,trAfter:1100,food4wk:20000,food5wk:25000,
-      gbpToJpy:215,usdToJpy:155,silverSpot:0,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,themeMigrated:false,subItems:[],showSkin:true,showGenSav:true,genSavAmount:0,showSilver:true,
+      gbpToJpy:215,fxFetchedOn:"",usdToJpy:155,silverSpot:0,savingsGoal:0,notifs:false,goals:[],workDays:[0,1,2],amazonSeeded:false,themeMigrated:false,subItems:[],showSkin:true,showGenSav:true,genSavAmount:0,showSilver:true,
       // Break (minutes) applied to NEWLY created shifts — a new schedule day, or a new row
       // in the Limit-page simulator. Existing saved shifts keep their own breakMin and are
       // never rewritten when this changes.
@@ -93,7 +93,6 @@
         0:{start:"10:30",end:"17:00",breakMin:60,label:"Sun"},
       },
       mumItems:[],
-      dadFreeSpend:{},
       fixed:[
         {id:1,name:"Paidy (MacBook + iPhone)",amount:9916,paidyDerived:true},
         {id:2,name:"Japanese Lessons",amount:3026},
@@ -119,7 +118,7 @@
       {id:"d3",note:"Lunch money",gbp:25},{id:"d4",note:"Student loan",gbp:150},
       {id:"d5",note:"Commuter pass",gbp:50},{id:"d6",note:"Japanese lessons",gbp:25},
     ];
-    const eM = () => ({hours:0,days:0,wageOverride:0,transportOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},skippedFixed:{},customDays:{},shiftOverrides:{},oneOffShifts:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0,txns:[],extraIncome:[],genSavAmt:0,saveGen:false,silverInvest:0});
+    const eM = () => ({hours:0,days:0,wageOverride:0,transportOverride:0,dadItems:DEF_DAD(),oneOffs:[],savings:0,skinTreatment:0,generalSavings:0,mumChecked:[],suicaOverride:null,foodOverride:null,paidFixed:{},paidOneOffs:{},dadRequested:{},skippedFixed:{},customDays:{},shiftOverrides:{},oneOffShifts:{},fixedAmounts:{},subInc:{},silverOz:0,silverUsd:0,txns:[],extraIncome:[],genSavAmt:0,saveGen:false,silverInvest:0});
     // Category display: emoji + label for transactions
     const TX_CATS={income:["💰","Income"],food:["🍜","Food"],transport:["🚇","Transport"],subscriptions:["🔁","Subscriptions"],shopping:["🛍️","Shopping"],bills:["📄","Bills"],savings:["🏦","Savings"],investment:["📈","Investment"],fees:["⚠️","Fees"],transfer:["↔️","Transfer"],cash:["💴","Cash"],other:["•","Other"]};
     // PF = manually-entered actuals for past months. wageOverride = TOTAL received (incl. transport); base pay = wageOverride − transportOverride.
@@ -431,6 +430,31 @@
         return()=>{sb.removeChannel(ch);};
       },[ld]);
 
+      // ── Live GBP→JPY: auto-refresh once per local day ──
+      // Runs on load and whenever the tab/PWA becomes visible again (so an app left open
+      // overnight still updates). A failed fetch leaves fxFetchedOn alone and keeps the last
+      // known rate, so we simply retry on the next open instead of looping.
+      const lclDay=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+      const fetchLiveRate=async()=>{
+        const r=await fetch("https://open.er-api.com/v6/latest/GBP");
+        const j=await r.json();
+        const raw=j&&j.rates&&j.rates.JPY;
+        if(!raw) throw new Error("no rate");
+        const rate=Math.round(raw*10)/10;
+        setSe(p=>({...p,gbpToJpy:rate,fxFetchedOn:lclDay()}));
+        return rate;
+      };
+      useEffect(()=>{
+        if(!ld) return;
+        let dead=false;
+        const maybe=()=>{ if(dead||se.fxFetchedOn===lclDay()) return; fetchLiveRate().catch(()=>{}); };
+        maybe();
+        const onVis=()=>{ if(document.visibilityState==='visible') maybe(); };
+        document.addEventListener('visibilitychange',onVis);
+        window.addEventListener('focus',onVis);
+        return()=>{dead=true;document.removeEventListener('visibilitychange',onVis);window.removeEventListener('focus',onVis);};
+      },[ld,se.fxFetchedOn]);
+
       useEffect(()=>{
         if(!ld||!se.notifs) return;
         if(!('Notification' in window)||Notification.permission!=='granted') return;
@@ -599,7 +623,7 @@
       // Until then, the estimate (schedule + calendar) stands in as projected income so Free to Spend/Total
       // reflect a realistic budget instead of ¥0 — reverts automatically the moment real hours are entered.
       const bdEstForTotals=(bdW===0&&bd.wageOverride<=0)?gEstPay(bm):null;
-      const bdDJ=dTJ(bd),bdDJFree=(bd.dadItems||[]).filter(x=>(se.dadFreeSpend||{})[x.id]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0),bdI=bdEstForTotals?bdEstForTotals.wage+bdTr:bdW+bdTr,bdFd=bd.foodOverride!=null?bd.foodOverride:fF(bm),bdSkin=(se.showSkin!==false)?(bd.skinTreatment||0):0,bdGenSav=genSavM(bm);
+      const bdDJ=dTJ(bd),bdI=bdEstForTotals?bdEstForTotals.wage+bdTr:bdW+bdTr,bdFd=bd.foodOverride!=null?bd.foodOverride:fF(bm),bdSkin=(se.showSkin!==false)?(bd.skinTreatment||0):0,bdGenSav=genSavM(bm);
       const bdMC=bd.mumChecked||[],bdPF=bd.paidFixed||{},bdPOO=bd.paidOneOffs||{},bdSF=bd.skippedFixed||{},bdFA=bd.fixedAmounts||{};
       const mIdx=mk=>MONTHS.findIndex(x=>x.key===mk);
       const subScheduled=(it,mk)=>{const ev=it.everyN||1;if(ev<=1)return true;const a=mIdx(mk),b=mIdx(it.startMK||MONTHS[0].key);return a>=0&&b>=0&&a>=b&&((a-b)%ev===0);};
@@ -624,7 +648,7 @@
       const allMumItems=[{id:"food",name:"Food Budget"+(bd.foodOverride!=null?" (custom)":MONTHS.find(x=>x.key===bm)?.is5wk?" (5-wk)":" (4-wk)"),amount:bdFoodAmt},...(se.mumItems||[]).filter(mumInWindow)];
       const bdMTDisplay=allMumItems.filter(x=>bdMC.includes(x.id)).reduce((s,x)=>s+x.amount,0);
       const bdExtra=extraInc(bm);
-      const bdFr=bdI+bdPLW+bdDJFree+bdExtra-bdFT-bdOY;
+      const bdFr=bdI+bdPLW+bdExtra-bdFT-bdOY;
       const bdFrD=useCountUp(bdFr);
       // ── Dashboard helpers ──
       // Home always reflects the CURRENT month, independent of the Budget tab's selected month (bm)
@@ -636,12 +660,11 @@
       const cmFd=cmd.foodOverride!=null?cmd.foodOverride:fF(cmk);
       const cmSkin=(se.showSkin!==false)?(cmd.skinTreatment||0):0;
       const cmGenSav=genSavM(cmk);
-      const cmDadFree=(cmd.dadItems||[]).filter(x=>(se.dadFreeSpend||{})[x.id]).reduce((s,x)=>s+Math.round(x.gbp*se.gbpToJpy),0);
       const cmPayOnly=gTx(cmd,cmk)+gTr(cmd,cmk);
       const cmSpending=(()=>{let s=0;se.fixed.forEach(f=>{if(!cmSF[f.id])s+=cmFx(f);});s+=cmCm+cmFd+cmSkin+cmGenSav;(cmd.oneOffs||[]).filter(x=>!x.mumPays).forEach(x=>s+=x.amount);return s;})();
       const cmExtra=extraInc(cmk);
       const cmOut=monthOut(cmk);
-      const cmFree=cmPayOnly+cmDadFree+cmExtra-cmOut;
+      const cmFree=cmPayOnly+cmExtra-cmOut;
       const cmFreeD=useCountUp(cmFree);
       const bdLeftPay=(()=>{let u=0;se.fixed.forEach(f=>{if(!cmSF[f.id]&&!cmPF[f.id])u+=cmFx(f);});if(!cmPF["suica"])u+=cmCm;if(!cmPF["food"])u+=cmFd;if(!cmPF["skinTreatment"])u+=cmSkin;if(!cmPF["generalSavings"])u+=cmGenSav;const cmSilverAmt=silverM(cmk);if(cmSilverAmt>0&&!cmPF["silverInvest"])u+=cmSilverAmt;return u;})();
       const homeBillIds=[...se.fixed.filter(f=>!cmSF[f.id]).map(f=>f.id),"suica","food",...(se.showSkin!==false&&cmSkin>0?["skinTreatment"]:[]),...(se.showGenSav!==false&&cmGenSav>0?["generalSavings"]:[]),...(se.showSilver!==false&&silverM(cmk)>0?["silverInvest"]:[])];
@@ -725,6 +748,9 @@
       const aXI=k=>{if(!nX.amount)return;setDa(p=>({...p,[k]:{...p[k],extraIncome:[...((p[k]&&p[k].extraIncome)||[]),{id:Date.now(),note:nX.note||"Extra money",amount:Number(nX.amount)||0}]}}));setNX({note:"",amount:""});};
       const rXI=(k,id)=>setDa(p=>({...p,[k]:{...p[k],extraIncome:((p[k]&&p[k].extraIncome)||[]).filter(x=>x.id!==id)}}));
       const uDI=(k,id,f,v)=>setDa(p=>({...p,[k]:{...p[k],dadItems:(p[k].dadItems||[]).map(x=>x.id===id?{...x,[f]:v}:x)}}));
+      // Revolut-request tracker: per MONTH (dad item ids d1..d6 repeat every month, so a
+      // global map would mark every month at once). Display only — touches no totals.
+      const tDR=(k,id)=>setDa(p=>({...p,[k]:{...p[k],dadRequested:{...((p[k]||{}).dadRequested||{}),[id]:!(((p[k]||{}).dadRequested||{})[id])}}}));
       const tMC=(k,id)=>setDa(p=>{const cu=p[k]?.mumChecked||[];const nx=cu.includes(id)?cu.filter(x=>x!==id):[...cu,id];return{...p,[k]:{...p[k],mumChecked:nx}};});
       const aMI=()=>{if(!nM.name||!nM.amount)return;setSe(p=>({...p,mumItems:[...p.mumItems,{id:Date.now(),name:nM.name,amount:Number(nM.amount)||0,startMonth:Number(nM.startMonth)||null,startYear:Number(nM.startYear)||null,endMonth:Number(nM.endMonth)||null,endYear:Number(nM.endYear)||null}]}));setNM({name:"",amount:"",startMonth:"",startYear:"",endMonth:"",endYear:""});};
       const rMI=id=>setSe(p=>({...p,mumItems:p.mumItems.filter(x=>x.id!==id)}));
@@ -985,7 +1011,6 @@
                   <div style={{fontSize:30,fontWeight:800,color:cmFree<0?c.roseD:c.text,letterSpacing:-0.5,marginBottom:10}}>{yn(cmFreeD)}</div>
                   <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Income</span><span style={{fontWeight:600,color:c.text}}>{yn(cmPayOnly)}</span></div>
-                    {cmDadFree>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>From Dad</span><span style={{fontWeight:600,color:c.text}}>+{yn(cmDadFree)}</span></div>}
                     {cmExtra>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Extra money</span><span style={{fontWeight:600,color:c.text}}>+{yn(cmExtra)}</span></div>}
                     <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:c.sub}}><span>Bills & spending</span><span style={{fontWeight:600,color:c.text}}>−{yn(cmOut)}</span></div>
                   </div>
@@ -1264,9 +1289,8 @@
                     ):null;})()}
                     {bdPLH>0&&<div style={rw}><span style={{color:c.sub}}>Paid leave ({bdPLH.toFixed(1)}h)</span><span style={{fontWeight:500,color:c.blueD}}>{yn(bdPLW)}</span></div>}
                     <div style={rw}><span style={{color:c.sub}}>Transport Received</span><span style={{fontWeight:500}}>{yn(bdTr)}</span></div>
-                    {bdDJFree>0&&<div style={rw}><span style={{color:c.sub}}>Dad (free spend)</span><span style={{fontWeight:500,color:c.greenD}}>{yn(bdDJFree)}</span></div>}
                     {bdExtra>0&&<div style={rw}><span style={{color:c.sub}}>Extra money</span><span style={{fontWeight:500,color:c.greenD}}>{yn(bdExtra)}</span></div>}
-                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total</span><span style={{fontWeight:700,fontSize:16,color:c.greenD}}>{yn(bdI+bdPLW+bdDJFree+bdExtra)}</span></div>
+                    <div style={{...rw,borderTop:`1px solid ${c.border}`,paddingTop:12}}><span style={{fontWeight:700,fontSize:14}}>Total</span><span style={{fontWeight:700,fontSize:16,color:c.greenD}}>{yn(bdI+bdPLW+bdExtra)}</span></div>
                   </div>
                 </div>
 
@@ -1277,7 +1301,7 @@
                     <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.greenD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Dad's Contributions</span></div>
                     <span style={{fontSize:11,color:c.sub,background:c.cardAlt,padding:"4px 10px",borderRadius:8,fontWeight:500}}>£1 = ¥{se.gbpToJpy}</span>
                   </div>
-                  {(bd.dadItems||[]).map(it=>(<div key={it.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,fontSize:13}}>{eD===it.id?<><input value={it.note} onChange={e=>uDI(bm,it.id,"note",e.target.value)} placeholder="Note" style={{...inp,flex:2}}/><div style={{flex:1,position:"relative"}}><span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,color:c.sub}}>£</span><input type="number" inputMode="numeric" value={it.gbp||""} onChange={e=>uDI(bm,it.id,"gbp",Number(e.target.value)||0)} style={{...inp,paddingLeft:26}}/></div><button onClick={()=>setED(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></>:<><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,color:c.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.note||"Dad"}</div><div style={{fontSize:11,color:c.sub,marginTop:2}}>{gf(it.gbp)}</div></div><span style={{fontWeight:600,flexShrink:0}}>{yn(Math.round(it.gbp*se.gbpToJpy))}</span><button onClick={()=>setSe(p=>({...p,dadFreeSpend:{...(p.dadFreeSpend||{}),[it.id]:!(p.dadFreeSpend||{})[it.id]}}))} style={{flexShrink:0,border:`1.5px solid ${(se.dadFreeSpend||{})[it.id]?c.greenD:c.border}`,background:(se.dadFreeSpend||{})[it.id]?c.greenD:"transparent",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:11,color:(se.dadFreeSpend||{})[it.id]?c.white:c.muted,fontWeight:600,fontFamily:mn}}>{(se.dadFreeSpend||{})[it.id]?"Free":"Free?"}</button><button onClick={()=>setED(it.id)} style={{flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:12,color:c.muted,fontFamily:mn,padding:"0 4px"}}>Edit</button><button onClick={()=>rDI(bm,it.id)} style={{flexShrink:0,border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></>}</div>))}
+                  {(bd.dadItems||[]).map(it=>(<div key={it.id} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,fontSize:13}}>{eD===it.id?<><input value={it.note} onChange={e=>uDI(bm,it.id,"note",e.target.value)} placeholder="Note" style={{...inp,flex:2}}/><div style={{flex:1,position:"relative"}}><span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:14,color:c.sub}}>£</span><input type="number" inputMode="numeric" value={it.gbp||""} onChange={e=>uDI(bm,it.id,"gbp",Number(e.target.value)||0)} style={{...inp,paddingLeft:26}}/></div><button onClick={()=>setED(null)} style={{border:"none",background:c.greenD,color:c.white,borderRadius:10,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600}}>Done</button></>:<><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,color:c.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.note||"Dad"}</div><div style={{fontSize:11,color:c.sub,marginTop:2}}>{gf(it.gbp)}</div></div><span style={{fontWeight:600,flexShrink:0}}>{yn(Math.round(it.gbp*se.gbpToJpy))}</span><button title="Revolut request sent to Dad" onClick={()=>tDR(bm,it.id)} style={{flexShrink:0,border:`1.5px solid ${(bd.dadRequested||{})[it.id]?c.blueD:c.border}`,background:(bd.dadRequested||{})[it.id]?c.blueD:"transparent",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:11,color:(bd.dadRequested||{})[it.id]?c.white:c.muted,fontWeight:600,fontFamily:mn}}>{(bd.dadRequested||{})[it.id]?"Requested":"Requested?"}</button><button onClick={()=>setED(it.id)} style={{flexShrink:0,border:"none",background:"transparent",cursor:"pointer",fontSize:12,color:c.muted,fontFamily:mn,padding:"0 4px"}}>Edit</button><button onClick={()=>rDI(bm,it.id)} style={{flexShrink:0,border:"none",background:"transparent",cursor:"pointer",color:c.roseD,fontSize:16,padding:0}}>×</button></>}</div>))}
                   {subTotalDad(bm)>0&&<div style={{...rw,fontSize:13,marginBottom:8}}><div style={{flex:1,minWidth:0}}><div style={{fontWeight:500,color:c.text}}>Amazon (Subscribe & Save)</div><div style={{fontSize:11,color:c.sub,marginTop:2}}>{gf(subTotalDad(bm)/se.gbpToJpy)}</div></div><span style={{fontWeight:600,flexShrink:0,color:c.greenD}}>{yn(subTotalDad(bm))}</span></div>}
                   {((bd.dadItems||[]).length>0||subTotalDad(bm)>0)&&<div style={{...rw,fontSize:13,borderTop:`1px solid ${c.border}`,paddingTop:10,fontWeight:700}}><span>Total</span><span>{gf((bd.dadItems||[]).reduce((s,x)=>s+x.gbp,0)+subTotalDad(bm)/se.gbpToJpy)} = {yn(bdDJ+subTotalDad(bm))}</span></div>}
                   <div style={{display:"flex",gap:8,marginTop:12}}>
@@ -2074,16 +2098,9 @@
                     <button onClick={async()=>{
                       setFxLoad("loading");
                       try{
-                        const r=await fetch("https://open.er-api.com/v6/latest/GBP");
-                        const j=await r.json();
-                        const raw=j&&j.rates&&j.rates.JPY;
-                        if(!raw)throw new Error("no rate");
-                        const rate=Math.round(raw*10)/10;
-                        const oldRate=se.gbpToJpy;
-                        setSe(p=>({...p,gbpToJpy:rate}));
+                        await fetchLiveRate();
                         setFxLoad("done");
                         setTimeout(()=>setFxLoad("idle"),3000);
-                        if(se.notifs&&Notification.permission==='granted'&&rate>oldRate) notify('💷 Rate improved!',`£1 = ¥${rate} today (up from ¥${oldRate}) — good time for Dad to send money!`,'rate');
                       }catch(e){
                         setFxLoad("error");
                         setTimeout(()=>setFxLoad("idle"),3000);
@@ -2092,7 +2109,7 @@
                       {fxLoad==="loading"?"…":fxLoad==="done"?"✓":fxLoad==="error"?"✗":"Live rate"}
                     </button>
                   </div>
-                  <div style={{fontSize:12,color:c.sub,marginTop:8}}>£1 = ¥{se.gbpToJpy} · tap "Live rate" to fetch today's rate</div>
+                  <div style={{fontSize:12,color:c.sub,marginTop:8}}>£1 = ¥{se.gbpToJpy} · updates automatically once a day when you open the app · tap "Live rate" to force a refresh</div>
                 </div>
                 <div style={crd}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>

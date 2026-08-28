@@ -226,10 +226,9 @@ struct HomeView: View {
         let cal = Calendar.current
         let cmk = clampMK(String(format: "%04d-%02d", cal.component(.year, from: now), cal.component(.month, from: now)))
         let pay = c.monthlyPay(cmk)
-        let dad = c.dadFree(cmk)
         let extra = c.extraIncome(cmk)
         let spend = c.monthOut(cmk)
-        let free = pay + dad + extra - spend
+        let free = pay + extra - spend
         let label = monthMeta(cmk)?.label ?? ""
         let billCount = c.homeBillIds(cmk).count
         let paid = c.paidCount(cmk)

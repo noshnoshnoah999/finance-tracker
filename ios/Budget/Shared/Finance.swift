@@ -414,12 +414,6 @@ struct Calc {
         return monthlyPay(mk)
     }
 
-    func dadFree(_ mk: String) -> Double {
-        let free = se["dadFreeSpend"]?.object ?? [:]
-        return month(mk).arr("dadItems")
-            .filter { free[idStr($0["id"])]?.bool == true }
-            .reduce(0) { $0 + ($1.d("gbp") * gbpToJpy).rounded() }
-    }
     func skin(_ mk: String) -> Double { showSkin ? month(mk).d("skinTreatment") : 0 }
     func genSav(_ mk: String) -> Double {
         guard showGenSav, month(mk)["saveGen"]?.bool == true else { return 0 }
@@ -488,7 +482,7 @@ struct Calc {
         return spending(mk)
     }
 
-    func income(_ mk: String) -> Double { projectedMonthlyPay(mk) + dadFree(mk) + extraIncome(mk) }
+    func income(_ mk: String) -> Double { projectedMonthlyPay(mk) + extraIncome(mk) }
     func freeToSpend(_ mk: String) -> Double { income(mk) - monthOut(mk) }
 
     /// Bills (ids) shown on the Home progress, excluding skipped and zero skin/savings.

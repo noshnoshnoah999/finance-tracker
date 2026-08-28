@@ -259,9 +259,26 @@ final class BudgetStore: ObservableObject {
         if let (d, _) = try? await URLSession.shared.data(from: u),
            let j = try? JSONDecoder().decode(JSONValue.self, from: d),
            let jpy = j["rates"]?["JPY"]?.double {
-            setSetting("gbpToJpy", .number((jpy * 10).rounded() / 10))
+            blob.settings["gbpToJpy"] = .number((jpy * 10).rounded() / 10)
+            blob.settings["fxFetchedOn"] = .string(Self.localDayKey())
+            persist()
         }
     }
+
+    /// Local (device-time) YYYY-MM-DD, used to fetch the rate at most once per day.
+    static func localDayKey() -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    /// Called on launch and whenever the app becomes active. Fetches the live GBP→JPY rate
+    /// only if today's rate hasn't been fetched yet. A failed fetch leaves fxFetchedOn alone
+    /// and keeps the last known rate, so it simply retries next time the app is opened.
+    func fetchRateIfStale() async {
+        guard blob.settings["fxFetchedOn"]?.string != Self.localDayKey() else { return }
+        await fetchRate()
+    }
+
     /// Set data.<monthKey>.<field> = value and persist.
     func setMonth(_ mk: String, _ field: String, _ value: JSONValue) {
         var m = blob.data[mk] ?? .object([:])
@@ -350,11 +367,6 @@ final class BudgetStore: ObservableObject {
             return .object(oo)
         }
         m["dadItems"] = .array(arr); blob.data[mk] = m; persist()
-    }
-    func toggleDadFree(_ id: String) {
-        var fs = blob.settings["dadFreeSpend"]?.object ?? [:]
-        fs[id] = .bool(!(fs[id]?.bool ?? false))
-        blob.settings["dadFreeSpend"] = .object(fs); persist()
     }
     func toggleOneOffMum(_ mk: String, _ id: String) {
         let c = calc

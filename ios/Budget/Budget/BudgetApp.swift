@@ -41,6 +41,7 @@ struct BudgetApp: App {
                     UNUserNotificationCenter.current().delegate = NotifDelegate.shared
                     if lock.locked { lock.authenticate() }   // prompt on genuine launch
                     await store.refresh()
+                    await store.fetchRateIfStale()
                     Notifs.schedule(store)
                     MumReminder.sync(store)
                     poll()
@@ -56,7 +57,7 @@ struct BudgetApp: App {
                         lock.onForeground()
                         if lock.locked { lock.authenticate() }
                         #endif
-                        Task { await store.refresh(); Notifs.schedule(store); MumReminder.sync(store) }
+                        Task { await store.refresh(); await store.fetchRateIfStale(); Notifs.schedule(store); MumReminder.sync(store) }
                     case .background:
                         lock.lockOnBackground()
                     default: break
