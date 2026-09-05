@@ -282,6 +282,7 @@
       const [ld,setLd]=useState(!!CACHED);
       const [eF,setEF]=useState(null);
       const [oosEdit,setOosEdit]=useState(null); // one-off shift being edited: {ds,start,end,breakMin} or null
+      const [oosPick,setOosPick]=useState(false); // "+ One-off" armed: the next calendar day clicked opens the shift-time editor for that date instead of cycling its work/hol/pl/off state
       const [nE,setNE]=useState({name:"",amount:""});
       const [nD,setND]=useState({note:"",gbp:""});
       const [eD,setED]=useState(null);
@@ -521,24 +522,17 @@
       // weekday it is about to remove from the base schedule — past months must keep that
       // shift's hours even though the day is gone from Settings.
       const gShifts=mk=>{const ov=(da[mk]||{}).shiftOverrides||{};const base=se.shifts||{};const r={};new Set([...Object.keys(base),...Object.keys(ov)]).forEach(d=>{const b=base[d],o=ov[d];if(b&&o)r[d]={...b,...o};else if(b)r[d]=b;else if(o&&o.start&&o.end)r[d]=o;});return r;};
-      // Earliest date the "one-off shift on any date" button (Work Schedule header) may open,
-      // for the currently-viewed month bm. Never before today (this only affects estimated/future
-      // pay, never a manually-logged current-month total — see oneOffShifts design). If bm is a
-      // future month the whole month is fair game, so the min is just the 1st of that month.
-      const oneOffMinDate=()=>{const now3=new Date();const todayDs=`${now3.getFullYear()}-${String(now3.getMonth()+1).padStart(2,"0")}-${String(now3.getDate()).padStart(2,"0")}`;const monthStart=`${bm}-01`;return monthStart>todayDs?monthStart:todayDs;};
-      // True only when bm has at least one selectable (today-or-later) date — i.e. bm is the
-      // current month or a future one. A wholly past bm has no valid date to open, so the
-      // one-off button is hidden rather than opening a picker whose min/max don't overlap.
+      // True only when the viewed month bm is the current month or a future one. A wholly
+      // past month can't be edited (this only ever affects estimated/future pay), so the
+      // "+ One-off" button is hidden there. Within an editable month ANY day may be picked.
       const oneOffAvailable=()=>{const now4=new Date();const curMk=`${now4.getFullYear()}-${String(now4.getMonth()+1).padStart(2,"0")}`;return bm>=curMk;};
-      // Opens the one-off-shift editor (the same box renderCal's toggleDay uses) for an
-      // arbitrary date in bm, pre-filled from whatever shift already resolves for that date
-      // (an existing oneOffShifts entry first, else the weekday's schedule/override) so the
-      // user edits from a real baseline instead of blank fields. Unlike toggleDay's own
-      // opener, this works even when the weekday already has a resolvable shift — that's
-      // the whole point of the button (override a single instance of an already-scheduled day).
+      // "Sunday 6 September" — names the date being edited in the one-off box.
+      const dsLabel=ds=>{const[y6,m6,d6]=ds.split("-").map(Number);return`${DOW_FULL[new Date(y6,m6-1,d6).getDay()]} ${d6} ${MONTHS[m6-1].label}`;};
+      // Opens the shift-time editor for an exact date, pre-filled from whatever shift already
+      // resolves for it (an existing one-off first, else that weekday's schedule/override) so
+      // the user edits real times rather than blank fields. Works for ANY day — a day already
+      // covered by the weekly schedule (edit just this Sunday) or one that isn't (add a one-off).
       const openOneOffFor=ds=>{const oos=da[bm]?.oneOffShifts||{};const[y,mo,dd]=ds.split("-").map(Number);const dow=new Date(y,mo-1,dd).getDay();const bmShifts=gShifts(bm);const base=oos[ds]||bmShifts[dow]||{start:"",end:"",breakMin:dfBrk()};setOosEdit({ds,start:base.start||"",end:base.end||"",breakMin:base.breakMin??dfBrk()});};
-      // Last valid calendar date in bm, for bounding the one-off date picker's max.
-      const oneOffMaxDate=()=>{const[y5,mo5]=bm.split("-").map(Number);const lastDay=new Date(y5,mo5,0).getDate();return`${bm}-${String(lastDay).padStart(2,"0")}`;};
       // Paid leave is paid in the NEXT month's payslip — so it shows regardless of whether
       // this month's hours are logged yet. Override months already include it, so skip them.
       const gPLW=mk=>{const d=da[mk]||eM();if(d.wageOverride>0)return 0;const pmk=gPrevMK(mk);if(!pmk)return 0;return Math.round(gPLHours(pmk,da[pmk]?.customDays,gShifts(pmk),se.workDays)*se.hourlyWage);};
@@ -852,6 +846,10 @@
           setDa(p=>({...p,[bm]:{...p[bm],customDays:newCD,days:wd}}));
         };
         const toggleDay=(ds,dt)=>{
+          // Armed by the "+ One-off" header button: the next day clicked — scheduled or not,
+          // work/holiday/off, doesn't matter — opens the shift-time editor for THAT date
+          // rather than cycling its state. Disarms after one pick.
+          if(oosPick){setOosPick(false);openOneOffFor(ds);return;}
           const isSched=se.workDays.includes(dt.getDay());
           const isPL=PAID_LEAVE.includes(ds);
           const state=getDayState(ds,dt,cd,se.workDays);
@@ -906,12 +904,8 @@
           <div style={{marginTop:10}}>
             {oosEdit&&(
               <div style={{marginBottom:12,padding:12,borderRadius:12,background:c.blueD,color:c.white}}>
-                <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>Choose the date, hours and break for this one-off shift</div>
-                <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}>
-                  <span style={{fontSize:12,opacity:0.9,flexShrink:0}}>Date</span>
-                  <input type="date" value={oosEdit.ds} min={oneOffMinDate()} max={oneOffMaxDate()} onChange={e=>{if(!e.target.value)return;openOneOffFor(e.target.value);}} style={{...inp,flex:1,padding:"6px 10px"}}/>
-                </div>
-                <div style={{fontSize:11,opacity:0.85,marginBottom:8}}>This changes only {oosEdit.ds} — every other {DOW_FULL[(()=>{const[y4,m4,d4]=oosEdit.ds.split("-").map(Number);return new Date(y4,m4-1,d4).getDay();})()]} keeps the regular schedule.</div>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>{dsLabel(oosEdit.ds)}</div>
+                <div style={{fontSize:11,opacity:0.85,marginBottom:8}}>Set the start, end and break for this date only — every other {DOW_FULL[(()=>{const[y4,m4,d4]=oosEdit.ds.split("-").map(Number);return new Date(y4,m4-1,d4).getDay();})()]} keeps the regular schedule.</div>
                 <div style={{display:"flex",gap:8,marginBottom:8}}>
                   <input type="time" value={oosEdit.start} onChange={e=>setOosEdit(p=>({...p,start:e.target.value}))} style={{...inp,flex:1,padding:"6px 10px"}}/>
                   <span style={{alignSelf:"center"}}>→</span>
@@ -924,11 +918,11 @@
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={saveOneOff} disabled={!oosEdit.start||!oosEdit.end} style={{border:"none",background:c.white,color:c.blueD,borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:700,opacity:(!oosEdit.start||!oosEdit.end)?0.5:1}}>Save</button>
                   <button onClick={()=>setOosEdit(null)} style={{border:"none",background:"transparent",color:c.white,borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:600}}>Cancel</button>
-                  {oos[oosEdit.ds]&&<button onClick={removeOneOff} style={{border:"none",background:"transparent",color:c.white,borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:600,opacity:0.85,marginLeft:"auto"}}>Remove shift</button>}
+                  {oos[oosEdit.ds]&&<button onClick={removeOneOff} style={{border:"none",background:"transparent",color:c.white,borderRadius:10,padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:600,opacity:0.85,marginLeft:"auto"}}>{bmShiftsForDow[(()=>{const[y7,m7,d7]=oosEdit.ds.split("-").map(Number);return new Date(y7,m7-1,d7).getDay();})()]?"Reset to regular":"Remove shift"}</button>}
                 </div>
               </div>
             )}
-            <div style={{fontSize:10,color:c.muted,marginBottom:6,textAlign:"right"}}>Tap a day to change it</div>
+            <div style={{fontSize:10,color:oosPick?c.greenD:c.muted,fontWeight:oosPick?700:400,marginBottom:6,textAlign:"right"}}>{oosPick?"Tap any day to edit its shift times":"Tap a day to change it"}</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,textAlign:"center",fontSize:11}}>
               {DCL.map(d2=><div key={d2} style={{color:c.sub,fontWeight:600,padding:4}}>{d2}</div>)}
               {cells.map((d2,i)=>{
@@ -1247,7 +1241,7 @@
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                     <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:3,height:18,borderRadius:2,background:c.blueD,flexShrink:0}}/><span style={{fontSize:15,fontWeight:700}}>Work Schedule</span></div>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      {oneOffAvailable()&&<button onClick={()=>openOneOffFor(oneOffMinDate())} title="Change one specific date's shift time, without changing the recurring schedule" style={{border:"none",background:c.blueD,color:c.white,borderRadius:8,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:ft}}>+ One-off</button>}
+                      {oneOffAvailable()&&<button onClick={()=>{setOosEdit(null);setOosPick(v=>!v);}} title="Pick any day to edit that date's start, end and break — without changing the recurring schedule" style={{border:"none",background:oosPick?c.greenD:c.blueD,color:c.white,borderRadius:8,padding:"5px 10px",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:ft}}>{oosPick?"Pick a day…":"+ One-off"}</button>}
                       <span style={{fontSize:12,fontWeight:600,color:c.blueD,background:c.blueBg,padding:"4px 10px",borderRadius:8}}>{DOW_ORDER.filter(d=>(se.shifts||{})[d]).map(d=>DN[d]).join(", ")||"No shifts set"}</span>
                     </div>
                   </div>
