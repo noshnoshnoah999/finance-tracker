@@ -129,9 +129,25 @@ struct BudgetTabView: View {
         let todayYMD = (tc.year ?? 0, tc.month ?? 0, tc.day ?? 0)
 
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("Work Schedule", color: T.blueD)
+            HStack {
+                sectionHeader("Work Schedule", color: T.blueD)
+                Spacer()
+                // Lets you override a SINGLE INSTANCE of an already-scheduled weekday
+                // (e.g. one Sunday's hours) without touching the recurring schedule or
+                // any other occurrence of that weekday. Unlike tapping a calendar day
+                // (which only opens this box for days with NO resolvable weekday shift),
+                // this button works for any day, scheduled or not. Hidden when bm is
+                // entirely in the past — this only ever affects estimated/future pay.
+                if oneOffAvailable(c) {
+                    Button("+ One-off") { openOneOffFor(c, oneOffMinDate(c)) }
+                        .font(.caption).fontWeight(.semibold)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(T.blueD).foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+            }
             if let ds = oosEditDS {
-                oneOffShiftBox(ds)
+                oneOffShiftBox(ds, c)
             }
             Text("Tap a day to change it").font(.caption2).foregroundStyle(T.muted)
             LazyVGrid(columns: cols, spacing: 4) {
@@ -189,6 +205,45 @@ struct BudgetTabView: View {
         }.buttonStyle(.plain)
     }
 
+    /// True only when bm has at least one selectable (today-or-later) date -- i.e. bm is
+    /// the current month or a future one. Mirrors oneOffAvailable in app.html.
+    private func oneOffAvailable(_ c: Calc) -> Bool {
+        let tc = Calendar.current.dateComponents([.year, .month], from: Date())
+        let curMk = String(format: "%04d-%02d", tc.year ?? 0, tc.month ?? 0)
+        return bm >= curMk
+    }
+    /// Earliest date the "+ One-off" button may open, for the currently-viewed month bm.
+    /// Never before today (this only affects estimated/future pay, never a manually-logged
+    /// current-month total). If bm is a future month the whole month is fair game.
+    /// Mirrors oneOffMinDate in app.html.
+    private func oneOffMinDate(_ c: Calc) -> String {
+        let tc = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        let todayDs = String(format: "%04d-%02d-%02d", tc.year ?? 0, tc.month ?? 0, tc.day ?? 0)
+        let monthStart = "\(bm)-01"
+        return monthStart > todayDs ? monthStart : todayDs
+    }
+    /// Last valid calendar date in bm, for bounding the one-off date picker's max.
+    /// Mirrors oneOffMaxDate in app.html.
+    private func oneOffMaxDate(_ c: Calc) -> String {
+        "\(bm)-" + String(format: "%02d", c.daysIn(bm))
+    }
+    /// Opens the one-off-shift editor for an arbitrary date in bm, pre-filled from
+    /// whatever shift already resolves for that date (an existing one-off entry first,
+    /// else the weekday's schedule/override) so the user edits from a real baseline
+    /// instead of blank fields. Mirrors openOneOffFor in app.html.
+    private func openOneOffFor(_ c: Calc, _ ds: String) {
+        let comps = ds.split(separator: "-").compactMap { Int($0) }
+        guard comps.count == 3 else { return }
+        let dow = c.weekday(comps[0], comps[1], comps[2])
+        let existing = store.oneOffShift(bm, ds)
+        let scheduled = c.shifts(bm)[String(dow)]
+        let base = existing ?? scheduled
+        oosEditDS = ds
+        oosStart = base?.s("start") ?? ""
+        oosEnd = base?.s("end") ?? ""
+        oosBreak = base?.d("breakMin") ?? c.defaultBreak
+    }
+
     /// Tap handler for a calendar day: opens the one-off-shift box instead of the normal
     /// state cycle when (a) the date has no resolvable shift and no saved one-off yet, or
     /// (b) the date is "work" only because of a saved one-off entry (re-tap to edit it).
@@ -209,10 +264,42 @@ struct BudgetTabView: View {
         store.toggleDay(bm, ds, y, mo, d)
     }
 
-    @ViewBuilder private func oneOffShiftBox(_ ds: String) -> some View {
+    private static let dowFull = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    /// Converts a plain "YYYY-MM-DD" string (as used everywhere else in this file, with no
+    /// timezone concept) to/from a Date, using the user's OWN calendar/timezone at noon local
+    /// time (not midnight, and not UTC) so the DatePicker -- which renders in the device's
+    /// local calendar -- always shows the intended calendar day regardless of timezone offset.
+    /// Noon avoids any chance of a DST-transition day rolling to the adjacent date.
+    private static func dsToDate(_ ds: String) -> Date? {
+        let comps = ds.split(separator: "-").compactMap { Int($0) }
+        guard comps.count == 3 else { return nil }
+        var dc = DateComponents()
+        dc.year = comps[0]; dc.month = comps[1]; dc.day = comps[2]; dc.hour = 12
+        return Calendar.current.date(from: dc)
+    }
+    private static func dateToDs(_ date: Date) -> String {
+        let dc = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", dc.year ?? 0, dc.month ?? 0, dc.day ?? 0)
+    }
+
+    @ViewBuilder private func oneOffShiftBox(_ ds: String, _ c: Calc) -> some View {
+        let comps = ds.split(separator: "-").compactMap { Int($0) }
+        let dowLabel = comps.count == 3 ? Self.dowFull[c.weekday(comps[0], comps[1], comps[2])] : ""
+        let dsBinding = Binding<Date>(
+            get: { Self.dsToDate(ds) ?? Date() },
+            set: { openOneOffFor(c, Self.dateToDs($0)) }
+        )
+        let minDate = Self.dsToDate(oneOffMinDate(c)) ?? Date()
+        let maxDate = Self.dsToDate(oneOffMaxDate(c)) ?? Date()
         VStack(alignment: .leading, spacing: 8) {
-            Text("Choose the hours and break duration for the shift on \(ds)")
+            Text("Choose the date, hours and break for this one-off shift")
                 .font(.footnote).fontWeight(.bold).foregroundStyle(.white)
+            DatePicker("Date", selection: dsBinding, in: minDate...maxDate, displayedComponents: .date)
+                .datePickerStyle(.compact)
+                .colorScheme(.dark)
+                .labelsHidden()
+            Text("This changes only \(ds) — every other \(dowLabel) keeps the regular schedule.")
+                .font(.caption2).foregroundStyle(.white.opacity(0.85))
             HStack(spacing: 8) {
                 TextField("09:00", text: $oosStart).modifier(FieldStyle())
                 Text("to").foregroundStyle(.white.opacity(0.85))
